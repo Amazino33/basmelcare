@@ -22,6 +22,11 @@ class Index extends Component
     public ?int $customer_id = null;
     public string $note = '';
 
+    public function updatedCustomerId()
+    {
+        $this->recalculatePrices();
+    }
+
     public function addToCart($productId)
     {
         $product = Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)->orderBy('expiry_date')])->findOrFail($productId);
@@ -33,6 +38,7 @@ class Index extends Component
             return;
         }
 
+        $customer = $this->customer_id ? Customer::find($this->customer_id) : null;
         $key = $productId . '-' . $batch->id;
 
         if (isset($this->cart[$key])) {
@@ -41,17 +47,23 @@ class Index extends Component
                 return;
             }
             $this->cart[$key]['qty']++;
-            $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $this->cart[$key]['unit_price'];
+            $price = $product->getPriceFor($customer, $this->cart[$key]['qty']);
+            $this->cart[$key]['unit_price'] = $price;
+            $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $price;
         } else {
+            $price = $product->getPriceFor($customer, 1);
             $this->cart[$key] = [
                 'product_id' => $product->id,
                 'batch_id' => $batch->id,
                 'name' => $product->name,
                 'batch_number' => $batch->batch_number,
-                'unit_price' => (float) $product->selling_price,
+                'unit_price' => $price,
+                'retail_price' => (float) $product->selling_price,
+                'wholesale_price' => $product->wholesale_price ? (float) $product->wholesale_price : null,
+                'wholesale_min_qty' => $product->wholesale_min_qty,
                 'cost_price' => (float) $batch->cost_price,
                 'qty' => 1,
-                'subtotal' => (float) $product->selling_price,
+                'subtotal' => $price,
                 'max_qty' => $batch->quantity,
             ];
         }
@@ -73,7 +85,7 @@ class Index extends Component
         }
 
         $this->cart[$key]['qty'] = $qty;
-        $this->cart[$key]['subtotal'] = $qty * $this->cart[$key]['unit_price'];
+        $this->resolvePrice($key);
     }
 
     public function removeFromCart($key)
@@ -84,6 +96,31 @@ class Index extends Component
     public function getCartTotalProperty()
     {
         return array_sum(array_column($this->cart, 'subtotal'));
+    }
+
+    private function recalculatePrices()
+    {
+        foreach (array_keys($this->cart) as $key) {
+            $this->resolvePrice($key);
+        }
+    }
+
+    private function resolvePrice(string $key)
+    {
+        $item = &$this->cart[$key];
+        $customer = $this->customer_id ? Customer::find($this->customer_id) : null;
+        $isWholesale = $customer && $customer->type === 'wholesale';
+
+        if ($isWholesale && $item['wholesale_price']) {
+            $price = $item['wholesale_price'];
+        } elseif ($item['wholesale_price'] && $item['wholesale_min_qty'] && $item['qty'] >= $item['wholesale_min_qty']) {
+            $price = $item['wholesale_price'];
+        } else {
+            $price = $item['retail_price'];
+        }
+
+        $item['unit_price'] = $price;
+        $item['subtotal'] = $item['qty'] * $price;
     }
 
     public function checkout()
@@ -139,11 +176,13 @@ class Index extends Component
             ->get();
 
         $customers = Customer::orderBy('name')->get();
+        $selectedCustomer = $this->customer_id ? Customer::find($this->customer_id) : null;
 
         return view('livewire.pos.index', [
             'products' => $products,
             'customers' => $customers,
             'cartTotal' => $this->cartTotal,
+            'isWholesale' => $selectedCustomer && $selectedCustomer->type === 'wholesale',
         ]);
     }
 }

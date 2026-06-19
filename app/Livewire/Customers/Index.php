@@ -13,6 +13,7 @@ class Index extends Component
 
     public string $search = '';
     public string $name = '';
+    public string $type = 'retail';
     public string $phone = '';
     public string $email = '';
     public string $address = '';
@@ -22,7 +23,7 @@ class Index extends Component
 
     public function create()
     {
-        $this->reset(['name', 'phone', 'email', 'address', 'notes', 'customerId']);
+        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
         $this->modal = true;
     }
 
@@ -30,6 +31,7 @@ class Index extends Component
     {
         $this->validate([
             'name' => 'required|string|max:255',
+            'type' => 'required|in:retail,wholesale',
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string',
@@ -40,6 +42,7 @@ class Index extends Component
             ['id' => $this->customerId],
             [
                 'name' => $this->name,
+                'type' => $this->type,
                 'phone' => $this->phone,
                 'email' => $this->email,
                 'address' => $this->address,
@@ -49,7 +52,7 @@ class Index extends Component
 
         $this->modal = false;
         $this->success($this->customerId ? 'Customer updated.' : 'Customer created.');
-        $this->reset(['name', 'phone', 'email', 'address', 'notes', 'customerId']);
+        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
     }
 
     public function edit($id)
@@ -57,6 +60,7 @@ class Index extends Component
         $customer = Customer::findOrFail($id);
         $this->customerId = $customer->id;
         $this->name = $customer->name;
+        $this->type = $customer->type;
         $this->phone = $customer->phone ?? '';
         $this->email = $customer->email ?? '';
         $this->address = $customer->address ?? '';
@@ -75,6 +79,7 @@ class Index extends Component
         $headers = [
             ['key' => 'id', 'label' => '#'],
             ['key' => 'name', 'label' => 'Name'],
+            ['key' => 'type', 'label' => 'Type'],
             ['key' => 'phone', 'label' => 'Phone'],
             ['key' => 'email', 'label' => 'Email'],
         ];

@@ -9,6 +9,13 @@
     </x-header>
 
     <x-table :headers="$headers" :rows="$customers" with-pagination>
+        @scope('cell_type', $customer)
+            <x-badge :value="ucfirst($customer->type)" @class([
+                'badge-ghost' => $customer->type === 'retail',
+                'badge-info' => $customer->type === 'wholesale',
+            ]) />
+        @endscope
+
         @scope('actions', $customer)
             <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-sm btn-ghost" />
             <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this customer?" />
@@ -18,6 +25,10 @@
     <x-modal wire:model="modal" title="{{ $customerId ? 'Edit Customer' : 'New Customer' }}">
         <x-form wire:submit="save">
             <x-input label="Name" wire:model="name" />
+            <x-select label="Customer Type" wire:model="type" :options="[
+                ['id' => 'retail', 'name' => 'Retail'],
+                ['id' => 'wholesale', 'name' => 'Wholesale'],
+            ]" option-value="id" option-label="name" />
             <x-input label="Phone" wire:model="phone" />
             <x-input label="Email" wire:model="email" type="email" />
             <x-textarea label="Address" wire:model="address" rows="2" />

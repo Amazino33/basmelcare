@@ -10,7 +10,10 @@
 
     <x-table :headers="$headers" :rows="$products" with-pagination>
         @scope('cell_selling_price', $product)
-            {{ number_format($product->selling_price, 2) }}
+            ₦{{ number_format($product->selling_price, 2) }}
+            @if($product->wholesale_price)
+                <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
+            @endif
         @endscope
 
         @scope('cell_stock', $product)
@@ -38,7 +41,9 @@
             <x-input label="Product Name" wire:model="name" />
             <x-input label="SKU" wire:model="sku" placeholder="Optional" />
             <x-select label="Category" wire:model="category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" />
-            <x-input label="Selling Price" wire:model="selling_price" prefix="₦" type="number" step="0.01" />
+            <x-input label="Selling Price (Retail)" wire:model="selling_price" prefix="₦" type="number" step="0.01" />
+            <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
+            <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
             <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
             <x-textarea label="Description" wire:model="description" placeholder="Optional" />
             <x-slot:actions>

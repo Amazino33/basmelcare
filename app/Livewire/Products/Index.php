@@ -21,6 +21,8 @@ class Index extends Component
     public ?string $sku = null;
     public ?int $category_id = null;
     public string $selling_price = '';
+    public ?string $wholesale_price = null;
+    public ?int $wholesale_min_qty = null;
     public int $reorder_level = 0;
     public string $description = '';
     public ?int $productId = null;
@@ -41,7 +43,7 @@ class Index extends Component
 
     public function createProduct()
     {
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'reorder_level', 'description', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'productId']);
         $this->productModal = true;
     }
 
@@ -52,6 +54,8 @@ class Index extends Component
             'sku' => 'nullable|string|max:100|unique:products,sku,' . $this->productId,
             'category_id' => 'required|exists:categories,id',
             'selling_price' => 'required|numeric|min:0',
+            'wholesale_price' => 'nullable|numeric|min:0',
+            'wholesale_min_qty' => 'nullable|integer|min:1',
             'reorder_level' => 'required|integer|min:0',
             'description' => 'nullable|string',
         ]);
@@ -63,6 +67,8 @@ class Index extends Component
                 'sku' => $this->sku,
                 'category_id' => $this->category_id,
                 'selling_price' => $this->selling_price,
+                'wholesale_price' => $this->wholesale_price ?: null,
+                'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
                 'reorder_level' => $this->reorder_level,
                 'description' => $this->description,
             ]
@@ -70,7 +76,7 @@ class Index extends Component
 
         $this->productModal = false;
         $this->success($this->productId ? 'Product updated.' : 'Product created.');
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'reorder_level', 'description', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'productId']);
     }
 
     public function editProduct($id)
@@ -81,6 +87,8 @@ class Index extends Component
         $this->sku = $product->sku;
         $this->category_id = $product->category_id;
         $this->selling_price = $product->selling_price;
+        $this->wholesale_price = $product->wholesale_price;
+        $this->wholesale_min_qty = $product->wholesale_min_qty;
         $this->reorder_level = $product->reorder_level;
         $this->description = $product->description ?? '';
         $this->productModal = true;

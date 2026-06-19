@@ -1,5 +1,11 @@
 <div>
-    <x-header title="Point of Sale" subtitle="Create a new sale" />
+    <x-header title="Point of Sale" subtitle="Create a new sale">
+        @if($isWholesale)
+            <x-slot:actions>
+                <x-badge value="WHOLESALE CUSTOMER" class="badge-info badge-lg" />
+            </x-slot:actions>
+        @endif
+    </x-header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Product Selection -->
@@ -22,8 +28,20 @@
                             @disabled($stock == 0)
                         >
                             <div class="font-semibold text-sm truncate">{{ $product->name }}</div>
-                            <div class="text-primary font-bold">₦{{ number_format($product->selling_price, 2) }}</div>
-                            <div class="text-xs text-base-content/60">Stock: {{ $stock }}</div>
+                            <div class="text-primary font-bold">
+                                @if($isWholesale && $product->wholesale_price)
+                                    ₦{{ number_format($product->wholesale_price, 2) }}
+                                    <span class="text-xs line-through text-base-content/40">₦{{ number_format($product->selling_price, 2) }}</span>
+                                @else
+                                    ₦{{ number_format($product->selling_price, 2) }}
+                                @endif
+                            </div>
+                            <div class="text-xs text-base-content/60">
+                                Stock: {{ $stock }}
+                                @if($product->wholesale_price && $product->wholesale_min_qty && !$isWholesale)
+                                    | W/S: {{ $product->wholesale_min_qty }}+
+                                @endif
+                            </div>
                         </button>
                     @empty
                         <div class="col-span-full text-center py-8 text-base-content/60">No products found.</div>
@@ -41,7 +59,12 @@
                             <div class="flex items-center gap-2 p-2 rounded bg-base-200">
                                 <div class="flex-1 min-w-0">
                                     <div class="font-semibold text-sm truncate">{{ $item['name'] }}</div>
-                                    <div class="text-xs text-base-content/60">₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}</div>
+                                    <div class="text-xs text-base-content/60">
+                                        ₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}
+                                        @if($item['unit_price'] < $item['retail_price'])
+                                            <span class="text-info">(wholesale)</span>
+                                        @endif
+                                    </div>
                                 </div>
                                 <input type="number" wire:change="updateQty('{{ $key }}', $event.target.value)" value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}" class="input input-xs input-bordered w-16 text-center" />
                                 <x-button icon="o-x-mark" wire:click="removeFromCart('{{ $key }}')" class="btn-xs btn-ghost text-error" />
@@ -55,7 +78,7 @@
                         ₦{{ number_format($cartTotal, 2) }}
                     </div>
 
-                    <x-select label="Customer" wire:model="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Walk-in customer" />
+                    <x-select label="Customer" wire:model.live="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Walk-in customer" />
                     <x-select label="Payment Method" wire:model="payment_method" :options="[
                         ['id' => 'cash', 'name' => 'Cash'],
                         ['id' => 'card', 'name' => 'Card'],
