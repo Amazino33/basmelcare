@@ -63,8 +63,12 @@
                     @endif
                 </x-menu-sub>
 
-                @if($role === 'admin')
+                @if(in_array($role, ['admin', 'pharmacist']))
                     <x-menu-separator />
+                    <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
+                @endif
+
+                @if($role === 'admin')
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
                 @endif
             </x-menu>

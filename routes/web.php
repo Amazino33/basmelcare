@@ -37,6 +37,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchase-orders', App\Livewire\PurchaseOrders\Index::class)->name('purchase-orders.index');
     });
 
+    // Admin & Pharmacist
+    Route::middleware('role:admin,pharmacist')->group(function () {
+        Route::get('/reports', App\Livewire\Reports\Index::class)->name('reports.index');
+    });
+
     // Admin only
     Route::middleware('role:admin')->group(function () {
         Route::get('/staff', App\Livewire\Staff\Index::class)->name('staff.index');
