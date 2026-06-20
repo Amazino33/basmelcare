@@ -11,6 +11,8 @@
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
 
+    @php $role = auth()->user()->role; @endphp
+
     <x-main full-width>
         <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-100 lg:bg-inherit">
             <x-menu activate-by-route>
@@ -19,40 +21,52 @@
                 <x-menu-separator />
                 <x-menu-item title="Dashboard" icon="o-chart-bar-square" link="{{ route('dashboard') }}" />
 
-                <x-menu-separator />
-                <x-menu-sub title="Catalog" icon="o-cube">
-                    <x-menu-item title="Categories" icon="o-tag" link="{{ route('categories.index') }}" />
-                    <x-menu-item title="Products" icon="o-cube" link="{{ route('products.index') }}" />
-                </x-menu-sub>
+                @if(in_array($role, ['admin', 'pharmacist', 'inventory_manager']))
+                    <x-menu-separator />
+                    <x-menu-sub title="Catalog" icon="o-cube">
+                        <x-menu-item title="Categories" icon="o-tag" link="{{ route('categories.index') }}" />
+                        <x-menu-item title="Products" icon="o-cube" link="{{ route('products.index') }}" />
+                    </x-menu-sub>
+                @endif
 
-                <x-menu-sub title="Sales" icon="o-shopping-cart">
-                    <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
-                    <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
-                    <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
-                </x-menu-sub>
+                @if(in_array($role, ['admin', 'pharmacist', 'cashier']))
+                    <x-menu-sub title="Sales" icon="o-shopping-cart">
+                        <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
+                        <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
+                        <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
+                    </x-menu-sub>
+                @endif
 
-                <x-menu-sub title="Inventory" icon="o-archive-box">
-                    <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
-                    <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
-                    <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
-                    <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
-                    <x-menu-item title="Expiry Alerts" icon="o-exclamation-triangle" link="{{ route('expiry-alerts.index') }}" />
-                    <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
-                </x-menu-sub>
+                @if(in_array($role, ['admin', 'pharmacist', 'inventory_manager']))
+                    <x-menu-sub title="Inventory" icon="o-archive-box">
+                        <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
+                        <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
+                        <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
+                        <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
+                        <x-menu-item title="Expiry Alerts" icon="o-exclamation-triangle" link="{{ route('expiry-alerts.index') }}" />
+                        <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
+                    </x-menu-sub>
 
-                <x-menu-sub title="Procurement" icon="o-truck">
-                    <x-menu-item title="Purchase Orders" icon="o-clipboard-document" link="{{ route('purchase-orders.index') }}" />
-                    <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
-                </x-menu-sub>
+                    <x-menu-sub title="Procurement" icon="o-truck">
+                        <x-menu-item title="Purchase Orders" icon="o-clipboard-document" link="{{ route('purchase-orders.index') }}" />
+                        <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
+                    </x-menu-sub>
+                @endif
 
                 <x-menu-sub title="People" icon="o-users">
-                    <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
-                    <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
-                    <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
+                    @if($role === 'admin')
+                        <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
+                    @endif
+                    @if(in_array($role, ['admin', 'pharmacist', 'cashier']))
+                        <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
+                        <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
+                    @endif
                 </x-menu-sub>
 
-                <x-menu-separator />
-                <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
+                @if($role === 'admin')
+                    <x-menu-separator />
+                    <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
+                @endif
             </x-menu>
 
             <x-slot:actions>
