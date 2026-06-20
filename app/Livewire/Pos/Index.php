@@ -24,6 +24,11 @@ class Index extends Component
     public string $note = '';
     public ?int $lastSaleId = null;
 
+    // Split payment
+    public string $split_cash = '';
+    public string $split_transfer = '';
+    public string $split_card = '';
+
     public function updatedCustomerId()
     {
         $this->recalculatePrices();
@@ -137,12 +142,32 @@ class Index extends Component
             return;
         }
 
-        $saleId = DB::transaction(function () {
+        $paymentDetails = null;
+
+        if ($this->payment_method === 'split') {
+            $cash = (float) ($this->split_cash ?: 0);
+            $transfer = (float) ($this->split_transfer ?: 0);
+            $card = (float) ($this->split_card ?: 0);
+            $splitTotal = $cash + $transfer + $card;
+
+            if (abs($splitTotal - $this->cartTotal) > 0.01) {
+                $this->error('Split amounts (₦' . number_format($splitTotal, 2) . ') must equal the total (₦' . number_format($this->cartTotal, 2) . ').');
+                return;
+            }
+
+            $paymentDetails = [];
+            if ($cash > 0) $paymentDetails['cash'] = $cash;
+            if ($transfer > 0) $paymentDetails['transfer'] = $transfer;
+            if ($card > 0) $paymentDetails['card'] = $card;
+        }
+
+        $saleId = DB::transaction(function () use ($paymentDetails) {
             $sale = Sale::create([
                 'user_id' => auth()->id(),
                 'customer_id' => $this->customer_id,
                 'total_amount' => $this->cartTotal,
                 'payment_method' => $this->payment_method,
+                'payment_details' => $paymentDetails,
                 'status' => 'completed',
                 'note' => $this->note,
             ]);
@@ -186,7 +211,7 @@ class Index extends Component
 
         $this->lastSaleId = $saleId;
         $this->cart = [];
-        $this->reset(['payment_method', 'customer_id', 'note']);
+        $this->reset(['payment_method', 'customer_id', 'note', 'split_cash', 'split_transfer', 'split_card']);
         $this->success($msg);
     }
 

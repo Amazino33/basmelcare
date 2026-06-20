@@ -72,6 +72,11 @@
         <div class="row"><span>Items:</span><span>{{ $sale->saleItems->sum('quantity') }}</span></div>
         <div class="row total"><span>TOTAL:</span><span>₦{{ number_format($sale->total_amount, 2) }}</span></div>
         <div class="row"><span>Payment:</span><span>{{ ucfirst($sale->payment_method) }}</span></div>
+        @if($sale->payment_method === 'split' && $sale->payment_details)
+            @foreach($sale->payment_details as $method => $amount)
+                <div class="row"><span>  {{ ucfirst($method) }}:</span><span>₦{{ number_format($amount, 2) }}</span></div>
+            @endforeach
+        @endif
 
         @if($sale->payment_method === 'credit')
             <div class="line"></div>

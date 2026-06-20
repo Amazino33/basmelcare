@@ -79,6 +79,11 @@
                 <div class="party-label">Payment Info</div>
                 <div class="party-detail">
                     Method: <strong>{{ ucfirst($sale->payment_method) }}</strong><br>
+                    @if($sale->payment_method === 'split' && $sale->payment_details)
+                        @foreach($sale->payment_details as $method => $amount)
+                            {{ ucfirst($method) }}: ₦{{ number_format($amount, 2) }}<br>
+                        @endforeach
+                    @endif
                     Status: <span class="badge {{ $sale->payment_method === 'credit' ? 'badge-credit' : 'badge-completed' }}">{{ $sale->payment_method === 'credit' ? 'Credit' : 'Paid' }}</span><br>
                     Cashier: {{ $sale->user->name }}
                 </div>

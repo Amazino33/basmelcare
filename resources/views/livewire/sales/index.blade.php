@@ -102,6 +102,13 @@
                 <div class="flex justify-between"><span class="text-base-content/60">Cashier:</span> <span>{{ $viewSale->user->name }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Customer:</span> <span>{{ $viewSale->customer?->name ?? 'Walk-in' }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Payment:</span> <span>{{ ucfirst($viewSale->payment_method) }}</span></div>
+                @if($viewSale->payment_method === 'split' && $viewSale->payment_details)
+                    <div class="bg-base-200 rounded p-2 mt-1">
+                        @foreach($viewSale->payment_details as $method => $amount)
+                            <div class="flex justify-between text-sm"><span class="text-base-content/60">{{ ucfirst($method) }}:</span> <span>₦{{ number_format($amount, 2) }}</span></div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             <x-hr />
