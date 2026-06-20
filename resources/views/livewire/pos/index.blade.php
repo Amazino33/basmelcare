@@ -78,7 +78,7 @@
                         ₦{{ number_format($cartTotal, 2) }}
                     </div>
 
-                    <x-select label="Customer" wire:model.live="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Walk-in customer" />
+                    <x-choices label="Customer" wire:model.live="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Search customer..." single searchable />
                     <x-select label="Payment Method" wire:model.live="payment_method" :options="[
                         ['id' => 'cash', 'name' => 'Cash'],
                         ['id' => 'card', 'name' => 'Card'],
