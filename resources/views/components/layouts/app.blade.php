@@ -48,6 +48,7 @@
                 <x-menu-sub title="People" icon="o-users">
                     <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
+                    <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
                 </x-menu-sub>
 
                 <x-menu-separator />
