@@ -90,6 +90,7 @@
 
         @scope('actions', $sale)
             <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-sm btn-ghost" />
+            <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-sm btn-ghost" tooltip="Invoice" external />
         @endscope
     </x-table>
 
@@ -136,6 +137,10 @@
             @if($viewSale->note)
                 <div class="mt-3 text-sm text-base-content/60">Note: {{ $viewSale->note }}</div>
             @endif
+
+            <div class="mt-4">
+                <x-button label="Print Invoice" link="{{ route('invoice.show', $viewSale->id) }}" class="btn-primary btn-block" icon="o-printer" external />
+            </div>
         @endif
     </x-drawer>
 </div>

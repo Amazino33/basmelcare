@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/purchase-orders', App\Livewire\PurchaseOrders\Index::class)->name('purchase-orders.index');
     Route::get('/staff', App\Livewire\Staff\Index::class)->name('staff.index');
     Route::get('/appointments', App\Livewire\Appointments\Index::class)->name('appointments.index');
+    Route::get('/invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
     Route::get('/settings', App\Livewire\Settings\Index::class)->name('settings.index');
 
     Route::view('profile', 'profile')->name('profile');
