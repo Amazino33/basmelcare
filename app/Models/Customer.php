@@ -26,6 +26,11 @@ class Customer extends Model
         return $this->hasMany(Debt::class);
     }
 
+    public function medicalRecords()
+    {
+        return $this->hasMany(MedicalRecord::class);
+    }
+
     public function getTotalDebtAttribute(): float
     {
         return $this->debts()->whereIn('status', ['unpaid', 'partial'])->sum('amount_owed')
