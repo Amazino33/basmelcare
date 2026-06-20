@@ -32,11 +32,11 @@
 
         @scope('actions', $member)
             <div class="flex gap-1">
-                <x-button icon="o-eye" wire:click="viewDetails({{ $member->id }})" class="btn-sm btn-ghost" tooltip="Details" />
-                <x-button icon="o-pencil" wire:click="edit({{ $member->id }})" class="btn-sm btn-ghost" />
+                <x-button icon="o-eye" wire:click="viewDetails({{ $member->id }})" class="btn-xs btn-ghost" tooltip="Details" />
+                <x-button icon="o-pencil" wire:click="edit({{ $member->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                 <x-button icon="{{ $member->status === 'active' ? 'o-no-symbol' : 'o-check-circle' }}"
                     wire:click="toggleStatus({{ $member->id }})"
-                    class="btn-sm btn-ghost {{ $member->status === 'active' ? 'text-warning' : 'text-success' }}"
+                    class="btn-xs btn-ghost {{ $member->status === 'active' ? 'text-warning' : 'text-success' }}"
                     wire:confirm="{{ $member->status === 'active' ? 'Deactivate this staff member?' : 'Reactivate this staff member?' }}"
                     tooltip="{{ $member->status === 'active' ? 'Deactivate' : 'Activate' }}" />
             </div>

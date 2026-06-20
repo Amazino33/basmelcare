@@ -9,8 +9,10 @@
     {{-- Table --}}
     <x-table :headers="$headers" :rows="$categories">
         @scope('actions', $category)
-            <x-button icon="o-pencil" wire:click="edit({{ $category->id }})" class="btn-sm" />
-            <x-button icon="o-trash" wire:click="delete({{ $category->id }})" class="btn-sm btn-error" wire:confirm="Delete this category?" />
+            <div class="flex gap-1">
+                <x-button icon="o-pencil" wire:click="edit({{ $category->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="delete({{ $category->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this category?" tooltip="Delete" />
+            </div>
         @endscope
     </x-table>
 

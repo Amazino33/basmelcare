@@ -17,9 +17,11 @@
         @endscope
 
         @scope('actions', $customer)
-            <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-sm btn-ghost" tooltip="Profile" />
-            <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-sm btn-ghost" />
-            <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this customer?" />
+            <div class="flex gap-1">
+                <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
+                <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
+            </div>
         @endscope
     </x-table>
 

@@ -52,14 +52,14 @@
         @scope('actions', $appt)
             <div class="flex gap-1">
                 @if($appt->status === 'scheduled')
-                    <x-button icon="o-check" wire:click="updateStatus({{ $appt->id }}, 'confirmed')" class="btn-sm btn-ghost text-primary" tooltip="Confirm" />
+                    <x-button icon="o-check" wire:click="updateStatus({{ $appt->id }}, 'confirmed')" class="btn-xs btn-ghost text-primary" tooltip="Confirm" />
                 @endif
                 @if(in_array($appt->status, ['scheduled', 'confirmed']))
-                    <x-button icon="o-check-circle" wire:click="updateStatus({{ $appt->id }}, 'completed')" class="btn-sm btn-ghost text-success" tooltip="Complete" />
-                    <x-button icon="o-x-circle" wire:click="updateStatus({{ $appt->id }}, 'no_show')" class="btn-sm btn-ghost text-warning" tooltip="No Show" />
+                    <x-button icon="o-check-circle" wire:click="updateStatus({{ $appt->id }}, 'completed')" class="btn-xs btn-ghost text-success" tooltip="Complete" />
+                    <x-button icon="o-x-circle" wire:click="updateStatus({{ $appt->id }}, 'no_show')" class="btn-xs btn-ghost text-warning" tooltip="No Show" />
                 @endif
-                <x-button icon="o-pencil" wire:click="edit({{ $appt->id }})" class="btn-sm btn-ghost" />
-                <x-button icon="o-trash" wire:click="delete({{ $appt->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this appointment?" />
+                <x-button icon="o-pencil" wire:click="edit({{ $appt->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="delete({{ $appt->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this appointment?" tooltip="Delete" />
             </div>
         @endscope
     </x-table>

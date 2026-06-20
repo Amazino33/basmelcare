@@ -37,10 +37,10 @@
 
         @scope('actions', $product)
             <div class="flex gap-1">
-                <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-sm btn-ghost" tooltip="View Batches" />
-                <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-sm btn-ghost text-success" tooltip="Add Batch" />
-                <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-sm btn-ghost" />
-                <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this product and all its batches?" />
+                <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
+                <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
+                <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
             </div>
         @endscope
     </x-table>

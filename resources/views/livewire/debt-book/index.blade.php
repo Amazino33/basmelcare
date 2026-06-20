@@ -80,9 +80,9 @@
 
         @scope('actions', $debt)
             <div class="flex gap-1">
-                <x-button icon="o-eye" wire:click="viewDetails({{ $debt->id }})" class="btn-sm btn-ghost" tooltip="Details" />
+                <x-button icon="o-eye" wire:click="viewDetails({{ $debt->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                 @if($debt->status !== 'paid')
-                    <x-button icon="o-banknotes" wire:click="openPayment({{ $debt->id }})" class="btn-sm btn-ghost text-success" tooltip="Record Payment" />
+                    <x-button icon="o-banknotes" wire:click="openPayment({{ $debt->id }})" class="btn-xs btn-ghost text-success" tooltip="Record Payment" />
                 @endif
             </div>
         @endscope

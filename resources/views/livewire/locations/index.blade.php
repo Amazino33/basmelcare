@@ -25,8 +25,10 @@
         @endscope
 
         @scope('actions', $location)
-            <x-button icon="o-pencil" wire:click="edit({{ $location->id }})" class="btn-sm btn-ghost" />
-            <x-button icon="o-trash" wire:click="delete({{ $location->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this location?" />
+            <div class="flex gap-1">
+                <x-button icon="o-pencil" wire:click="edit({{ $location->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="delete({{ $location->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this location?" tooltip="Delete" />
+            </div>
         @endscope
     </x-table>
 

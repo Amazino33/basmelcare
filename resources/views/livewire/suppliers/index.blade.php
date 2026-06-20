@@ -10,9 +10,11 @@
 
     <x-table :headers="$headers" :rows="$suppliers" with-pagination>
         @scope('actions', $supplier)
-            <x-button icon="o-eye" wire:click="viewProfile({{ $supplier->id }})" class="btn-sm btn-ghost" tooltip="Profile" />
-            <x-button icon="o-pencil" wire:click="edit({{ $supplier->id }})" class="btn-sm btn-ghost" />
-            <x-button icon="o-trash" wire:click="delete({{ $supplier->id }})" class="btn-sm btn-ghost text-error" wire:confirm="Delete this supplier?" />
+            <div class="flex gap-1">
+                <x-button icon="o-eye" wire:click="viewProfile({{ $supplier->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
+                <x-button icon="o-pencil" wire:click="edit({{ $supplier->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                <x-button icon="o-trash" wire:click="delete({{ $supplier->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this supplier?" tooltip="Delete" />
+            </div>
         @endscope
     </x-table>
 

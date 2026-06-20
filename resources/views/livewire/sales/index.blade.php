@@ -89,8 +89,10 @@
         @endscope
 
         @scope('actions', $sale)
-            <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-sm btn-ghost" />
-            <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-sm btn-ghost" tooltip="Invoice" external />
+            <div class="flex gap-1">
+                <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
+                <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-xs btn-ghost" tooltip="Invoice" external />
+            </div>
         @endscope
     </x-table>
 

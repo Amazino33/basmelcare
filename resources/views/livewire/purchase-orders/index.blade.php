@@ -37,15 +37,15 @@
 
         @scope('actions', $po)
             <div class="flex gap-1">
-                <x-button icon="o-eye" wire:click="viewDetails({{ $po->id }})" class="btn-sm btn-ghost" tooltip="Details" />
+                <x-button icon="o-eye" wire:click="viewDetails({{ $po->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                 @if($po->status === 'draft')
-                    <x-button icon="o-paper-airplane" wire:click="markSent({{ $po->id }})" class="btn-sm btn-ghost text-info" tooltip="Mark Sent" wire:confirm="Mark this PO as sent?" />
+                    <x-button icon="o-paper-airplane" wire:click="markSent({{ $po->id }})" class="btn-xs btn-ghost text-info" tooltip="Mark Sent" wire:confirm="Mark this PO as sent?" />
                 @endif
                 @if(in_array($po->status, ['sent', 'partially_received']))
-                    <x-button icon="o-arrow-down-tray" wire:click="openReceive({{ $po->id }})" class="btn-sm btn-ghost text-success" tooltip="Receive Stock" />
+                    <x-button icon="o-arrow-down-tray" wire:click="openReceive({{ $po->id }})" class="btn-xs btn-ghost text-success" tooltip="Receive Stock" />
                 @endif
                 @if($po->status !== 'received')
-                    <x-button icon="o-x-mark" wire:click="cancelPO({{ $po->id }})" class="btn-sm btn-ghost text-error" tooltip="Cancel" wire:confirm="Cancel this purchase order?" />
+                    <x-button icon="o-x-mark" wire:click="cancelPO({{ $po->id }})" class="btn-xs btn-ghost text-error" tooltip="Cancel" wire:confirm="Cancel this purchase order?" />
                 @endif
             </div>
         @endscope
