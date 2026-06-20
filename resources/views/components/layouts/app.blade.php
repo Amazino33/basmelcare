@@ -40,10 +40,14 @@
                     <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
                 </x-menu-sub>
 
+                <x-menu-sub title="Procurement" icon="o-truck">
+                    <x-menu-item title="Purchase Orders" icon="o-clipboard-document" link="{{ route('purchase-orders.index') }}" />
+                    <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
+                </x-menu-sub>
+
                 <x-menu-sub title="People" icon="o-users">
                     <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
-                    <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
                 </x-menu-sub>
 
                 <x-menu-separator />

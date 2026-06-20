@@ -19,6 +19,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stock/history', App\Livewire\Stock\History::class)->name('stock.history');
     Route::get('/customers', App\Livewire\Customers\Index::class)->name('customers.index');
     Route::get('/suppliers', App\Livewire\Suppliers\Index::class)->name('suppliers.index');
+    Route::get('/purchase-orders', App\Livewire\PurchaseOrders\Index::class)->name('purchase-orders.index');
     Route::get('/staff', App\Livewire\Staff\Index::class)->name('staff.index');
     Route::get('/settings', App\Livewire\Settings\Index::class)->name('settings.index');
 
