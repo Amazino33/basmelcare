@@ -7,12 +7,13 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockMovement;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
 
 class Index extends Component
 {
-    use Toast, WithPagination;
+    use Toast, WithPagination, WithFileUploads;
 
     public string $search = '';
 
@@ -25,6 +26,9 @@ class Index extends Component
     public ?int $wholesale_min_qty = null;
     public int $reorder_level = 0;
     public string $description = '';
+    public ?string $barcode = null;
+    public $photo = null;
+    public ?string $existingImage = null;
     public ?int $productId = null;
     public bool $productModal = false;
 
@@ -43,7 +47,7 @@ class Index extends Component
 
     public function createProduct()
     {
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
@@ -58,25 +62,34 @@ class Index extends Component
             'wholesale_min_qty' => 'nullable|integer|min:1',
             'reorder_level' => 'required|integer|min:0',
             'description' => 'nullable|string',
+            'barcode' => 'nullable|string|max:100',
+            'photo' => 'nullable|image|max:2048',
         ]);
+
+        $data = [
+            'name' => $this->name,
+            'sku' => $this->sku,
+            'category_id' => $this->category_id,
+            'selling_price' => $this->selling_price,
+            'wholesale_price' => $this->wholesale_price ?: null,
+            'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
+            'reorder_level' => $this->reorder_level,
+            'description' => $this->description,
+            'barcode' => $this->barcode,
+        ];
+
+        if ($this->photo) {
+            $data['image'] = $this->photo->store('products', 'public');
+        }
 
         Product::updateOrCreate(
             ['id' => $this->productId],
-            [
-                'name' => $this->name,
-                'sku' => $this->sku,
-                'category_id' => $this->category_id,
-                'selling_price' => $this->selling_price,
-                'wholesale_price' => $this->wholesale_price ?: null,
-                'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
-                'reorder_level' => $this->reorder_level,
-                'description' => $this->description,
-            ]
+            $data
         );
 
         $this->productModal = false;
         $this->success($this->productId ? 'Product updated.' : 'Product created.');
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
     }
 
     public function editProduct($id)
@@ -91,7 +104,19 @@ class Index extends Component
         $this->wholesale_min_qty = $product->wholesale_min_qty;
         $this->reorder_level = $product->reorder_level;
         $this->description = $product->description ?? '';
+        $this->barcode = $product->barcode;
+        $this->existingImage = $product->image;
+        $this->photo = null;
         $this->productModal = true;
+    }
+
+    public function removeImage()
+    {
+        $this->photo = null;
+        $this->existingImage = null;
+        if ($this->productId) {
+            Product::where('id', $this->productId)->update(['image' => null]);
+        }
     }
 
     public function deleteProduct($id)
@@ -148,6 +173,7 @@ class Index extends Component
     {
         $headers = [
             ['key' => 'id', 'label' => '#'],
+            ['key' => 'image', 'label' => ''],
             ['key' => 'name', 'label' => 'Name'],
             ['key' => 'category.name', 'label' => 'Category'],
             ['key' => 'selling_price', 'label' => 'Price'],
@@ -155,7 +181,8 @@ class Index extends Component
         ];
 
         $products = Product::with('category', 'batches')
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")
+                ->orWhere('barcode', 'like', "%{$this->search}%"))
             ->latest()
             ->paginate(15);
 
