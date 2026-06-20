@@ -20,6 +20,9 @@ class Index extends Component
     public ?int $supplierId = null;
     public bool $modal = false;
 
+    public ?int $viewSupplierId = null;
+    public bool $profileDrawer = false;
+
     public function create()
     {
         $this->reset(['name', 'phone', 'email', 'address', 'contact_person', 'supplierId']);
@@ -70,6 +73,12 @@ class Index extends Component
         $this->success('Supplier deleted.');
     }
 
+    public function viewProfile($id)
+    {
+        $this->viewSupplierId = $id;
+        $this->profileDrawer = true;
+    }
+
     public function render()
     {
         $headers = [
@@ -80,9 +89,14 @@ class Index extends Component
             ['key' => 'email', 'label' => 'Email'],
         ];
 
+        $viewSupplier = $this->viewSupplierId
+            ? Supplier::with(['purchaseOrders' => fn($q) => $q->latest()->limit(10)])->find($this->viewSupplierId)
+            : null;
+
         return view('livewire.suppliers.index', [
             'headers' => $headers,
             'suppliers' => Supplier::when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))->latest()->paginate(20),
+            'viewSupplier' => $viewSupplier,
         ]);
     }
 }

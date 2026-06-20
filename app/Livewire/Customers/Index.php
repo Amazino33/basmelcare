@@ -148,7 +148,7 @@ class Index extends Component
         ];
 
         $viewCustomer = $this->viewCustomerId
-            ? Customer::with(['medicalRecords' => fn($q) => $q->latest(), 'medicalRecords.recorder', 'sales' => fn($q) => $q->latest()->limit(5), 'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial'])])->find($this->viewCustomerId)
+            ? Customer::with(['medicalRecords' => fn($q) => $q->latest(), 'medicalRecords.recorder', 'sales' => fn($q) => $q->latest()->limit(10), 'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial'])])->find($this->viewCustomerId)
             : null;
 
         return view('livewire.customers.index', [

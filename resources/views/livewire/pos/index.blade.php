@@ -93,10 +93,22 @@
 
                     <x-button label="Complete Sale" wire:click="checkout" icon="o-check" class="btn-primary btn-block mt-4" wire:confirm="Confirm this sale?" />
                 @else
-                    <div class="text-center py-8 text-base-content/60">
-                        <x-icon name="o-shopping-cart" class="w-12 h-12 mx-auto mb-2 opacity-30" />
-                        <p>Cart is empty</p>
-                    </div>
+                    @if($lastSaleId)
+                        <div class="text-center py-6">
+                            <x-icon name="o-check-circle" class="w-12 h-12 mx-auto mb-2 text-success" />
+                            <p class="font-semibold mb-4">Sale #{{ $lastSaleId }} completed!</p>
+                            <div class="flex gap-2 justify-center">
+                                <x-button label="Receipt" link="{{ route('receipt.show', $lastSaleId) }}" icon="o-printer" class="btn-sm btn-primary" external />
+                                <x-button label="Invoice" link="{{ route('invoice.show', $lastSaleId) }}" icon="o-document-text" class="btn-sm btn-ghost" external />
+                            </div>
+                            <x-button label="New Sale" wire:click="$set('lastSaleId', null)" class="btn-sm btn-ghost mt-3" icon="o-plus" />
+                        </div>
+                    @else
+                        <div class="text-center py-8 text-base-content/60">
+                            <x-icon name="o-shopping-cart" class="w-12 h-12 mx-auto mb-2 opacity-30" />
+                            <p>Cart is empty</p>
+                        </div>
+                    @endif
                 @endif
             </x-card>
         </div>

@@ -22,6 +22,7 @@ class Index extends Component
     public string $payment_method = 'cash';
     public ?int $customer_id = null;
     public string $note = '';
+    public ?int $lastSaleId = null;
 
     public function updatedCustomerId()
     {
@@ -136,7 +137,7 @@ class Index extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $saleId = DB::transaction(function () {
             $sale = Sale::create([
                 'user_id' => auth()->id(),
                 'customer_id' => $this->customer_id,
@@ -175,12 +176,15 @@ class Index extends Component
                     'status' => 'unpaid',
                 ]);
             }
+
+            return $sale->id;
         });
 
         $msg = $this->payment_method === 'credit'
             ? 'Credit sale recorded. Debt added to customer.'
             : 'Sale completed!';
 
+        $this->lastSaleId = $saleId;
         $this->cart = [];
         $this->reset(['payment_method', 'customer_id', 'note']);
         $this->success($msg);

@@ -15,6 +15,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/sales', App\Livewire\Sales\Index::class)->name('sales.index');
         Route::get('/debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
         Route::get('/invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
+        Route::get('/receipt/{sale}', [App\Http\Controllers\InvoiceController::class, 'receipt'])->name('receipt.show');
         Route::get('/customers', App\Livewire\Customers\Index::class)->name('customers.index');
         Route::get('/appointments', App\Livewire\Appointments\Index::class)->name('appointments.index');
     });
