@@ -32,7 +32,11 @@
 
                 <x-menu-sub title="Inventory" icon="o-archive-box">
                     <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
+                    <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
+                    <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
+                    <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
                     <x-menu-item title="Expiry Alerts" icon="o-exclamation-triangle" link="{{ route('expiry-alerts.index') }}" />
+                    <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
                 </x-menu-sub>
 
                 <x-menu-sub title="People" icon="o-users">
