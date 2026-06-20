@@ -10,6 +10,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products', App\Livewire\Products\Index::class)->name('products.index');
     Route::get('/pos', App\Livewire\Pos\Index::class)->name('pos.index');
     Route::get('/sales', App\Livewire\Sales\Index::class)->name('sales.index');
+    Route::get('/debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
     Route::get('/inventory', App\Livewire\Inventory\Index::class)->name('inventory.index');
     Route::get('/expiry-alerts', App\Livewire\ExpiryAlerts\Index::class)->name('expiry-alerts.index');
     Route::get('/locations', App\Livewire\Locations\Index::class)->name('locations.index');

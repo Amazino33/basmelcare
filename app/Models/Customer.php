@@ -20,4 +20,15 @@ class Customer extends Model
     {
         return $this->hasMany(Sale::class);
     }
+
+    public function debts()
+    {
+        return $this->hasMany(Debt::class);
+    }
+
+    public function getTotalDebtAttribute(): float
+    {
+        return $this->debts()->whereIn('status', ['unpaid', 'partial'])->sum('amount_owed')
+             - $this->debts()->whereIn('status', ['unpaid', 'partial'])->sum('amount_paid');
+    }
 }

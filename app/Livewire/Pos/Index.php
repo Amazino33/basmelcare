@@ -4,6 +4,7 @@ namespace App\Livewire\Pos;
 
 use App\Models\Batch;
 use App\Models\Customer;
+use App\Models\Debt;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -130,6 +131,11 @@ class Index extends Component
             return;
         }
 
+        if ($this->payment_method === 'credit' && !$this->customer_id) {
+            $this->error('Credit sales require a customer. Please select one.');
+            return;
+        }
+
         DB::transaction(function () {
             $sale = Sale::create([
                 'user_id' => auth()->id(),
@@ -160,11 +166,24 @@ class Index extends Component
                     'reference' => 'Sale #' . $sale->id,
                 ]);
             }
+
+            if ($this->payment_method === 'credit') {
+                Debt::create([
+                    'sale_id' => $sale->id,
+                    'customer_id' => $this->customer_id,
+                    'amount_owed' => $this->cartTotal,
+                    'status' => 'unpaid',
+                ]);
+            }
         });
+
+        $msg = $this->payment_method === 'credit'
+            ? 'Credit sale recorded. Debt added to customer.'
+            : 'Sale completed!';
 
         $this->cart = [];
         $this->reset(['payment_method', 'customer_id', 'note']);
-        $this->success('Sale completed!');
+        $this->success($msg);
     }
 
     public function render()

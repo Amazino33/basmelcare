@@ -83,7 +83,12 @@
                         ['id' => 'cash', 'name' => 'Cash'],
                         ['id' => 'card', 'name' => 'Card'],
                         ['id' => 'transfer', 'name' => 'Transfer'],
+                        ['id' => 'credit', 'name' => 'Credit (Debt)'],
                     ]" option-value="id" option-label="name" class="mt-3" />
+
+                    @if($payment_method === 'credit')
+                        <x-alert title="Credit Sale" description="This will create a debt record for the customer. A customer must be selected." icon="o-exclamation-triangle" class="alert-warning mt-3" />
+                    @endif
                     <x-textarea label="Note" wire:model="note" placeholder="Optional" class="mt-3" rows="2" />
 
                     <x-button label="Complete Sale" wire:click="checkout" icon="o-check" class="btn-primary btn-block mt-4" wire:confirm="Confirm this sale?" />
