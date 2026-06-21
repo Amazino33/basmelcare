@@ -79,11 +79,12 @@
 
             <x-form wire:submit="processPayment">
                 <x-select label="Payment Method" wire:model.live="payment_method" :options="[
-                    ['id' => 'cash', 'name' => 'Cash'],
-                    ['id' => 'card', 'name' => 'Card'],
-                    ['id' => 'transfer', 'name' => 'Transfer'],
+                    ['id' => 'cash', 'name' => 'Cash (Full)'],
+                    ['id' => 'card', 'name' => 'Card (Full)'],
+                    ['id' => 'transfer', 'name' => 'Transfer (Full)'],
                     ['id' => 'split', 'name' => 'Split Payment'],
-                    ['id' => 'credit', 'name' => 'Credit (Debt)'],
+                    ['id' => 'part_payment', 'name' => 'Part Payment (Balance on Debt)'],
+                    ['id' => 'credit', 'name' => 'Full Credit (Debt)'],
                 ]" option-value="id" option-label="name" />
 
                 @if($payment_method === 'split')
@@ -102,11 +103,33 @@
                     </div>
                 @endif
 
+                @if($payment_method === 'part_payment')
+                    <div class="bg-base-200 rounded-lg p-3 mt-3 space-y-2">
+                        <div class="text-xs font-semibold text-base-content/60 uppercase">Part Payment (Total: ₦{{ number_format($payingSale->total_amount, 2) }})</div>
+                        <x-input wire:model.blur="part_amount" prefix="₦" type="number" step="0.01" label="Amount Paying Now" />
+                        <x-select label="Paying With" wire:model="part_method" :options="[
+                            ['id' => 'cash', 'name' => 'Cash'],
+                            ['id' => 'card', 'name' => 'Card'],
+                            ['id' => 'transfer', 'name' => 'Transfer'],
+                        ]" option-value="id" option-label="name" />
+                        @php $partPaid = (float)($part_amount ?: 0); $partBalance = (float)$payingSale->total_amount - $partPaid; @endphp
+                        @if($partPaid > 0)
+                            <div class="flex justify-between text-sm pt-1 border-t border-base-300">
+                                <span>Balance to Debt Book:</span>
+                                <span class="font-bold text-error">₦{{ number_format(max(0, $partBalance), 2) }}</span>
+                            </div>
+                        @endif
+                        @if(!$payingSale->customer_id)
+                            <x-alert title="No Customer" description="Part payment requires a customer. This invoice has none." icon="o-x-circle" class="alert-error" />
+                        @endif
+                    </div>
+                @endif
+
                 @if($payment_method === 'credit')
                     @if($payingSale->customer_id)
-                        <x-alert title="Credit Sale" description="A debt record will be created for {{ $payingSale->customer->name }}." icon="o-exclamation-triangle" class="alert-warning mt-3" />
+                        <x-alert title="Full Credit" description="The full amount (₦{{ number_format($payingSale->total_amount, 2) }}) will be added to {{ $payingSale->customer->name }}'s debt book." icon="o-exclamation-triangle" class="alert-warning mt-3" />
                     @else
-                        <x-alert title="No Customer" description="Credit sales require a customer. This invoice has no customer assigned." icon="o-x-circle" class="alert-error mt-3" />
+                        <x-alert title="No Customer" description="Credit requires a customer. This invoice has no customer assigned." icon="o-x-circle" class="alert-error mt-3" />
                     @endif
                 @endif
 
