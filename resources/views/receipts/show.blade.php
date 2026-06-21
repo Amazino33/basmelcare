@@ -48,7 +48,7 @@
 
         <div class="line"></div>
 
-        <div class="row"><span>Receipt #:</span><span>{{ $sale->id }}</span></div>
+        <div class="row"><span>Invoice:</span><span>{{ $sale->invoice_number ?? '#' . $sale->id }}</span></div>
         <div class="row"><span>Date:</span><span>{{ $sale->created_at->format('d/m/Y H:i') }}</span></div>
         <div class="row"><span>Cashier:</span><span>{{ $sale->user->name }}</span></div>
         @if($sale->customer)

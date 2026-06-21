@@ -32,6 +32,7 @@
                 @if(in_array($role, ['admin', 'pharmacist', 'cashier']))
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
                         <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
+                        <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
                         <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
                     </x-menu-sub>

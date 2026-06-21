@@ -12,6 +12,7 @@ Route::middleware('auth')->group(function () {
     // Sales (admin, pharmacist, cashier)
     Route::middleware('role:admin,pharmacist,cashier')->group(function () {
         Route::get('/pos', App\Livewire\Pos\Index::class)->name('pos.index');
+        Route::get('/cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
         Route::get('/sales', App\Livewire\Sales\Index::class)->name('sales.index');
         Route::get('/debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
         Route::get('/invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');

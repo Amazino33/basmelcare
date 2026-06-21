@@ -1,5 +1,5 @@
 <div>
-    <x-header title="Point of Sale" subtitle="Create a new sale">
+    <x-header title="Point of Sale" subtitle="Create invoices for customers">
         @if($isWholesale)
             <x-slot:actions>
                 <x-badge value="WHOLESALE CUSTOMER" class="badge-info badge-lg" />
@@ -79,49 +79,20 @@
                     </div>
 
                     <x-choices label="Customer" wire:model.live="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Search customer..." single searchable />
-                    <x-select label="Payment Method" wire:model.live="payment_method" :options="[
-                        ['id' => 'cash', 'name' => 'Cash'],
-                        ['id' => 'card', 'name' => 'Card'],
-                        ['id' => 'transfer', 'name' => 'Transfer'],
-                        ['id' => 'split', 'name' => 'Split Payment'],
-                        ['id' => 'credit', 'name' => 'Credit (Debt)'],
-                    ]" option-value="id" option-label="name" class="mt-3" />
-
-                    @if($payment_method === 'split')
-                        <div class="bg-base-200 rounded-lg p-3 mt-3 space-y-2">
-                            <div class="text-xs font-semibold text-base-content/60 uppercase">Split Amount (Total: ₦{{ number_format($cartTotal, 2) }})</div>
-                            <x-input wire:model.blur="split_cash" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Cash" />
-                            <x-input wire:model.blur="split_transfer" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Transfer" />
-                            <x-input wire:model.blur="split_card" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Card" />
-                            @php $splitSum = (float)($split_cash ?: 0) + (float)($split_transfer ?: 0) + (float)($split_card ?: 0); @endphp
-                            <div class="flex justify-between text-sm pt-1 border-t border-base-300">
-                                <span>Split Total:</span>
-                                <span @class(['font-bold', 'text-success' => abs($splitSum - $cartTotal) < 0.01, 'text-error' => abs($splitSum - $cartTotal) >= 0.01])>
-                                    ₦{{ number_format($splitSum, 2) }}
-                                </span>
-                            </div>
-                            @if(abs($splitSum - $cartTotal) >= 0.01 && $splitSum > 0)
-                                <div class="text-xs text-error">Remaining: ₦{{ number_format($cartTotal - $splitSum, 2) }}</div>
-                            @endif
-                        </div>
-                    @endif
-
-                    @if($payment_method === 'credit')
-                        <x-alert title="Credit Sale" description="This will create a debt record for the customer. A customer must be selected." icon="o-exclamation-triangle" class="alert-warning mt-3" />
-                    @endif
                     <x-textarea label="Note" wire:model="note" placeholder="Optional" class="mt-3" rows="2" />
 
-                    <x-button label="Complete Sale" wire:click="checkout" icon="o-check" class="btn-primary btn-block mt-4" wire:confirm="Confirm this sale?" />
+                    <x-button label="Create Invoice" wire:click="createInvoice" icon="o-document-text" class="btn-primary btn-block mt-4" wire:confirm="Create this invoice?" />
                 @else
-                    @if($lastSaleId)
+                    @if($lastSale)
                         <div class="text-center py-6">
                             <x-icon name="o-check-circle" class="w-12 h-12 mx-auto mb-2 text-success" />
-                            <p class="font-semibold mb-4">Sale #{{ $lastSaleId }} completed!</p>
+                            <p class="font-semibold mb-1">{{ $lastSale->invoice_number }}</p>
+                            <p class="text-sm text-base-content/60 mb-4">Invoice created. Print for customer.</p>
                             <div class="flex gap-2 justify-center">
-                                <x-button label="Receipt" link="{{ route('receipt.show', $lastSaleId) }}" icon="o-printer" class="btn-sm btn-primary" external />
-                                <x-button label="Invoice" link="{{ route('invoice.show', $lastSaleId) }}" icon="o-document-text" class="btn-sm btn-ghost" external />
+                                <x-button label="Print Invoice" link="{{ route('invoice.show', $lastSale->id) }}" icon="o-printer" class="btn-sm btn-primary" external />
+                                <x-button label="Receipt" link="{{ route('receipt.show', $lastSale->id) }}" icon="o-document-text" class="btn-sm btn-ghost" external />
                             </div>
-                            <x-button label="New Sale" wire:click="$set('lastSaleId', null)" class="btn-sm btn-ghost mt-3" icon="o-plus" />
+                            <x-button label="New Invoice" wire:click="$set('lastSaleId', null)" class="btn-sm btn-ghost mt-3" icon="o-plus" />
                         </div>
                     @else
                         <div class="text-center py-8 text-base-content/60">
@@ -133,4 +104,65 @@
             </x-card>
         </div>
     </div>
+
+    <!-- My Invoices -->
+    @if($myInvoices->count() || $recentCompleted->count())
+        <div class="mt-6">
+            <x-card title="My Invoices" subtitle="Track your pending and paid invoices">
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($myInvoices as $invoice)
+                                <tr @class(['bg-success/10' => $invoice->status === 'paid'])>
+                                    <td class="font-semibold">{{ $invoice->invoice_number }}</td>
+                                    <td>{{ $invoice->customer?->name ?? 'Walk-in' }}</td>
+                                    <td>₦{{ number_format($invoice->total_amount, 2) }}</td>
+                                    <td>
+                                        <x-badge :value="ucfirst($invoice->status)" @class([
+                                            'badge-warning' => $invoice->status === 'pending',
+                                            'badge-success' => $invoice->status === 'paid',
+                                        ]) />
+                                    </td>
+                                    <td class="text-xs">{{ $invoice->created_at->format('H:i') }}</td>
+                                    <td>
+                                        <div class="flex gap-1">
+                                            <x-button icon="o-printer" link="{{ route('invoice.show', $invoice->id) }}" class="btn-xs btn-ghost" tooltip="Print" external />
+                                            @if($invoice->status === 'paid')
+                                                <x-button label="Handover" wire:click="confirmHandover({{ $invoice->id }})" class="btn-xs btn-success" wire:confirm="Confirm goods handed to customer?" />
+                                            @endif
+                                            @if($invoice->status === 'pending')
+                                                <x-button icon="o-x-mark" wire:click="cancelInvoice({{ $invoice->id }})" class="btn-xs btn-ghost text-error" tooltip="Cancel" wire:confirm="Cancel this invoice? Stock will be restored." />
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            @foreach($recentCompleted as $invoice)
+                                <tr class="opacity-60">
+                                    <td class="font-semibold">{{ $invoice->invoice_number }}</td>
+                                    <td>{{ $invoice->customer?->name ?? 'Walk-in' }}</td>
+                                    <td>₦{{ number_format($invoice->total_amount, 2) }}</td>
+                                    <td><x-badge value="Completed" class="badge-ghost" /></td>
+                                    <td class="text-xs">{{ $invoice->created_at->format('H:i') }}</td>
+                                    <td>
+                                        <x-button icon="o-printer" link="{{ route('invoice.show', $invoice->id) }}" class="btn-xs btn-ghost" tooltip="Print" external />
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-card>
+        </div>
+    @endif
 </div>

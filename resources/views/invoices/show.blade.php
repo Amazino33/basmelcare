@@ -55,7 +55,7 @@
             </div>
             <div class="invoice-meta">
                 <h2>Invoice</h2>
-                <p><strong>#INV-{{ str_pad($sale->id, 5, '0', STR_PAD_LEFT) }}</strong></p>
+                <p><strong>{{ $sale->invoice_number ?? '#INV-' . str_pad($sale->id, 5, '0', STR_PAD_LEFT) }}</strong></p>
                 <p>Date: {{ $sale->created_at->format('M d, Y') }}</p>
                 <p>Time: {{ $sale->created_at->format('h:i A') }}</p>
             </div>
@@ -84,7 +84,22 @@
                             {{ ucfirst($method) }}: ₦{{ number_format($amount, 2) }}<br>
                         @endforeach
                     @endif
-                    Status: <span class="badge {{ $sale->payment_method === 'credit' ? 'badge-credit' : 'badge-completed' }}">{{ $sale->payment_method === 'credit' ? 'Credit' : 'Paid' }}</span><br>
+                    @php
+                        $statusLabel = match($sale->status) {
+                            'pending' => 'Pending Payment',
+                            'paid' => $sale->payment_method === 'credit' ? 'Credit' : 'Paid',
+                            'completed' => 'Completed',
+                            'cancelled' => 'Cancelled',
+                            default => ucfirst($sale->status),
+                        };
+                        $statusClass = match($sale->status) {
+                            'pending' => 'badge-credit',
+                            'paid', 'completed' => $sale->payment_method === 'credit' ? 'badge-credit' : 'badge-completed',
+                            'cancelled' => 'badge-credit',
+                            default => 'badge-completed',
+                        };
+                    @endphp
+                    Status: <span class="badge {{ $statusClass }}">{{ $statusLabel }}</span><br>
                     Cashier: {{ $sale->user->name }}
                 </div>
             </div>

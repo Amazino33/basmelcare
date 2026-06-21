@@ -4,7 +4,6 @@ namespace App\Livewire\Pos;
 
 use App\Models\Batch;
 use App\Models\Customer;
-use App\Models\Debt;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -19,15 +18,9 @@ class Index extends Component
 
     public string $search = '';
     public array $cart = [];
-    public string $payment_method = 'cash';
     public ?int $customer_id = null;
     public string $note = '';
     public ?int $lastSaleId = null;
-
-    // Split payment
-    public string $split_cash = '';
-    public string $split_transfer = '';
-    public string $split_card = '';
 
     public function updatedCustomerId()
     {
@@ -130,45 +123,20 @@ class Index extends Component
         $item['subtotal'] = $item['qty'] * $price;
     }
 
-    public function checkout()
+    public function createInvoice()
     {
         if (empty($this->cart)) {
             $this->error('Cart is empty.');
             return;
         }
 
-        if ($this->payment_method === 'credit' && !$this->customer_id) {
-            $this->error('Credit sales require a customer. Please select one.');
-            return;
-        }
-
-        $paymentDetails = null;
-
-        if ($this->payment_method === 'split') {
-            $cash = (float) ($this->split_cash ?: 0);
-            $transfer = (float) ($this->split_transfer ?: 0);
-            $card = (float) ($this->split_card ?: 0);
-            $splitTotal = $cash + $transfer + $card;
-
-            if (abs($splitTotal - $this->cartTotal) > 0.01) {
-                $this->error('Split amounts (₦' . number_format($splitTotal, 2) . ') must equal the total (₦' . number_format($this->cartTotal, 2) . ').');
-                return;
-            }
-
-            $paymentDetails = [];
-            if ($cash > 0) $paymentDetails['cash'] = $cash;
-            if ($transfer > 0) $paymentDetails['transfer'] = $transfer;
-            if ($card > 0) $paymentDetails['card'] = $card;
-        }
-
-        $saleId = DB::transaction(function () use ($paymentDetails) {
+        $saleId = DB::transaction(function () {
             $sale = Sale::create([
+                'invoice_number' => Sale::generateInvoiceNumber(),
                 'user_id' => auth()->id(),
                 'customer_id' => $this->customer_id,
                 'total_amount' => $this->cartTotal,
-                'payment_method' => $this->payment_method,
-                'payment_details' => $paymentDetails,
-                'status' => 'completed',
+                'status' => 'pending',
                 'note' => $this->note,
             ]);
 
@@ -189,30 +157,68 @@ class Index extends Component
                     'batch_id' => $item['batch_id'],
                     'quantity' => -$item['qty'],
                     'type' => 'sale',
-                    'reference' => 'Sale #' . $sale->id,
-                ]);
-            }
-
-            if ($this->payment_method === 'credit') {
-                Debt::create([
-                    'sale_id' => $sale->id,
-                    'customer_id' => $this->customer_id,
-                    'amount_owed' => $this->cartTotal,
-                    'status' => 'unpaid',
+                    'reference' => $sale->invoice_number,
+                    'user_id' => auth()->id(),
                 ]);
             }
 
             return $sale->id;
         });
 
-        $msg = $this->payment_method === 'credit'
-            ? 'Credit sale recorded. Debt added to customer.'
-            : 'Sale completed!';
-
         $this->lastSaleId = $saleId;
         $this->cart = [];
-        $this->reset(['payment_method', 'customer_id', 'note', 'split_cash', 'split_transfer', 'split_card']);
-        $this->success($msg);
+        $this->reset(['customer_id', 'note']);
+        $this->success('Invoice created. Print it for the customer.');
+    }
+
+    public function confirmHandover($saleId)
+    {
+        $sale = Sale::findOrFail($saleId);
+        if ($sale->status !== 'paid') {
+            $this->error('Invoice must be paid before handover.');
+            return;
+        }
+
+        $sale->update([
+            'status' => 'completed',
+            'confirmed_by' => auth()->id(),
+            'confirmed_at' => now(),
+        ]);
+
+        $this->success('Goods handed over. Sale completed.');
+    }
+
+    public function cancelInvoice($saleId)
+    {
+        $sale = Sale::with('saleItems')->findOrFail($saleId);
+
+        if ($sale->status === 'completed') {
+            $this->error('Cannot cancel a completed sale.');
+            return;
+        }
+
+        if ($sale->status === 'paid') {
+            $this->error('Cannot cancel a paid invoice. Refund first.');
+            return;
+        }
+
+        DB::transaction(function () use ($sale) {
+            foreach ($sale->saleItems as $item) {
+                Batch::where('id', $item->batch_id)->increment('quantity', $item->quantity);
+
+                StockMovement::create([
+                    'batch_id' => $item->batch_id,
+                    'quantity' => $item->quantity,
+                    'type' => 'return',
+                    'reference' => $sale->invoice_number . ' (cancelled)',
+                    'user_id' => auth()->id(),
+                ]);
+            }
+
+            $sale->update(['status' => 'cancelled']);
+        });
+
+        $this->success('Invoice cancelled. Stock restored.');
     }
 
     public function render()
@@ -226,11 +232,30 @@ class Index extends Component
         $customers = Customer::orderBy('name')->get();
         $selectedCustomer = $this->customer_id ? Customer::find($this->customer_id) : null;
 
+        $myInvoices = Sale::with('customer')
+            ->where('user_id', auth()->id())
+            ->whereIn('status', ['pending', 'paid'])
+            ->latest()
+            ->limit(20)
+            ->get();
+
+        $recentCompleted = Sale::with('customer')
+            ->where('user_id', auth()->id())
+            ->where('status', 'completed')
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        $lastSale = $this->lastSaleId ? Sale::find($this->lastSaleId) : null;
+
         return view('livewire.pos.index', [
             'products' => $products,
             'customers' => $customers,
             'cartTotal' => $this->cartTotal,
             'isWholesale' => $selectedCustomer && $selectedCustomer->type === 'wholesale',
+            'myInvoices' => $myInvoices,
+            'recentCompleted' => $recentCompleted,
+            'lastSale' => $lastSale,
         ]);
     }
 }
