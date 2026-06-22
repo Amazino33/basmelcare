@@ -88,10 +88,7 @@
                             <x-icon name="o-check-circle" class="w-12 h-12 mx-auto mb-2 text-success" />
                             <p class="font-semibold mb-1">{{ $lastSale->invoice_number }}</p>
                             <p class="text-sm text-base-content/60 mb-4">Invoice created. Print for customer.</p>
-                            <div class="flex gap-2 justify-center">
-                                <x-button label="Print Invoice" link="{{ route('invoice.show', $lastSale->id) }}" icon="o-printer" class="btn-sm btn-primary" external />
-                                <x-button label="Receipt" link="{{ route('receipt.show', $lastSale->id) }}" icon="o-document-text" class="btn-sm btn-ghost" external />
-                            </div>
+                            <x-button label="Print Invoice" link="{{ route('invoice.show', $lastSale->id) }}" icon="o-printer" class="btn-sm btn-primary" external />
                             <x-button label="New Invoice" wire:click="$set('lastSaleId', null)" class="btn-sm btn-ghost mt-3" icon="o-plus" />
                         </div>
                     @else
