@@ -79,21 +79,17 @@
                     <x-menu-item title="Branches" icon="o-building-storefront" link="{{ route('branches.index') }}" />
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
                 @endif
-            </x-menu>
 
-            <x-slot:actions>
-                <x-menu activate-by-route>
-                    <x-menu-separator />
-                    <x-menu-item title="Theme" icon="o-sun">
-                        <x-slot:actions>
-                            <x-theme-toggle />
-                        </x-slot:actions>
-                    </x-menu-item>
-                    <x-menu-item title="{{ auth()->user()->name }}" icon="o-user" link="{{ route('profile') }}" />
-                    <x-menu-item title="Logout" icon="o-power" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" />
-                    <form id="logout-form" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
-                </x-menu>
-            </x-slot:actions>
+                <x-menu-separator />
+                <x-menu-item title="My Profile" icon="o-user-circle" link="{{ route('profile') }}" />
+                <x-menu-item title="Theme" icon="o-sun">
+                    <x-slot:actions>
+                        <x-theme-toggle />
+                    </x-slot:actions>
+                </x-menu-item>
+                <x-menu-item title="Logout" icon="o-arrow-right-start-on-rectangle" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" />
+                <form id="logout-form" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
+            </x-menu>
         </x-slot:sidebar>
 
         <x-slot:content>
