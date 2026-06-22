@@ -82,11 +82,13 @@
 
                 <x-menu-separator />
                 <x-menu-item title="My Profile" icon="o-user-circle" link="{{ route('profile') }}" />
-                <x-menu-item title="Theme" icon="o-sun">
-                    <x-slot:actions>
-                        <x-theme-toggle />
-                    </x-slot:actions>
-                </x-menu-item>
+                <li class="flex items-center justify-between px-4 py-2">
+                    <span class="flex items-center gap-3 text-sm">
+                        <x-icon name="o-sun" class="w-5 h-5" />
+                        <span>Theme</span>
+                    </span>
+                    <x-theme-toggle class="swap swap-rotate" />
+                </li>
                 <x-menu-item title="Logout" icon="o-arrow-right-start-on-rectangle" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" />
                 <form id="logout-form" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
             </x-menu>
