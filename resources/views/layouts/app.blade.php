@@ -9,12 +9,14 @@
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
-        (function(){
+        function applyTheme() {
             try {
                 var t = JSON.parse(localStorage.getItem('mary-theme'));
                 if (t) { document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('class', t); }
             } catch(e){}
-        })();
+        }
+        applyTheme();
+        document.addEventListener('livewire:navigated', applyTheme);
     </script>
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
