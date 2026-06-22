@@ -8,25 +8,18 @@ new #[Layout('layouts.guest')] class extends Component
 {
     public string $email = '';
 
-    /**
-     * Send a password reset link to the provided email address.
-     */
     public function sendPasswordResetLink(): void
     {
         $this->validate([
             'email' => ['required', 'string', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
         $status = Password::sendResetLink(
             $this->only('email')
         );
 
         if ($status != Password::RESET_LINK_SENT) {
             $this->addError('email', __($status));
-
             return;
         }
 
@@ -37,25 +30,22 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
-    </div>
+    <h2 class="text-xl font-bold text-center mb-2">Forgot Password</h2>
+    <p class="text-sm text-base-content/60 text-center mb-6">Enter your email and we'll send you a reset link.</p>
 
-    <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form wire:submit="sendPasswordResetLink">
-        <!-- Email Address -->
+    <form wire:submit="sendPasswordResetLink" class="space-y-4">
         <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input wire:model="email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <label class="label"><span class="label-text font-semibold">Email</span></label>
+            <input wire:model="email" type="email" class="input input-bordered w-full" placeholder="you@example.com" required autofocus />
+            @error('email') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Email Password Reset Link') }}
-            </x-primary-button>
+        <button type="submit" class="btn btn-primary btn-block">Send Reset Link</button>
+
+        <div class="text-center text-sm text-base-content/60">
+            <a href="{{ route('login') }}" wire:navigate class="text-primary hover:underline">Back to Sign In</a>
         </div>
     </form>
 </div>

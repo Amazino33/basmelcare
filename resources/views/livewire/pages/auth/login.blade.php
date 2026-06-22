@@ -9,9 +9,6 @@ new #[Layout('layouts.guest')] class extends Component
 {
     public LoginForm $form;
 
-    /**
-     * Handle an incoming authentication request.
-     */
     public function login(): void
     {
         $this->validate();
@@ -25,47 +22,41 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
-    <!-- Session Status -->
+    <h2 class="text-xl font-bold text-center mb-6">Sign In</h2>
+
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form wire:submit="login">
-        <!-- Email Address -->
+    <form wire:submit="login" class="space-y-4">
         <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input wire:model="form.email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('form.email')" class="mt-2" />
+            <label class="label"><span class="label-text font-semibold">Email</span></label>
+            <input wire:model="form.email" type="email" class="input input-bordered w-full" placeholder="you@example.com" required autofocus autocomplete="username" />
+            @error('form.email') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input wire:model="form.password" id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('form.password')" class="mt-2" />
+        <div>
+            <label class="label"><span class="label-text font-semibold">Password</span></label>
+            <input wire:model="form.password" type="password" class="input input-bordered w-full" placeholder="Enter your password" required autocomplete="current-password" />
+            @error('form.password') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
         </div>
 
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember" class="inline-flex items-center">
-                <input wire:model="form.remember" id="remember" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
+        <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input wire:model="form.remember" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                <span class="text-sm text-base-content/70">Remember me</span>
             </label>
-        </div>
 
-        <div class="flex items-center justify-end mt-4">
             @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}" wire:navigate>
-                    {{ __('Forgot your password?') }}
+                <a href="{{ route('password.request') }}" wire:navigate class="text-sm text-primary hover:underline">
+                    Forgot password?
                 </a>
             @endif
+        </div>
 
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
+        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+
+        <div class="text-center text-sm text-base-content/60">
+            Don't have an account?
+            <a href="{{ route('register') }}" wire:navigate class="text-primary hover:underline font-semibold">Register</a>
         </div>
     </form>
 </div>
