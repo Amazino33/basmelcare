@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrder extends Model
 {
+    use BelongsToBranch;
+
     protected $fillable = [
-        'po_number', 'supplier_id', 'user_id', 'status', 'total_amount', 'expected_date', 'note',
+        'po_number', 'supplier_id', 'user_id', 'status', 'total_amount', 'expected_date', 'note', 'branch_id',
     ];
 
     protected $casts = [

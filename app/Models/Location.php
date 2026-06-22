@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
 
 class Location extends Model
 {
-    protected $fillable = ['name', 'type', 'address', 'is_default'];
+    use BelongsToBranch;
+
+    protected $fillable = ['name', 'type', 'address', 'is_default', 'branch_id'];
 
     protected $casts = [
         'is_default' => 'boolean',

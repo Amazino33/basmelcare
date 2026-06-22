@@ -13,6 +13,7 @@
             <x-badge :value="ucfirst(str_replace('_', ' ', $member->role))" @class([
                 'badge-primary' => $member->role === 'admin',
                 'badge-secondary' => $member->role === 'pharmacist',
+                'badge-accent' => $member->role === 'branch_manager',
                 'badge-ghost' => $member->role === 'cashier',
                 'badge-info' => $member->role === 'inventory_manager',
             ]) />
@@ -54,9 +55,11 @@
                 <x-select label="Role" wire:model="role" :options="[
                     ['id' => 'admin', 'name' => 'Admin'],
                     ['id' => 'pharmacist', 'name' => 'Pharmacist'],
+                    ['id' => 'branch_manager', 'name' => 'Branch Manager'],
                     ['id' => 'cashier', 'name' => 'Cashier'],
                     ['id' => 'inventory_manager', 'name' => 'Inventory Manager'],
                 ]" option-value="id" option-label="name" />
+                <x-select label="Branch" wire:model="branch_id" :options="$branches" option-value="id" option-label="name" placeholder="All branches (admin)" />
                 <x-input label="Position/Title" wire:model="position" placeholder="e.g. Senior Pharmacist" />
                 <x-input label="Employment Date" wire:model="employment_date" type="date" />
                 <x-input label="Salary" wire:model="salary" prefix="₦" type="number" step="0.01" />

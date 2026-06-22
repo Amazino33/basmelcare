@@ -18,10 +18,16 @@
             <x-menu activate-by-route>
                 <x-menu-item title="BasmelCare" icon="o-heart" class="text-primary font-bold" link="{{ route('dashboard') }}" />
 
+                @if(auth()->user()->branch)
+                    <div class="px-5 mb-2">
+                        <x-badge value="{{ auth()->user()->branch->name }}" class="badge-ghost badge-sm" />
+                    </div>
+                @endif
+
                 <x-menu-separator />
                 <x-menu-item title="Dashboard" icon="o-chart-bar-square" link="{{ route('dashboard') }}" />
 
-                @if(in_array($role, ['admin', 'pharmacist', 'inventory_manager']))
+                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-separator />
                     <x-menu-sub title="Catalog" icon="o-cube">
                         <x-menu-item title="Categories" icon="o-tag" link="{{ route('categories.index') }}" />
@@ -29,7 +35,7 @@
                     </x-menu-sub>
                 @endif
 
-                @if(in_array($role, ['admin', 'pharmacist', 'cashier']))
+                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
                         <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
                         <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
@@ -38,7 +44,7 @@
                     </x-menu-sub>
                 @endif
 
-                @if(in_array($role, ['admin', 'pharmacist', 'inventory_manager']))
+                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Inventory" icon="o-archive-box">
                         <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
                         <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
@@ -58,18 +64,19 @@
                     @if($role === 'admin')
                         <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     @endif
-                    @if(in_array($role, ['admin', 'pharmacist', 'cashier']))
+                    @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
                         <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
                         <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
                     @endif
                 </x-menu-sub>
 
-                @if(in_array($role, ['admin', 'pharmacist']))
+                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager']))
                     <x-menu-separator />
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
                 @endif
 
                 @if($role === 'admin')
+                    <x-menu-item title="Branches" icon="o-building-storefront" link="{{ route('branches.index') }}" />
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
                 @endif
             </x-menu>

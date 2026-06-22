@@ -17,7 +17,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'phone', 'role', 'position',
         'employment_date', 'salary', 'address',
-        'emergency_contact_name', 'emergency_contact_phone', 'status',
+        'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id',
     ];
 
     protected function casts(): array
@@ -30,6 +30,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function sales()
     {
         return $this->hasMany(Sale::class);
@@ -38,6 +43,11 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function isBranchManager(): bool
+    {
+        return $this->role === 'branch_manager';
     }
 
     public function isActive(): bool

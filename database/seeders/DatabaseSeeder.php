@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\AppSetting;
 use App\Models\Appointment;
 use App\Models\Batch;
+use App\Models\Branch;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Debt;
@@ -24,9 +25,23 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Branches
+        $mainBranch = Branch::firstOrCreate(['name' => 'Main Branch'], [
+            'address' => '15 Health Avenue, Victoria Island, Lagos',
+            'phone' => '08012345678',
+            'is_main' => true,
+        ]);
+
+        $ikejaBranch = Branch::firstOrCreate(['name' => 'Ikeja Branch'], [
+            'address' => '42 Allen Avenue, Ikeja, Lagos',
+            'phone' => '08099887766',
+            'is_main' => false,
+        ]);
+
         // Locations
-        $shop = Location::firstOrCreate(['name' => 'Main Shop'], ['type' => 'shop', 'is_default' => true]);
-        $warehouse = Location::firstOrCreate(['name' => 'Warehouse'], ['type' => 'warehouse', 'is_default' => false]);
+        $shop = Location::firstOrCreate(['name' => 'Main Shop'], ['type' => 'shop', 'is_default' => true, 'branch_id' => $mainBranch->id]);
+        $warehouse = Location::firstOrCreate(['name' => 'Warehouse'], ['type' => 'warehouse', 'is_default' => false, 'branch_id' => $mainBranch->id]);
+        Location::firstOrCreate(['name' => 'Ikeja Shop'], ['type' => 'shop', 'is_default' => false, 'branch_id' => $ikejaBranch->id]);
 
         // Staff
         $admin = User::firstOrCreate(['email' => 'admin@basmelcare.com'], [
@@ -38,6 +53,7 @@ class DatabaseSeeder extends Seeder
             'salary' => 500000,
             'phone' => '08012345678',
             'status' => 'active',
+            'branch_id' => null,
         ]);
 
         $pharmacist = User::firstOrCreate(['email' => 'pharm@basmelcare.com'], [
@@ -49,6 +65,7 @@ class DatabaseSeeder extends Seeder
             'salary' => 350000,
             'phone' => '08023456789',
             'status' => 'active',
+            'branch_id' => $mainBranch->id,
         ]);
 
         $cashier = User::firstOrCreate(['email' => 'cashier@basmelcare.com'], [
@@ -60,6 +77,19 @@ class DatabaseSeeder extends Seeder
             'salary' => 150000,
             'phone' => '08034567890',
             'status' => 'active',
+            'branch_id' => $mainBranch->id,
+        ]);
+
+        $branchMgr = User::firstOrCreate(['email' => 'branch@basmelcare.com'], [
+            'name' => 'Emeka Branch Manager',
+            'password' => bcrypt('password'),
+            'role' => 'branch_manager',
+            'position' => 'Ikeja Branch Manager',
+            'employment_date' => '2025-02-01',
+            'salary' => 280000,
+            'phone' => '08056789012',
+            'status' => 'active',
+            'branch_id' => $ikejaBranch->id,
         ]);
 
         $invManager = User::firstOrCreate(['email' => 'inventory@basmelcare.com'], [
@@ -71,6 +101,7 @@ class DatabaseSeeder extends Seeder
             'salary' => 180000,
             'phone' => '08045678901',
             'status' => 'active',
+            'branch_id' => $mainBranch->id,
         ]);
 
         // Categories

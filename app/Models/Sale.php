@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
+    use BelongsToBranch;
+
     protected $fillable = [
         'invoice_number', 'user_id', 'confirmed_by', 'customer_id',
         'total_amount', 'payment_method', 'payment_details',

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Staff;
 
+use App\Models\Branch;
 use App\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -26,6 +27,7 @@ class Index extends Component
     public string $emergency_contact_name = '';
     public string $emergency_contact_phone = '';
     public string $status = 'active';
+    public ?int $branch_id = null;
     public ?int $staffId = null;
     public bool $modal = false;
 
@@ -38,7 +40,7 @@ class Index extends Component
         $this->reset([
             'name', 'email', 'phone', 'password', 'role', 'position',
             'employment_date', 'salary', 'address',
-            'emergency_contact_name', 'emergency_contact_phone', 'status', 'staffId',
+            'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id', 'staffId',
         ]);
         $this->modal = true;
     }
@@ -49,7 +51,8 @@ class Index extends Component
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email,' . $this->staffId,
             'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,pharmacist,cashier,inventory_manager',
+            'role' => 'required|in:admin,pharmacist,branch_manager,cashier,inventory_manager',
+            'branch_id' => 'nullable|exists:branches,id',
             'position' => 'nullable|string|max:255',
             'employment_date' => 'nullable|date',
             'salary' => 'nullable|numeric|min:0',
@@ -79,6 +82,7 @@ class Index extends Component
             'emergency_contact_name' => $this->emergency_contact_name,
             'emergency_contact_phone' => $this->emergency_contact_phone,
             'status' => $this->status,
+            'branch_id' => $this->branch_id,
         ];
 
         if ($this->password) {
@@ -96,7 +100,7 @@ class Index extends Component
         $this->reset([
             'name', 'email', 'phone', 'password', 'role', 'position',
             'employment_date', 'salary', 'address',
-            'emergency_contact_name', 'emergency_contact_phone', 'status', 'staffId',
+            'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id', 'staffId',
         ]);
     }
 
@@ -116,6 +120,7 @@ class Index extends Component
         $this->emergency_contact_name = $staff->emergency_contact_name ?? '';
         $this->emergency_contact_phone = $staff->emergency_contact_phone ?? '';
         $this->status = $staff->status;
+        $this->branch_id = $staff->branch_id;
         $this->modal = true;
     }
 
@@ -150,12 +155,14 @@ class Index extends Component
             ->latest()
             ->paginate(20);
 
-        $viewStaff = $this->viewStaffId ? User::find($this->viewStaffId) : null;
+        $viewStaff = $this->viewStaffId ? User::with('branch')->find($this->viewStaffId) : null;
+        $branches = Branch::orderBy('name')->get();
 
         return view('livewire.staff.index', [
             'headers' => $headers,
             'staff' => $staff,
             'viewStaff' => $viewStaff,
+            'branches' => $branches,
         ]);
     }
 }
