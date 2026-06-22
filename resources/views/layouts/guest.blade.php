@@ -8,6 +8,14 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script>
+        (function(){
+            try {
+                var t = JSON.parse(localStorage.getItem('mary-theme'));
+                if (t) { document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('class', t); }
+            } catch(e){}
+        })();
+    </script>
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200">
     <div class="min-h-screen flex items-center justify-center p-4">

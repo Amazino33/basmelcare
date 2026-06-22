@@ -8,6 +8,14 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script>
+        (function(){
+            try {
+                var t = JSON.parse(localStorage.getItem('mary-theme'));
+                if (t) { document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('class', t); }
+            } catch(e){}
+        })();
+    </script>
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
 
@@ -82,13 +90,17 @@
 
                 <x-menu-separator />
                 <x-menu-item title="My Profile" icon="o-user-circle" link="{{ route('profile') }}" />
-                <li class="flex items-center justify-between px-4 py-2">
-                    <span class="flex items-center gap-3 text-sm">
-                        <x-icon name="o-sun" class="w-5 h-5" />
-                        <span>Theme</span>
-                    </span>
-                    <x-theme-toggle class="swap swap-rotate" />
-                </li>
+                <x-menu-item title="Toggle Theme" icon="o-moon"
+                    x-data
+                    @click.prevent="
+                        let current = document.documentElement.getAttribute('data-theme');
+                        let next = current === 'dark' ? 'light' : 'dark';
+                        document.documentElement.setAttribute('data-theme', next);
+                        document.documentElement.setAttribute('class', next);
+                        localStorage.setItem('mary-theme', JSON.stringify(next));
+                        localStorage.setItem('mary-class', JSON.stringify(next));
+                    "
+                />
                 <x-menu-item title="Logout" icon="o-arrow-right-start-on-rectangle" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" />
                 <form id="logout-form" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
             </x-menu>
