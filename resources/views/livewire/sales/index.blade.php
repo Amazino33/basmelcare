@@ -1,21 +1,19 @@
 <div>
-    <x-header title="Sales History" subtitle="View all sales and performance">
-        <x-slot:middle class="!justify-end">
-            <x-input icon="o-magnifying-glass" placeholder="Search by ID, customer, cashier..." wire:model.live.debounce="search" clearable />
-        </x-slot:middle>
-        <x-slot:actions>
-            <x-select wire:model.live="period" :options="[
-                ['id' => 'today', 'name' => 'Today'],
-                ['id' => 'week', 'name' => 'This Week'],
-                ['id' => 'month', 'name' => 'This Month'],
-                ['id' => 'year', 'name' => 'This Year'],
-                ['id' => 'all', 'name' => 'All Time'],
-            ]" option-value="id" option-label="name" class="w-36" />
-        </x-slot:actions>
-    </x-header>
+    <x-header title="Sales History" size="text-xl" />
+
+    <div class="flex flex-col sm:flex-row gap-2 mb-4">
+        <x-input icon="o-magnifying-glass" placeholder="Search..." wire:model.live.debounce="search" clearable class="flex-1" />
+        <x-select wire:model.live="period" :options="[
+            ['id' => 'today', 'name' => 'Today'],
+            ['id' => 'week', 'name' => 'This Week'],
+            ['id' => 'month', 'name' => 'This Month'],
+            ['id' => 'year', 'name' => 'This Year'],
+            ['id' => 'all', 'name' => 'All Time'],
+        ]" option-value="id" option-label="name" class="sm:w-36" />
+    </div>
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <x-stat
             title="Revenue"
             value="₦{{ number_format($totalRevenue, 2) }}"

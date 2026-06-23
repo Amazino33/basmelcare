@@ -27,3 +27,8 @@
 .mary-table-pagination button {
     @apply cursor-pointer
 }
+
+/* Make all tables horizontally scrollable on mobile */
+.mary-table {
+    @apply overflow-x-auto
+}
