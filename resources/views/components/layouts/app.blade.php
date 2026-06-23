@@ -109,6 +109,17 @@
         </x-slot:sidebar>
 
         <x-slot:content>
+            <!-- Mobile top bar -->
+            <div class="lg:hidden flex items-center justify-between p-3 bg-base-100 border-b border-base-200">
+                <label for="main-drawer" class="btn btn-ghost btn-sm">
+                    <x-icon name="o-bars-3" class="w-6 h-6" />
+                </label>
+                <span class="font-bold text-primary">BasmelCare</span>
+                <a href="{{ route('profile') }}" class="btn btn-ghost btn-sm btn-circle">
+                    <x-icon name="o-user-circle" class="w-6 h-6" />
+                </a>
+            </div>
+
             <div class="p-5">
                 {{ $slot }}
             </div>
