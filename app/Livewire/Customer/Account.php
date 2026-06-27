@@ -25,19 +25,22 @@ class Account extends Component
 
         $recentSales = $customer->sales()->with('saleItems.product')->latest()->limit(5)->get();
         $allSales = $customer->sales()->with('saleItems.product')->latest()->get();
+        $onlineOrders = $customer->orders()->with('items.product')->latest()->get();
         $debts = $customer->debts()->with('sale', 'payments')->latest()->get();
         $appointments = $customer->appointments()->with('staff')->latest()->get();
         $medicalRecords = $customer->medicalRecords()->with('recorder')->latest()->get();
 
-        $totalSpent = $customer->sales()->where('status', 'completed')->sum('total_amount');
+        $totalSpent = $customer->sales()->where('status', 'completed')->sum('total_amount')
+            + $customer->orders()->where('payment_status', 'paid')->sum('total_amount');
         $totalDebt = $customer->totalDebt;
-        $totalOrders = $customer->sales()->count();
+        $totalOrders = $customer->sales()->count() + $customer->orders()->count();
 
         return view('livewire.customer.account', [
             'customer' => $customer,
             'recentSales' => $recentSales,
             'allSales' => $allSales,
             'debts' => $debts,
+            'onlineOrders' => $onlineOrders,
             'appointments' => $appointments,
             'medicalRecords' => $medicalRecords,
             'totalSpent' => $totalSpent,

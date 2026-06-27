@@ -33,7 +33,7 @@
 
     <!-- Tab Navigation -->
     <div class="flex overflow-x-auto gap-1 mb-4 border-b border-base-200 pb-1 scrollbar-hide">
-        @foreach(['overview' => 'Overview', 'orders' => 'Orders', 'debts' => 'Debts', 'appointments' => 'Appointments', 'records' => 'Records'] as $tab => $label)
+        @foreach(['overview' => 'Overview', 'orders' => 'In-Store', 'online' => 'Online Orders', 'debts' => 'Debts', 'appointments' => 'Appointments', 'records' => 'Records'] as $tab => $label)
             <button wire:click="$set('activeTab', '{{ $tab }}')" @class([
                 'px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors',
                 'bg-primary text-primary-content' => $activeTab === $tab,
@@ -130,6 +130,58 @@
                     <x-icon name="o-shopping-bag" class="w-10 h-10 mx-auto mb-2 opacity-30" />
                     <p class="text-sm">No orders yet</p>
                     <a href="/shop" class="btn btn-primary btn-sm mt-3">Start Shopping</a>
+                </div>
+            @endforelse
+        </div>
+    @endif
+
+    <!-- Online Orders Tab -->
+    @if($activeTab === 'online')
+        <div class="space-y-3">
+            @forelse($onlineOrders as $order)
+                <div class="card bg-base-100 border border-base-200 p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="font-bold text-sm">{{ $order->order_number }}</div>
+                            <div class="text-xs text-base-content/60">{{ $order->created_at->format('M d, Y h:i A') }}</div>
+                            <div class="text-xs text-base-content/60 mt-1">{{ ucfirst($order->fulfillment_type) }} | {{ $order->payment_method === 'paystack' ? 'Online' : 'Pay on ' . ucfirst($order->fulfillment_type) }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-primary">₦{{ number_format($order->total_amount, 2) }}</div>
+                            <div class="flex gap-1 mt-1">
+                                <span @class([
+                                    'badge badge-xs',
+                                    'badge-warning' => $order->status === 'pending',
+                                    'badge-info' => $order->status === 'processing',
+                                    'badge-primary' => $order->status === 'ready',
+                                    'badge-success' => $order->status === 'completed',
+                                    'badge-error' => $order->status === 'cancelled',
+                                ])>{{ ucfirst($order->status) }}</span>
+                                <span @class([
+                                    'badge badge-xs',
+                                    'badge-warning' => $order->payment_status === 'pending',
+                                    'badge-success' => $order->payment_status === 'paid',
+                                ])>{{ ucfirst($order->payment_status) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        @foreach($order->items as $item)
+                            <div class="flex justify-between text-xs">
+                                <span class="text-base-content/60">{{ $item->product->name }} × {{ $item->quantity }}</span>
+                                <span>₦{{ number_format($item->subtotal, 2) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                    @if($order->payment_status === 'pending' && $order->payment_method === 'paystack')
+                        <a href="{{ route('order.pay', $order->id) }}" class="btn btn-primary btn-sm btn-block mt-3">Pay Now</a>
+                    @endif
+                </div>
+            @empty
+                <div class="text-center py-8 text-base-content/60">
+                    <x-icon name="o-shopping-bag" class="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p class="text-sm">No online orders yet</p>
+                    <a href="/shop" class="btn btn-primary btn-sm mt-3">Shop Now</a>
                 </div>
             @endforelse
         </div>

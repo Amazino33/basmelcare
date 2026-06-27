@@ -25,6 +25,10 @@ class Index extends Component
     public string $wawp_access_token = '';
     public bool $wawp_enabled = false;
 
+    // Paystack
+    public string $paystack_public_key = '';
+    public string $paystack_secret_key = '';
+
     // Notifications
     public bool $notify_low_stock = true;
     public bool $notify_expiry = true;
@@ -46,9 +50,19 @@ class Index extends Component
         $this->wawp_access_token = AppSetting::get('wawp_access_token', '');
         $this->wawp_enabled = AppSetting::bool('wawp_enabled', false);
 
+        $this->paystack_public_key = AppSetting::get('paystack_public_key', '');
+        $this->paystack_secret_key = AppSetting::get('paystack_secret_key', '');
+
         $this->notify_low_stock = AppSetting::bool('notify_low_stock', true);
         $this->notify_expiry = AppSetting::bool('notify_expiry', true);
         $this->expiry_alert_days = (int) AppSetting::get('expiry_alert_days', 90);
+    }
+
+    public function savePaystack()
+    {
+        AppSetting::set('paystack_public_key', $this->paystack_public_key);
+        AppSetting::set('paystack_secret_key', $this->paystack_secret_key);
+        $this->success('Paystack settings saved.');
     }
 
     public function saveGeneral()

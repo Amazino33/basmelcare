@@ -3,12 +3,16 @@
 namespace App\Livewire\Shop;
 
 use App\Models\Product;
+use App\Services\CartService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Mary\Traits\Toast;
 
 #[Layout('layouts.public')]
 class Show extends Component
 {
+    use Toast;
+
     public Product $product;
     public int $quantity = 1;
 
@@ -26,6 +30,21 @@ class Show extends Component
     public function decrement()
     {
         if ($this->quantity > 1) $this->quantity--;
+    }
+
+    public function addToCart()
+    {
+        $cart = new CartService();
+        $cart->add($this->product->id, $this->quantity);
+        $this->success($this->product->name . ' added to cart.');
+        $this->dispatch('cart-updated');
+    }
+
+    public function buyNow()
+    {
+        $cart = new CartService();
+        $cart->add($this->product->id, $this->quantity);
+        $this->redirect('/cart');
     }
 
     public function render()

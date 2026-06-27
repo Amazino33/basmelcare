@@ -36,9 +36,13 @@
                 </div>
 
                 <!-- Desktop right actions -->
+                @php $cartCount = (new \App\Services\CartService)->count(); @endphp
                 <div class="hidden md:flex items-center gap-3">
-                    <a href="/shop" class="btn btn-ghost btn-sm btn-circle relative">
-                        <x-icon name="o-shopping-bag" class="w-5 h-5" />
+                    <a href="/cart" class="btn btn-ghost btn-sm btn-circle relative">
+                        <x-icon name="o-shopping-cart" class="w-5 h-5" />
+                        @if($cartCount > 0)
+                            <span class="badge badge-xs badge-primary absolute -top-1 -right-1">{{ $cartCount }}</span>
+                        @endif
                     </a>
                     @if(auth('customer')->check())
                         <a href="/account" class="btn btn-ghost btn-sm">
@@ -51,8 +55,11 @@
 
                 <!-- Mobile right actions -->
                 <div class="md:hidden flex items-center gap-1">
-                    <a href="/shop" class="btn btn-ghost btn-sm btn-circle relative">
-                        <x-icon name="o-shopping-bag" class="w-5 h-5" />
+                    <a href="/cart" class="btn btn-ghost btn-sm btn-circle relative">
+                        <x-icon name="o-shopping-cart" class="w-5 h-5" />
+                        @if($cartCount > 0)
+                            <span class="badge badge-xs badge-primary absolute -top-1 -right-1">{{ $cartCount }}</span>
+                        @endif
                     </a>
                 </div>
             </div>
@@ -124,7 +131,12 @@
                 <span class="mt-0.5">Shop</span>
             </a>
             <a href="/cart" class="flex-1 flex flex-col items-center py-2 text-xs relative {{ request()->is('cart') ? 'text-primary' : 'text-base-content/60' }}">
-                <x-icon name="o-shopping-cart" class="w-5 h-5" />
+                <div class="relative">
+                    <x-icon name="o-shopping-cart" class="w-5 h-5" />
+                    @if($cartCount > 0)
+                        <span class="badge badge-xs badge-primary absolute -top-2 -right-3">{{ $cartCount }}</span>
+                    @endif
+                </div>
                 <span class="mt-0.5">Cart</span>
             </a>
             <a href="{{ auth('customer')->check() ? '/account' : '/customer/login' }}" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('account*') ? 'text-primary' : 'text-base-content/60' }}">

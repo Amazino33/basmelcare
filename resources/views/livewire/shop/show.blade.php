@@ -66,10 +66,10 @@
                     </div>
 
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button class="btn btn-primary flex-1" onclick="alert('Cart coming soon!')">
+                        <button wire:click="addToCart" class="btn btn-primary flex-1">
                             <x-icon name="o-shopping-cart" class="w-5 h-5" /> Add to Cart
                         </button>
-                        <button class="btn btn-accent flex-1" onclick="alert('Cart coming soon!')">
+                        <button wire:click="buyNow" class="btn btn-accent flex-1">
                             Buy Now
                         </button>
                     </div>

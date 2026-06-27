@@ -53,6 +53,18 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="paystack" label="Paystack" icon="o-credit-card">
+            <x-card title="Paystack Payment Gateway" class="mt-4">
+                <x-form wire:submit="savePaystack">
+                    <x-input label="Public Key" wire:model="paystack_public_key" placeholder="pk_live_..." />
+                    <x-input label="Secret Key" wire:model="paystack_secret_key" type="password" placeholder="sk_live_..." />
+                    <x-slot:actions>
+                        <x-button label="Save Paystack Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
         <x-tab name="notifications" label="Notifications" icon="o-bell">
             <x-card title="Alert Preferences" class="mt-4">
                 <x-form wire:submit="saveNotifications">

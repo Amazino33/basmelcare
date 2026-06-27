@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Livewire\Shop;
+
+use App\Models\AppSetting;
+use App\Models\Batch;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\StockMovement;
+use App\Services\CartService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+use Livewire\WithFileUploads;
+use Mary\Traits\Toast;
+
+#[Layout('layouts.public')]
+class Checkout extends Component
+{
+    use Toast, WithFileUploads;
+
+    public string $fulfillment_type = 'delivery';
+    public string $delivery_address = '';
+    public string $delivery_phone = '';
+    public string $payment_method = 'paystack';
+    public string $note = '';
+    public $prescription = null;
+
+    public function mount()
+    {
+        $customer = Auth::guard('customer')->user();
+        $this->delivery_address = $customer->address ?? '';
+        $this->delivery_phone = $customer->phone ?? '';
+    }
+
+    public function placeOrder()
+    {
+        $cart = new CartService();
+
+        if (count($cart->get()) === 0) {
+            $this->error('Cart is empty.');
+            return;
+        }
+
+        $rules = [
+            'fulfillment_type' => 'required|in:delivery,pickup',
+            'payment_method' => 'required|in:paystack,pay_on_delivery',
+            'note' => 'nullable|string|max:500',
+        ];
+
+        if ($this->fulfillment_type === 'delivery') {
+            $rules['delivery_address'] = 'required|string|max:500';
+            $rules['delivery_phone'] = 'required|string|max:20';
+        }
+
+        if ($cart->requiresPrescription()) {
+            $rules['prescription'] = 'required|file|max:5120';
+        }
+
+        $this->validate($rules);
+
+        $customer = Auth::guard('customer')->user();
+        $deliveryFee = $this->fulfillment_type === 'delivery' ? 1500 : 0;
+        $subtotal = $cart->subtotal();
+        $prescriptionPath = $this->prescription?->store('prescriptions', 'public');
+
+        $order = DB::transaction(function () use ($cart, $customer, $subtotal, $deliveryFee, $prescriptionPath) {
+            $order = Order::create([
+                'order_number' => Order::generateOrderNumber(),
+                'customer_id' => $customer->id,
+                'subtotal' => $subtotal,
+                'delivery_fee' => $deliveryFee,
+                'total_amount' => $subtotal + $deliveryFee,
+                'fulfillment_type' => $this->fulfillment_type,
+                'payment_method' => $this->payment_method,
+                'payment_status' => $this->payment_method === 'pay_on_delivery' ? 'pending' : 'pending',
+                'status' => 'pending',
+                'delivery_address' => $this->fulfillment_type === 'delivery' ? $this->delivery_address : null,
+                'delivery_phone' => $this->fulfillment_type === 'delivery' ? $this->delivery_phone : null,
+                'note' => $this->note,
+                'prescription_path' => $prescriptionPath,
+            ]);
+
+            foreach ($cart->get() as $item) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['price'],
+                    'subtotal' => $item['price'] * $item['quantity'],
+                ]);
+
+                $product = Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)->orderBy('expiry_date')])->find($item['product_id']);
+                $remaining = $item['quantity'];
+
+                foreach ($product->batches as $batch) {
+                    if ($remaining <= 0) break;
+                    $deduct = min($remaining, $batch->quantity);
+                    $batch->decrement('quantity', $deduct);
+                    StockMovement::create([
+                        'batch_id' => $batch->id,
+                        'quantity' => -$deduct,
+                        'type' => 'sale',
+                        'reference' => $order->order_number,
+                    ]);
+                    $remaining -= $deduct;
+                }
+            }
+
+            return $order;
+        });
+
+        $cart->clear();
+
+        if ($this->payment_method === 'paystack') {
+            $this->redirect('/order/' . $order->id . '/pay');
+        } else {
+            $this->redirect('/order/' . $order->id . '/confirmation');
+        }
+    }
+
+    public function render()
+    {
+        $cart = new CartService();
+        $deliveryFee = $this->fulfillment_type === 'delivery' ? 1500 : 0;
+
+        return view('livewire.shop.checkout', [
+            'items' => $cart->get(),
+            'subtotal' => $cart->subtotal(),
+            'deliveryFee' => $deliveryFee,
+            'total' => $cart->subtotal() + $deliveryFee,
+            'itemCount' => $cart->count(),
+            'requiresPrescription' => $cart->requiresPrescription(),
+        ]);
+    }
+}
