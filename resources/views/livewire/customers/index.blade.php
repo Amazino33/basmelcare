@@ -58,10 +58,14 @@
             </div>
 
             <!-- Quick Stats -->
-            <div class="grid grid-cols-3 gap-2 mb-4">
+            <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="bg-base-200 rounded p-2 text-center">
                     <div class="text-lg font-bold">{{ $viewCustomer->sales->count() }}</div>
-                    <div class="text-xs text-base-content/60">Sales</div>
+                    <div class="text-xs text-base-content/60">In-Store</div>
+                </div>
+                <div class="bg-base-200 rounded p-2 text-center">
+                    <div class="text-lg font-bold">{{ $viewCustomer->orders->count() }}</div>
+                    <div class="text-xs text-base-content/60">Online</div>
                 </div>
                 <div class="bg-base-200 rounded p-2 text-center">
                     <div class="text-lg font-bold text-error">₦{{ number_format($viewCustomer->totalDebt, 2) }}</div>
@@ -130,6 +134,63 @@
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">No sales yet.</div>
             @endforelse
+
+            <!-- Online Orders -->
+            @if($viewCustomer->orders->count())
+                <x-hr />
+                <div class="text-sm font-semibold text-base-content/60 uppercase mb-2">Online Orders</div>
+                @foreach($viewCustomer->orders as $order)
+                    <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                        <div>
+                            <div class="text-sm font-semibold">{{ $order->order_number }}</div>
+                            <div class="text-xs text-base-content/60">{{ $order->created_at->format('M d, Y') }} | {{ ucfirst($order->fulfillment_type) }}</div>
+                            <div class="text-xs text-base-content/60">{{ $order->items->count() }} items</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-bold">₦{{ number_format($order->total_amount, 2) }}</span>
+                            <div class="flex gap-1 mt-1">
+                                <span @class([
+                                    'badge badge-xs',
+                                    'badge-warning' => $order->status === 'pending',
+                                    'badge-info' => $order->status === 'processing',
+                                    'badge-success' => $order->status === 'completed',
+                                    'badge-error' => $order->status === 'cancelled',
+                                ])>{{ ucfirst($order->status) }}</span>
+                                <span @class([
+                                    'badge badge-xs',
+                                    'badge-warning' => $order->payment_status === 'pending',
+                                    'badge-success' => $order->payment_status === 'paid',
+                                ])>{{ ucfirst($order->payment_status) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            @endif
+
+            <!-- Appointments -->
+            @if($viewCustomer->appointments->count())
+                <x-hr />
+                <div class="text-sm font-semibold text-base-content/60 uppercase mb-2">Appointments</div>
+                @foreach($viewCustomer->appointments as $appt)
+                    <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                        <div>
+                            <div class="text-sm font-semibold">{{ $appt->title }}</div>
+                            <div class="text-xs text-base-content/60">{{ $appt->scheduled_at->format('M d, Y h:i A') }}</div>
+                            @if($appt->staff)
+                                <div class="text-xs text-base-content/60">With: {{ $appt->staff->name }}</div>
+                            @endif
+                        </div>
+                        <span @class([
+                            'badge badge-xs',
+                            'badge-info' => $appt->status === 'scheduled',
+                            'badge-primary' => $appt->status === 'confirmed',
+                            'badge-success' => $appt->status === 'completed',
+                            'badge-error' => $appt->status === 'cancelled',
+                            'badge-warning' => $appt->status === 'no_show',
+                        ])>{{ ucfirst(str_replace('_', ' ', $appt->status)) }}</span>
+                    </div>
+                @endforeach
+            @endif
 
             <!-- Outstanding Debts -->
             @if($viewCustomer->debts->count())
