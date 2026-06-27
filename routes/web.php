@@ -5,6 +5,18 @@ use Illuminate\Support\Facades\Route;
 // Public pages
 Route::get('/', fn() => view('public.home'))->name('home');
 
+// Customer auth
+Route::middleware('guest:customer')->group(function () {
+    Route::get('/customer/login', App\Livewire\Customer\Login::class)->name('customer.login');
+    Route::get('/customer/register', App\Livewire\Customer\Register::class)->name('customer.register');
+});
+
+// Customer portal
+Route::middleware('auth:customer')->group(function () {
+    Route::get('/account', App\Livewire\Customer\Account::class)->name('customer.account');
+});
+
+// Staff auth & admin
 Route::middleware('auth')->group(function () {
     // Everyone can access
     Route::get('/dashboard', App\Livewire\Dashboard::class)->name('dashboard');

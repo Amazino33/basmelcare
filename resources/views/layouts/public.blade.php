@@ -40,7 +40,13 @@
                     <a href="/shop" class="btn btn-ghost btn-sm btn-circle relative">
                         <x-icon name="o-shopping-bag" class="w-5 h-5" />
                     </a>
-                    <a href="/customer/login" class="btn btn-primary btn-sm">Sign In</a>
+                    @if(auth('customer')->check())
+                        <a href="/account" class="btn btn-ghost btn-sm">
+                            <x-icon name="o-user-circle" class="w-5 h-5" /> Account
+                        </a>
+                    @else
+                        <a href="/customer/login" class="btn btn-primary btn-sm">Sign In</a>
+                    @endif
                 </div>
 
                 <!-- Mobile right actions -->
@@ -121,7 +127,7 @@
                 <x-icon name="o-shopping-cart" class="w-5 h-5" />
                 <span class="mt-0.5">Cart</span>
             </a>
-            <a href="/customer/login" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('account*') ? 'text-primary' : 'text-base-content/60' }}">
+            <a href="{{ auth('customer')->check() ? '/account' : '/customer/login' }}" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('account*') ? 'text-primary' : 'text-base-content/60' }}">
                 <x-icon name="o-user" class="w-5 h-5" />
                 <span class="mt-0.5">Account</span>
             </a>
