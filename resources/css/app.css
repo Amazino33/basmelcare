@@ -6,7 +6,32 @@
 
 /** daisyUI */
 @plugin "daisyui" {
-    themes: light --default, dark;
+    themes: light --default, dark,
+    --name: pharmacy
+    --default
+    --color-scheme: light
+    --p: oklch(59.29% 0.144 163.05)
+    --s: oklch(44.6% 0.03 256.8)
+    --a: oklch(76.86% 0.165 84.43)
+    --n: oklch(27.45% 0.024 264.44)
+    --b1: oklch(98.51% 0.002 247.84)
+    --b2: oklch(96.15% 0.005 247.84)
+    --b3: oklch(92.76% 0.009 258.34)
+    --bc: oklch(27.45% 0.024 264.44)
+    --pc: oklch(97% 0.02 163.05)
+    --sc: oklch(97% 0.01 256.8)
+    --ac: oklch(25% 0.04 84.43)
+    --nc: oklch(97% 0.01 264.44)
+    --su: oklch(64.8% 0.15 160)
+    --er: oklch(57.71% 0.215 27.33)
+    --wa: oklch(68.5% 0.169 52.25)
+    --in: oklch(62.31% 0.145 253.1)
+    --suc: oklch(97% 0.02 160)
+    --erc: oklch(97% 0.02 27.33)
+    --wac: oklch(25% 0.04 52.25)
+    --inc: oklch(97% 0.02 253.1)
+    --rounded-btn: 0.5rem
+    --rounded-box: 0.75rem;
 }
 
 /* maryUI */

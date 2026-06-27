@@ -2,7 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/dashboard');
+// Public pages
+Route::get('/', fn() => view('public.home'))->name('home');
 
 Route::middleware('auth')->group(function () {
     // Everyone can access
