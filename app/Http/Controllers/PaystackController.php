@@ -20,7 +20,7 @@ class PaystackController extends Controller
         return view('public.paystack-pay', [
             'order' => $order,
             'paystackKey' => $paystackKey,
-            'email' => $order->customer?->email ?? $order->guest_email,
+            'email' => $order->customer?->email ?? $order->guest_email ?? ($order->guest_phone . '@guest.basmelcare.com'),
             'amount' => $order->total_amount * 100,
             'reference' => 'BMC-' . $order->id . '-' . time(),
         ]);

@@ -40,14 +40,14 @@
                                     @error('guest_name') <span class="text-error text-xs">{{ $message }}</span> @enderror
                                 </div>
                                 <div>
-                                    <label class="label"><span class="label-text font-semibold text-sm">Email</span></label>
-                                    <input wire:model="guest_email" type="email" class="input input-bordered w-full input-sm" placeholder="you@example.com" required />
-                                    @error('guest_email') <span class="text-error text-xs">{{ $message }}</span> @enderror
-                                </div>
-                                <div>
                                     <label class="label"><span class="label-text font-semibold text-sm">Phone</span></label>
                                     <input wire:model="guest_phone" type="tel" class="input input-bordered w-full input-sm" placeholder="08012345678" required />
                                     @error('guest_phone') <span class="text-error text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="label"><span class="label-text font-semibold text-sm">Email <span class="text-base-content/40">(optional)</span></span></label>
+                                    <input wire:model="guest_email" type="email" class="input input-bordered w-full input-sm" placeholder="you@example.com" />
+                                    @error('guest_email') <span class="text-error text-xs">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                         @endif

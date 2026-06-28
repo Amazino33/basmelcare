@@ -96,7 +96,7 @@ class Checkout extends Component
 
         if ($this->checkout_mode === 'guest') {
             $rules['guest_name'] = 'required|string|max:255';
-            $rules['guest_email'] = 'required|email|max:255';
+            $rules['guest_email'] = 'nullable|email|max:255';
             $rules['guest_phone'] = 'required|string|max:20';
         }
 
