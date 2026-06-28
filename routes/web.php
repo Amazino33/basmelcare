@@ -31,9 +31,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', App\Livewire\Dashboard::class)->name('dashboard');
     Route::view('profile', 'profile')->name('profile');
 
-    // POS — sales person creates invoices (admin, pharmacist, branch_manager, sales)
+    // POS & Online Orders — sales person (admin, pharmacist, branch_manager, sales)
     Route::middleware('role:admin,pharmacist,branch_manager,sales')->group(function () {
         Route::get('/pos', App\Livewire\Pos\Index::class)->name('pos.index');
+        Route::get('/online-orders', App\Livewire\OnlineOrders\Index::class)->name('online-orders.index');
     });
 
     // Cashier — processes payments (admin, pharmacist, branch_manager, cashier)

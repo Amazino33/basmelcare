@@ -46,9 +46,11 @@
                 @endif
 
                 @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
+                    @php $onlineOrderCount = \App\Models\Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count(); @endphp
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
                         @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
                             <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
+                            <x-menu-item title="Online Orders" icon="o-globe-alt" link="{{ route('online-orders.index') }}" badge="{{ $onlineOrderCount ?: '' }}" badge-classes="badge-error badge-xs" />
                         @endif
                         @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
