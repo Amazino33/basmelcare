@@ -55,8 +55,7 @@ new #[Layout('layouts.guest')] class extends Component
         <button type="submit" class="btn btn-primary btn-block">Sign In</button>
 
         <div class="text-center text-sm text-base-content/60">
-            Don't have an account?
-            <a href="{{ route('register') }}" wire:navigate class="text-primary hover:underline font-semibold">Register</a>
+            Staff accounts are created by admin only.
         </div>
     </form>
 </div>
