@@ -49,8 +49,18 @@ class Sale extends Model
 
     public static function generateInvoiceNumber(): string
     {
-        $last = static::whereNotNull('invoice_number')->latest('id')->first();
-        $next = $last ? ((int) str_replace('INV-', '', $last->invoice_number)) + 1 : 1;
-        return 'INV-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+        $prefix = 'INV-' . now()->format('Ymd') . '-';
+        $last = static::where('invoice_number', 'like', $prefix . '%')
+            ->orderByDesc('invoice_number')
+            ->value('invoice_number');
+
+        if ($last) {
+            $lastNum = (int) substr($last, strlen($prefix));
+            $next = $lastNum + 1;
+        } else {
+            $next = 1;
+        }
+
+        return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
     }
 }
