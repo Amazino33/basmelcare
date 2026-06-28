@@ -2,12 +2,9 @@
 
 namespace App\Livewire\Shop;
 
-use App\Models\Batch;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
-use App\Models\StockMovement;
 use App\Services\CartService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -139,22 +136,6 @@ class Checkout extends Component
                     'unit_price' => $item['price'],
                     'subtotal' => $item['price'] * $item['quantity'],
                 ]);
-
-                $product = Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)->orderBy('expiry_date')])->find($item['product_id']);
-                $remaining = $item['quantity'];
-
-                foreach ($product->batches as $batch) {
-                    if ($remaining <= 0) break;
-                    $deduct = min($remaining, $batch->quantity);
-                    $batch->decrement('quantity', $deduct);
-                    StockMovement::create([
-                        'batch_id' => $batch->id,
-                        'quantity' => -$deduct,
-                        'type' => 'sale',
-                        'reference' => $order->order_number,
-                    ]);
-                    $remaining -= $deduct;
-                }
             }
 
             return $order;
