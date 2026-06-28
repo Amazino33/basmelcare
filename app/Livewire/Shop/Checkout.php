@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Shop;
 
-use App\Models\AppSetting;
 use App\Models\Batch;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -21,6 +21,19 @@ class Checkout extends Component
 {
     use Toast, WithFileUploads;
 
+    public string $checkout_mode = 'guest';
+    public bool $isLoggedIn = false;
+
+    // Guest fields
+    public string $guest_name = '';
+    public string $guest_email = '';
+    public string $guest_phone = '';
+
+    // Login fields
+    public string $login_email = '';
+    public string $login_password = '';
+
+    // Shared fields
     public string $fulfillment_type = 'delivery';
     public string $delivery_address = '';
     public string $delivery_phone = '';
@@ -31,8 +44,34 @@ class Checkout extends Component
     public function mount()
     {
         $customer = Auth::guard('customer')->user();
-        $this->delivery_address = $customer->address ?? '';
-        $this->delivery_phone = $customer->phone ?? '';
+        if ($customer) {
+            $this->isLoggedIn = true;
+            $this->checkout_mode = 'account';
+            $this->delivery_address = $customer->address ?? '';
+            $this->delivery_phone = $customer->phone ?? '';
+        }
+    }
+
+    public function loginAndCheckout()
+    {
+        $this->validate([
+            'login_email' => 'required|string',
+            'login_password' => 'required|string',
+        ]);
+
+        $customer = Customer::where('email', $this->login_email)
+            ->orWhere('phone', $this->login_email)
+            ->first();
+
+        if ($customer && Auth::guard('customer')->attempt(['email' => $customer->email, 'password' => $this->login_password], true)) {
+            $this->isLoggedIn = true;
+            $this->checkout_mode = 'account';
+            $this->delivery_address = $customer->address ?? '';
+            $this->delivery_phone = $customer->phone ?? '';
+            $this->success('Signed in! Continue checkout.');
+        } else {
+            $this->addError('login_password', 'Invalid credentials.');
+        }
     }
 
     public function placeOrder()
@@ -55,6 +94,12 @@ class Checkout extends Component
             $rules['delivery_phone'] = 'required|string|max:20';
         }
 
+        if ($this->checkout_mode === 'guest') {
+            $rules['guest_name'] = 'required|string|max:255';
+            $rules['guest_email'] = 'required|email|max:255';
+            $rules['guest_phone'] = 'required|string|max:20';
+        }
+
         if ($cart->requiresPrescription()) {
             $rules['prescription'] = 'required|file|max:5120';
         }
@@ -69,16 +114,19 @@ class Checkout extends Component
         $order = DB::transaction(function () use ($cart, $customer, $subtotal, $deliveryFee, $prescriptionPath) {
             $order = Order::create([
                 'order_number' => Order::generateOrderNumber(),
-                'customer_id' => $customer->id,
+                'customer_id' => $customer?->id,
+                'guest_name' => $this->checkout_mode === 'guest' ? $this->guest_name : null,
+                'guest_email' => $this->checkout_mode === 'guest' ? $this->guest_email : null,
+                'guest_phone' => $this->checkout_mode === 'guest' ? $this->guest_phone : null,
                 'subtotal' => $subtotal,
                 'delivery_fee' => $deliveryFee,
                 'total_amount' => $subtotal + $deliveryFee,
                 'fulfillment_type' => $this->fulfillment_type,
                 'payment_method' => $this->payment_method,
-                'payment_status' => $this->payment_method === 'pay_on_delivery' ? 'pending' : 'pending',
+                'payment_status' => 'pending',
                 'status' => 'pending',
                 'delivery_address' => $this->fulfillment_type === 'delivery' ? $this->delivery_address : null,
-                'delivery_phone' => $this->fulfillment_type === 'delivery' ? $this->delivery_phone : null,
+                'delivery_phone' => $this->fulfillment_type === 'delivery' ? $this->delivery_phone : ($this->checkout_mode === 'guest' ? $this->guest_phone : $customer?->phone),
                 'note' => $this->note,
                 'prescription_path' => $prescriptionPath,
             ]);

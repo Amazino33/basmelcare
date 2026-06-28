@@ -15,12 +15,14 @@ Route::middleware('guest:customer')->group(function () {
     Route::get('/customer/register', App\Livewire\Customer\Register::class)->name('customer.register');
 });
 
-// Customer portal
+// Checkout (guest or logged in)
+Route::get('/checkout', App\Livewire\Shop\Checkout::class)->name('checkout');
+Route::get('/order/{order}/pay', [App\Http\Controllers\PaystackController::class, 'pay'])->name('order.pay');
+Route::get('/order/{order}/confirmation', fn(App\Models\Order $order) => view('public.order-confirmation', ['order' => $order]))->name('order.confirmation');
+
+// Customer portal (logged in only)
 Route::middleware('auth:customer')->group(function () {
     Route::get('/account', App\Livewire\Customer\Account::class)->name('customer.account');
-    Route::get('/checkout', App\Livewire\Shop\Checkout::class)->name('checkout');
-    Route::get('/order/{order}/pay', [App\Http\Controllers\PaystackController::class, 'pay'])->name('order.pay');
-    Route::get('/order/{order}/confirmation', fn(App\Models\Order $order) => view('public.order-confirmation', ['order' => $order]))->name('order.confirmation');
 });
 
 // Staff auth & admin
