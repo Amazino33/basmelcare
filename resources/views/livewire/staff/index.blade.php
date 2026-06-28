@@ -14,6 +14,7 @@
                 'badge-primary' => $member->role === 'admin',
                 'badge-secondary' => $member->role === 'pharmacist',
                 'badge-accent' => $member->role === 'branch_manager',
+                'badge-warning' => $member->role === 'sales',
                 'badge-ghost' => $member->role === 'cashier',
                 'badge-info' => $member->role === 'inventory_manager',
             ]) />
@@ -56,6 +57,7 @@
                     ['id' => 'admin', 'name' => 'Admin'],
                     ['id' => 'pharmacist', 'name' => 'Pharmacist'],
                     ['id' => 'branch_manager', 'name' => 'Branch Manager'],
+                    ['id' => 'sales', 'name' => 'Sales'],
                     ['id' => 'cashier', 'name' => 'Cashier'],
                     ['id' => 'inventory_manager', 'name' => 'Inventory Manager'],
                 ]" option-value="id" option-label="name" />

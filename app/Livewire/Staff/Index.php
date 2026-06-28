@@ -51,7 +51,7 @@ class Index extends Component
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email,' . $this->staffId,
             'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,pharmacist,branch_manager,cashier,inventory_manager',
+            'role' => 'required|in:admin,pharmacist,branch_manager,sales,cashier,inventory_manager',
             'branch_id' => 'nullable|exists:branches,id',
             'position' => 'nullable|string|max:255',
             'employment_date' => 'nullable|date',

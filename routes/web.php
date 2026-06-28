@@ -29,10 +29,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', App\Livewire\Dashboard::class)->name('dashboard');
     Route::view('profile', 'profile')->name('profile');
 
-    // Sales (admin, pharmacist, branch_manager, cashier)
-    Route::middleware('role:admin,pharmacist,branch_manager,cashier')->group(function () {
+    // POS — sales person creates invoices (admin, pharmacist, branch_manager, sales)
+    Route::middleware('role:admin,pharmacist,branch_manager,sales')->group(function () {
         Route::get('/pos', App\Livewire\Pos\Index::class)->name('pos.index');
+    });
+
+    // Cashier — processes payments (admin, pharmacist, branch_manager, cashier)
+    Route::middleware('role:admin,pharmacist,branch_manager,cashier')->group(function () {
         Route::get('/cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
+    });
+
+    // Shared sales pages (admin, pharmacist, branch_manager, sales, cashier)
+    Route::middleware('role:admin,pharmacist,branch_manager,sales,cashier')->group(function () {
         Route::get('/sales', App\Livewire\Sales\Index::class)->name('sales.index');
         Route::get('/debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
         Route::get('/invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');

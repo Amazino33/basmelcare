@@ -45,10 +45,14 @@
                     </x-menu-sub>
                 @endif
 
-                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
-                        <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
-                        <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
+                        @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+                            <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
+                        @endif
+                        @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                            <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
+                        @endif
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
                         <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
                     </x-menu-sub>
@@ -74,7 +78,7 @@
                     @if($role === 'admin')
                         <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     @endif
-                    @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                    @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
                         <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
                         <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
                     @endif
