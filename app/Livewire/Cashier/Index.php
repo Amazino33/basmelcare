@@ -14,6 +14,7 @@ class Index extends Component
     use Toast;
 
     public string $searchInvoice = '';
+    public int $lastPendingCount = 0;
 
     // Payment form
     public ?int $payingSaleId = null;
@@ -151,6 +152,13 @@ class Index extends Component
         $payingSale = $this->payingSaleId
             ? Sale::with('saleItems.product', 'customer', 'user')->find($this->payingSaleId)
             : null;
+
+        $currentCount = $pendingInvoices->count();
+        if ($currentCount > $this->lastPendingCount && $this->lastPendingCount > 0) {
+            $this->dispatch('new-invoice');
+            $this->success('New invoice received!');
+        }
+        $this->lastPendingCount = $currentCount;
 
         return view('livewire.cashier.index', [
             'pendingInvoices' => $pendingInvoices,

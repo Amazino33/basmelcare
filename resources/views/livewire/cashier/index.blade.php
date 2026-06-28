@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.5s>
     <x-header title="Cashier" subtitle="Process invoice payments" size="text-xl">
         <x-slot:middle class="!justify-end">
             <x-input icon="o-magnifying-glass" placeholder="Search invoice #..." wire:model.live.debounce="searchInvoice" clearable />
@@ -134,4 +134,32 @@
             </x-form>
         @endif
     </x-modal>
+
+    @script
+    <script>
+        $wire.on('new-invoice', () => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 800;
+                gain.gain.value = 0.3;
+                osc.start();
+                osc.stop(ctx.currentTime + 0.2);
+                setTimeout(() => {
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.frequency.value = 1000;
+                    gain2.gain.value = 0.3;
+                    osc2.start();
+                    osc2.stop(ctx.currentTime + 0.3);
+                }, 250);
+            } catch(e) {}
+        });
+    </script>
+    @endscript
 </div>

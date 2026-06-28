@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.5s>
     <x-header title="Point of Sale" subtitle="Create invoices for customers" size="text-xl">
         @if($isWholesale)
             <x-slot:actions>
@@ -92,4 +92,42 @@
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
+
+    @script
+    <script>
+        $wire.on('invoice-paid', () => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 600;
+                gain.gain.value = 0.3;
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+                setTimeout(() => {
+                    const o2 = ctx.createOscillator();
+                    const g2 = ctx.createGain();
+                    o2.connect(g2);
+                    g2.connect(ctx.destination);
+                    o2.frequency.value = 900;
+                    g2.gain.value = 0.3;
+                    o2.start();
+                    o2.stop(ctx.currentTime + 0.15);
+                    setTimeout(() => {
+                        const o3 = ctx.createOscillator();
+                        const g3 = ctx.createGain();
+                        o3.connect(g3);
+                        g3.connect(ctx.destination);
+                        o3.frequency.value = 1200;
+                        g3.gain.value = 0.3;
+                        o3.start();
+                        o3.stop(ctx.currentTime + 0.25);
+                    }, 200);
+                }, 200);
+            } catch(e) {}
+        });
+    </script>
+    @endscript
 </div>

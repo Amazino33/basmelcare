@@ -21,11 +21,13 @@ class Index extends Component
     public ?int $customer_id = null;
     public string $note = '';
     public ?int $lastSaleId = null;
+    public int $lastPaidCount = 0;
 
     public function mount()
     {
         $this->cart = session('pos_cart', []);
         $this->customer_id = session('pos_customer_id');
+        $this->lastPaidCount = Sale::where('user_id', auth()->id())->where('status', 'paid')->count();
     }
 
     private function saveCartToSession()
@@ -268,6 +270,13 @@ class Index extends Component
             ->latest()
             ->limit(5)
             ->get();
+
+        $currentPaidCount = Sale::where('user_id', auth()->id())->where('status', 'paid')->count();
+        if ($currentPaidCount > $this->lastPaidCount && $this->lastPaidCount > 0) {
+            $this->dispatch('invoice-paid');
+            $this->success('An invoice has been paid! Ready for handover.');
+        }
+        $this->lastPaidCount = $currentPaidCount;
 
         $lastSale = $this->lastSaleId ? Sale::find($this->lastSaleId) : null;
 
