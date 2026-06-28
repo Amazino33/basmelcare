@@ -27,6 +27,9 @@
     <x-textarea label="Note" wire:model="note" placeholder="Optional" class="mt-2" rows="2" />
 
     <x-button label="Create Invoice" wire:click="createInvoice" icon="o-document-text" class="btn-primary btn-block mt-3" wire:confirm="Create this invoice?" />
+    <button wire:click="clearCart" wire:confirm="Clear all items?" class="btn btn-ghost btn-xs text-error btn-block mt-1">
+        <x-icon name="o-trash" class="w-3 h-3" /> Clear Cart
+    </button>
 @else
     @if($lastSale)
         <div class="text-center py-4">

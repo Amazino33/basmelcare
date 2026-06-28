@@ -22,9 +22,21 @@ class Index extends Component
     public string $note = '';
     public ?int $lastSaleId = null;
 
+    public function mount()
+    {
+        $this->cart = session('pos_cart', []);
+        $this->customer_id = session('pos_customer_id');
+    }
+
+    private function saveCartToSession()
+    {
+        session(['pos_cart' => $this->cart, 'pos_customer_id' => $this->customer_id]);
+    }
+
     public function updatedCustomerId()
     {
         $this->recalculatePrices();
+        $this->saveCartToSession();
     }
 
     public function addToCart($productId)
@@ -67,6 +79,7 @@ class Index extends Component
                 'max_qty' => $batch->quantity,
             ];
         }
+        $this->saveCartToSession();
     }
 
     public function updateQty($key, $qty)
@@ -86,16 +99,25 @@ class Index extends Component
 
         $this->cart[$key]['qty'] = $qty;
         $this->resolvePrice($key);
+        $this->saveCartToSession();
     }
 
     public function removeFromCart($key)
     {
         unset($this->cart[$key]);
+        $this->saveCartToSession();
     }
 
     public function getCartTotalProperty()
     {
         return array_sum(array_column($this->cart, 'subtotal'));
+    }
+
+    public function clearCart()
+    {
+        $this->cart = [];
+        $this->reset(['customer_id', 'note']);
+        session()->forget(['pos_cart', 'pos_customer_id']);
     }
 
     private function recalculatePrices()
@@ -168,6 +190,7 @@ class Index extends Component
         $this->lastSaleId = $saleId;
         $this->cart = [];
         $this->reset(['customer_id', 'note']);
+        session()->forget(['pos_cart', 'pos_customer_id']);
         $this->success('Invoice created. Print it for the customer.');
     }
 
