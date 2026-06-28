@@ -25,6 +25,7 @@
             color="text-primary"
             class="text-sm"
         />
+        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
         <x-stat
             title="Today's Profit"
             value="₦{{ number_format($todayProfit, 2) }}"
@@ -33,6 +34,7 @@
             color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
             class="text-sm"
         />
+        @endif
         <x-stat
             title="Products"
             value="{{ $totalProducts }}"
@@ -52,6 +54,7 @@
     </div>
 
     <!-- Potential Profit -->
+    @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
     <x-card title="Potential Profit" class="mb-4">
         <div class="grid grid-cols-3 gap-2">
             <div class="text-center p-2 sm:p-4 bg-base-200 rounded-lg">
@@ -68,6 +71,7 @@
             </div>
         </div>
     </x-card>
+    @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Expiry Alerts -->

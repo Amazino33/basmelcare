@@ -21,6 +21,7 @@
             icon="o-banknotes"
             color="text-primary"
         />
+        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
         <x-stat
             title="Profit"
             value="₦{{ number_format($totalProfit, 2) }}"
@@ -28,6 +29,7 @@
             icon="o-arrow-trending-up"
             color="{{ $totalProfit >= 0 ? 'text-success' : 'text-error' }}"
         />
+        @endif
         <x-stat
             title="Items Sold"
             value="{{ number_format($totalItemsSold) }}"
@@ -121,7 +123,9 @@
                         <div>
                             <div class="font-semibold text-sm">{{ $item->product->name }}</div>
                             <div class="text-xs text-base-content/60">Batch: {{ $item->batch->batch_number }} | Qty: {{ $item->quantity }} × ₦{{ number_format($item->unit_price, 2) }}</div>
-                            <div class="text-xs text-success">Profit: ₦{{ number_format(($item->unit_price - $item->cost_price) * $item->quantity, 2) }}</div>
+                            @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+                                <div class="text-xs text-success">Profit: ₦{{ number_format(($item->unit_price - $item->cost_price) * $item->quantity, 2) }}</div>
+                            @endif
                         </div>
                         <div class="font-bold">₦{{ number_format($item->subtotal, 2) }}</div>
                     </div>
@@ -135,10 +139,12 @@
                     <span>Total</span>
                     <span class="text-primary">₦{{ number_format($viewSale->total_amount, 2) }}</span>
                 </div>
+                @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
                 <div class="flex justify-between text-sm">
                     <span class="text-base-content/60">Profit</span>
                     <span class="text-success font-semibold">₦{{ number_format($saleProfit, 2) }}</span>
                 </div>
+                @endif
             </div>
 
             @if($viewSale->note)
