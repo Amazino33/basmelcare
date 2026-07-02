@@ -18,7 +18,7 @@
     <!-- Stats Row -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <x-stat
-            title="Today's Sales"
+            title="POS Sales Today"
             value="₦{{ number_format($totalSalesToday, 2) }}"
             description="{{ $salesCountToday }} transactions"
             icon="o-banknotes"
@@ -52,6 +52,51 @@
             class="text-sm"
         />
     </div>
+
+    <!-- Online Orders Stats (visible to roles that process online orders) -->
+    @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <x-stat
+            title="Online Sales Today"
+            value="₦{{ number_format($todayOnlineRevenue, 2) }}"
+            description="{{ $todayOnlineCount }} orders completed"
+            icon="o-globe-alt"
+            color="text-secondary"
+            class="text-sm"
+        />
+        <x-stat
+            title="Pending Online"
+            value="{{ $pendingOnlineOrders }}"
+            description="Awaiting processing"
+            icon="o-clock"
+            color="{{ $pendingOnlineOrders > 0 ? 'text-warning' : 'text-base-content/40' }}"
+            class="text-sm"
+        />
+        <div class="col-span-2 lg:col-span-1 bg-base-100 rounded-lg p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <div class="text-sm text-base-content/60">Combined Today</div>
+                <div class="text-xl font-bold text-primary">₦{{ number_format($totalSalesToday + $todayOnlineRevenue, 2) }}</div>
+                <div class="text-xs text-base-content/60">POS + Online</div>
+            </div>
+            <x-icon name="o-chart-bar" class="w-10 h-10 text-primary/20" />
+        </div>
+    </div>
+
+    @if($pendingOnlineOrders > 0)
+        <div class="alert alert-warning mb-4 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <x-icon name="o-exclamation-triangle" class="w-5 h-5 shrink-0" />
+                <div>
+                    <div class="font-semibold text-sm">{{ $pendingOnlineOrders }} online {{ $pendingOnlineOrders === 1 ? 'order' : 'orders' }} waiting</div>
+                    <div class="text-xs opacity-80">Unclaimed and awaiting a staff member to process.</div>
+                </div>
+            </div>
+            <a href="{{ route('online-orders.index') }}" class="btn btn-sm btn-warning shrink-0">
+                View <x-icon name="o-arrow-right" class="w-4 h-4 inline" />
+            </a>
+        </div>
+    @endif
+    @endif
 
     <!-- Potential Profit -->
     @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
@@ -126,7 +171,7 @@
         </x-card>
 
         <!-- Recent Sales -->
-        <x-card title="Recent Sales" class="lg:col-span-2">
+        <x-card title="Recent POS Sales">
             @forelse($recentSales as $sale)
                 <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
                     <div class="min-w-0 flex-1">
@@ -140,7 +185,42 @@
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">No sales yet.</div>
             @endforelse
+            <div class="mt-2">
+                <x-button label="All Sales" link="{{ route('sales.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
         </x-card>
+
+        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+        <!-- Recent Online Orders -->
+        <x-card title="Recent Online Orders">
+            @forelse($recentOnlineOrders as $order)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-xs sm:text-sm">{{ $order->order_number }}</div>
+                        <div class="text-xs text-base-content/60 truncate">
+                            {{ $order->created_at->format('M d, H:i') }} |
+                            {{ $order->customer?->name ?? $order->guest_name ?? 'Guest' }}
+                        </div>
+                    </div>
+                    <div class="text-right ml-2 shrink-0 space-y-1">
+                        <div class="font-bold text-sm text-secondary">₦{{ number_format($order->total_amount, 2) }}</div>
+                        <x-badge :value="ucfirst($order->status)" @class([
+                            'badge-xs',
+                            'badge-warning'  => in_array($order->status, ['pending', 'processing']),
+                            'badge-info'     => $order->status === 'ready',
+                            'badge-success'  => $order->status === 'completed',
+                            'badge-error'    => $order->status === 'cancelled',
+                        ]) />
+                    </div>
+                </div>
+            @empty
+                <div class="text-center py-4 text-base-content/60 text-sm">No online orders yet.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="All Online Orders" link="{{ route('online-orders.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+        @endif
     </div>
 
     <!-- Setup Wizard Modal -->

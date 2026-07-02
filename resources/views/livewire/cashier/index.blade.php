@@ -32,13 +32,16 @@
         <x-card title="Recently Paid" subtitle="Awaiting handover">
             @forelse($recentPaid as $invoice)
                 <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
-                    <div class="min-w-0">
+                    <div class="min-w-0 flex-1">
                         <div class="font-semibold text-sm">{{ $invoice->invoice_number }}</div>
                         <div class="text-xs text-base-content/60 truncate">{{ $invoice->customer?->name ?? 'Walk-in' }} | {{ ucfirst($invoice->payment_method) }}</div>
                     </div>
-                    <div class="text-right ml-3 shrink-0">
+                    <div class="text-right ml-3 shrink-0 space-y-1">
                         <div class="font-bold text-sm">₦{{ number_format($invoice->total_amount, 2) }}</div>
-                        <x-badge value="Paid" class="badge-success badge-xs" />
+                        <a href="{{ route('receipt.show', $invoice->id) }}" target="_blank"
+                            class="btn btn-xs btn-outline btn-primary">
+                            <x-icon name="o-printer" class="w-3 h-3" /> Receipt
+                        </a>
                     </div>
                 </div>
             @empty
@@ -48,8 +51,38 @@
     </div>
 
     <!-- Payment Modal -->
-    <x-modal wire:model="payModal" title="Process Payment" box-class="max-w-lg">
-        @if($payingSale)
+    <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : 'Process Payment' }}" box-class="max-w-lg">
+        @if($paySuccess && $payingSale)
+            <div class="text-center py-6">
+                <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
+                <div class="text-xl font-bold mb-1">Payment Received!</div>
+                <div class="text-base-content/60 text-sm mb-1">{{ $payingSale->invoice_number }}</div>
+                <div class="text-2xl font-bold text-primary mb-5">₦{{ number_format($payingSale->total_amount, 2) }}</div>
+
+                <div class="bg-base-200 rounded-lg p-3 mb-5 text-sm text-left">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-base-content/60">Customer</span>
+                        <span>{{ $payingSale->customer?->name ?? 'Walk-in' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">Payment</span>
+                        <span>{{ ucfirst($payingSale->payment_method) }}</span>
+                    </div>
+                </div>
+
+                <p class="text-sm text-base-content/60 mb-4">Print 2 copies — customer returns one to the sales person as proof of payment.</p>
+
+                <div class="flex gap-2 justify-center">
+                    <a href="{{ route('receipt.show', $lastPaidSaleId) }}" target="_blank"
+                        class="btn btn-primary gap-2">
+                        <x-icon name="o-printer" class="w-4 h-4" />
+                        Print Receipt (2 copies)
+                    </a>
+                    <x-button label="Done" wire:click="closePay" class="btn-ghost" />
+                </div>
+            </div>
+
+        @elseif($payingSale)
             <div class="bg-base-200 rounded-lg p-3 mb-4">
                 <div class="flex justify-between mb-1">
                     <span class="font-bold">{{ $payingSale->invoice_number }}</span>

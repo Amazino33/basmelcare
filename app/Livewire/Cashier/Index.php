@@ -25,6 +25,8 @@ class Index extends Component
     public string $part_amount = '';
     public string $part_method = 'cash';
     public bool $payModal = false;
+    public bool $paySuccess = false;
+    public ?int $lastPaidSaleId = null;
 
     public function openPayment($saleId)
     {
@@ -129,9 +131,17 @@ class Index extends Component
             }
         });
 
+        $this->lastPaidSaleId = $sale->id;
+        $this->paySuccess = true;
+    }
+
+    public function closePay(): void
+    {
         $this->payModal = false;
-        $this->success('Payment received for ' . $sale->invoice_number);
-        $this->reset(['payingSaleId', 'payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method']);
+        $this->paySuccess = false;
+        $this->reset(['payingSaleId', 'lastPaidSaleId', 'payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method']);
+        $this->payment_method = 'cash';
+        $this->part_method = 'cash';
     }
 
     public function render()

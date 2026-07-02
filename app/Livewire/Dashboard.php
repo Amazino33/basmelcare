@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\AppSetting;
 use App\Models\Batch;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
@@ -159,6 +160,20 @@ class Dashboard extends Component
             ->limit(5)
             ->get();
 
+        $todayOnlineRevenue = Order::whereDate('created_at', today())
+            ->whereIn('status', ['completed', 'ready'])
+            ->sum('total_amount');
+        $todayOnlineCount = Order::whereDate('created_at', today())
+            ->whereIn('status', ['completed', 'ready'])
+            ->count();
+        $pendingOnlineOrders = Order::whereNull('claimed_by')
+            ->whereIn('status', ['pending', 'processing'])
+            ->count();
+        $recentOnlineOrders = Order::with('customer')
+            ->latest()
+            ->limit(5)
+            ->get();
+
         $setupProgress = $this->getSetupProgress();
 
         return view('livewire.dashboard.index', [
@@ -175,6 +190,10 @@ class Dashboard extends Component
             'potentialRevenue' => $potentialRevenue,
             'potentialCost' => $potentialCost,
             'recentSales' => $recentSales,
+            'todayOnlineRevenue' => $todayOnlineRevenue,
+            'todayOnlineCount' => $todayOnlineCount,
+            'pendingOnlineOrders' => $pendingOnlineOrders,
+            'recentOnlineOrders' => $recentOnlineOrders,
             'setupProgress' => $setupProgress,
         ]);
     }
