@@ -41,6 +41,22 @@ class Index extends Component
         $this->saveCartToSession();
     }
 
+    public function selectCustomer(int $id): void
+    {
+        $this->customer_id = $id;
+        $this->customerSearch = '';
+        $this->recalculatePrices();
+        $this->saveCartToSession();
+    }
+
+    public function clearCustomer(): void
+    {
+        $this->customer_id = null;
+        $this->customerSearch = '';
+        $this->recalculatePrices();
+        $this->saveCartToSession();
+    }
+
     public function addToCart($productId)
     {
         $product = Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)->orderBy('expiry_date')])->findOrFail($productId);
@@ -254,7 +270,7 @@ class Index extends Component
             ->limit(20)
             ->get();
 
-        $customers = Customer::orderBy('name')->get();
+        $customers = Customer::orderBy('name')->get(['id', 'name', 'phone']);
         $selectedCustomer = $this->customer_id ? Customer::find($this->customer_id) : null;
 
         $myInvoices = Sale::with('customer')
@@ -283,6 +299,7 @@ class Index extends Component
         return view('livewire.pos.index', [
             'products' => $products,
             'customers' => $customers,
+            'selectedCustomer' => $selectedCustomer,
             'cartTotal' => $this->cartTotal,
             'isWholesale' => $selectedCustomer && $selectedCustomer->type === 'wholesale',
             'myInvoices' => $myInvoices,

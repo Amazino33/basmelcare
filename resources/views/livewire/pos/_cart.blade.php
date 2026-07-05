@@ -23,7 +23,60 @@
         ₦{{ number_format($cartTotal, 2) }}
     </div>
 
-    <x-choices label="Customer" wire:model.live="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Search customer..." single searchable />
+    {{-- Customer search (fully client-side filtering via Alpine.js) --}}
+    <div class="mt-2"
+        x-data="{
+            all: {{ $customers->toJson() }},
+            search: '',
+            open: false,
+            get results() {
+                if (!this.search) return [];
+                const q = this.search.toLowerCase();
+                return this.all.filter(c =>
+                    c.name.toLowerCase().includes(q) ||
+                    (c.phone && c.phone.includes(q))
+                ).slice(0, 15);
+            }
+        }"
+        @click.outside="open = false; search = ''">
+
+        <label class="label py-1"><span class="label-text text-sm font-semibold">Customer</span></label>
+
+        @if($selectedCustomer)
+            <div class="flex items-center gap-2 input input-bordered input-sm w-full pr-1">
+                <span class="flex-1 text-sm truncate">{{ $selectedCustomer->name }}
+                    @if($selectedCustomer->phone)
+                        <span class="text-base-content/50 text-xs ml-1">{{ $selectedCustomer->phone }}</span>
+                    @endif
+                </span>
+                <button wire:click="clearCustomer" class="btn btn-ghost btn-xs text-error shrink-0">✕</button>
+            </div>
+        @else
+            <div class="relative">
+                <input
+                    type="text"
+                    x-model="search"
+                    @focus="open = true"
+                    @input="open = true"
+                    placeholder="Search name or phone..."
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="off"
+                />
+
+                <div x-show="open && results.length > 0"
+                    class="absolute z-200 w-full bg-base-100 border border-base-300 rounded-lg shadow-2xl mt-1 max-h-52 overflow-y-auto">
+                    <template x-for="c in results" :key="c.id">
+                        <button
+                            @mousedown.prevent="$wire.selectCustomer(c.id); open = false; search = ''"
+                            class="w-full text-left px-3 py-2 hover:bg-base-200 border-b border-base-200 last:border-0 transition-colors">
+                            <div class="font-semibold text-sm" x-text="c.name"></div>
+                            <div class="text-xs text-base-content/50" x-text="c.phone ?? ''"></div>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        @endif
+    </div>
     <x-textarea label="Note" wire:model="note" placeholder="Optional" class="mt-2" rows="2" />
 
     <x-button label="Create Invoice" wire:click="createInvoice" icon="o-document-text" class="btn-primary btn-block mt-3" wire:confirm="Create this invoice?" />
