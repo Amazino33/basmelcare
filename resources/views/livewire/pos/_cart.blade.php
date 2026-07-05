@@ -63,7 +63,7 @@
                     autocomplete="off"
                 />
 
-                <div x-show="open && results.length > 0"
+                <div x-show="open && (results.length > 0 || search.length > 0)"
                     class="absolute z-200 w-full bg-base-100 border border-base-300 rounded-lg shadow-2xl mt-1 max-h-52 overflow-y-auto">
                     <template x-for="c in results" :key="c.id">
                         <button
@@ -73,6 +73,13 @@
                             <div class="text-xs text-base-content/50" x-text="c.phone ?? ''"></div>
                         </button>
                     </template>
+
+                    <button
+                        @mousedown.prevent="$wire.openCreateCustomer(search); open = false"
+                        class="w-full text-left px-3 py-2 text-primary hover:bg-primary/10 flex items-center gap-2 text-sm font-semibold border-t border-base-300">
+                        <span>+</span>
+                        <span x-text="search ? 'Create \'' + search + '\'' : 'Create new customer'"></span>
+                    </button>
                 </div>
             </div>
         @endif
@@ -83,6 +90,19 @@
     <button wire:click="clearCart" wire:confirm="Clear all items?" class="btn btn-ghost btn-xs text-error btn-block mt-1">
         <x-icon name="o-trash" class="w-3 h-3" /> Clear Cart
     </button>
+{{-- Create Customer Modal --}}
+<x-modal wire:model="createCustomerModal" title="New Customer" box-class="max-w-sm">
+    <x-form wire:submit="createCustomer">
+        <x-input label="Name" wire:model="newCustomerName" placeholder="Full name" required autofocus />
+        <x-input label="Phone" wire:model="newCustomerPhone" placeholder="08012345678" />
+        <x-input label="Email" wire:model="newCustomerEmail" type="email" placeholder="optional" />
+        <x-slot:actions>
+            <x-button label="Cancel" @click="$wire.createCustomerModal = false" />
+            <x-button label="Create & Select" type="submit" class="btn-primary" icon="o-user-plus" />
+        </x-slot:actions>
+    </x-form>
+</x-modal>
+
 @else
     @if($lastSale)
         <div class="text-center py-4">

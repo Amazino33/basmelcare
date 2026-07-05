@@ -21,6 +21,12 @@ class Index extends Component
     public ?int $customer_id = null;
     public string $note = '';
     public ?int $lastSaleId = null;
+
+    // Create customer inline
+    public bool $createCustomerModal = false;
+    public string $newCustomerName = '';
+    public string $newCustomerPhone = '';
+    public string $newCustomerEmail = '';
     public int $lastPaidCount = 0;
 
     public function mount()
@@ -52,9 +58,35 @@ class Index extends Component
     public function clearCustomer(): void
     {
         $this->customer_id = null;
-        $this->customerSearch = '';
         $this->recalculatePrices();
         $this->saveCartToSession();
+    }
+
+    public function openCreateCustomer(string $name = ''): void
+    {
+        $this->newCustomerName = $name;
+        $this->newCustomerPhone = '';
+        $this->newCustomerEmail = '';
+        $this->createCustomerModal = true;
+    }
+
+    public function createCustomer(): void
+    {
+        $this->validate([
+            'newCustomerName'  => 'required|string|max:255',
+            'newCustomerPhone' => 'nullable|string|max:20',
+            'newCustomerEmail' => 'nullable|email|max:255',
+        ]);
+
+        $customer = Customer::create([
+            'name'  => $this->newCustomerName,
+            'phone' => $this->newCustomerPhone ?: null,
+            'email' => $this->newCustomerEmail ?: null,
+        ]);
+
+        $this->createCustomerModal = false;
+        $this->selectCustomer($customer->id);
+        $this->success($customer->name . ' created and selected.');
     }
 
     public function addToCart($productId)
