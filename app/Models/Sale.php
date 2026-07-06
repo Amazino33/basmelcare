@@ -13,6 +13,7 @@ class Sale extends Model
         'invoice_number', 'user_id', 'confirmed_by', 'customer_id',
         'total_amount', 'payment_method', 'payment_details',
         'status', 'paid_at', 'confirmed_at', 'note',
+        'voucher_redeemed_at',
     ];
 
     protected $casts = [
@@ -20,6 +21,7 @@ class Sale extends Model
         'payment_details' => 'array',
         'paid_at' => 'datetime',
         'confirmed_at' => 'datetime',
+        'voucher_redeemed_at' => 'datetime',
     ];
 
     public function user()

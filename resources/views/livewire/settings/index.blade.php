@@ -9,6 +9,7 @@
                         <x-input label="Pharmacy Name" wire:model="pharmacy_name" />
                         <x-input label="Phone" wire:model="pharmacy_phone" />
                         <x-input label="Email" wire:model="pharmacy_email" type="email" />
+                        <x-input label="Website" wire:model="pharmacy_website" placeholder="https://www.example.com" />
                         <x-input label="Currency Symbol" wire:model="currency_symbol" hint="e.g. ₦, $, £" />
                         <div class="md:col-span-2">
                             <x-textarea label="Address" wire:model="pharmacy_address" rows="2" />
@@ -60,6 +61,32 @@
                     <x-input label="Secret Key" wire:model="paystack_secret_key" type="password" placeholder="sk_live_..." />
                     <x-slot:actions>
                         <x-button label="Save Paystack Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
+        <x-tab name="incentives" label="Incentives" icon="o-gift">
+            <x-card title="HifastLink Voucher Integration" class="mt-4">
+                <p class="text-sm text-base-content/60 mb-4">
+                    Customers who pay at BasmelCare can redeem their receipt number on HifastLink for free internet access.
+                    Give the API key to your HifastLink administrator to paste into the integration settings.
+                </p>
+                <x-form wire:submit="saveIncentives">
+                    <div>
+                        <x-input label="API Key" wire:model="hifastlink_api_key" readonly
+                            hint="Paste this into HifastLink → Network Settings → Pharmacy Integration" />
+                        <div class="mt-2">
+                            <x-button label="Generate New Key" wire:click="regenerateApiKey" class="btn-warning btn-sm"
+                                icon="o-arrow-path"
+                                wire:confirm="This will invalidate the old key. HifastLink will stop working until you update it there. Continue?" />
+                        </div>
+                    </div>
+                    <x-input label="Voucher Validity (hours)" wire:model="voucher_validity_hours"
+                        type="number" min="1" max="168"
+                        hint="How long free internet lasts after redemption. Default: 24 hours" class="max-w-xs mt-4" />
+                    <x-slot:actions>
+                        <x-button label="Save" type="submit" class="btn-primary" />
                     </x-slot:actions>
                 </x-form>
             </x-card>

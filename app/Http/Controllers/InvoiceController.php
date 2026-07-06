@@ -29,6 +29,7 @@ class InvoiceController extends Controller
             'pharmacyPhone' => AppSetting::get('pharmacy_phone', ''),
             'pharmacyEmail' => AppSetting::get('pharmacy_email', ''),
             'pharmacyAddress' => AppSetting::get('pharmacy_address', ''),
+            'pharmacyWebsite' => AppSetting::get('pharmacy_website', ''),
         ];
     }
 }

@@ -69,6 +69,7 @@
 
     @php
         $items = $sale->saleItems;
+        $hifastlinkEnabled = \App\Models\AppSetting::get('hifastlink_api_key', '') !== '';
     @endphp
 
     {{-- COPY 1: CUSTOMER RECEIPT --}}
@@ -81,6 +82,7 @@
             <h1>{{ $pharmacyName ?: 'BasmelCare Pharmacy' }}</h1>
             @if($pharmacyAddress)<p>{{ $pharmacyAddress }}</p>@endif
             @if($pharmacyPhone)<p>Tel: {{ $pharmacyPhone }}</p>@endif
+            @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
         </div>
 
         <div class="line"></div>
@@ -121,10 +123,21 @@
 
         <div class="line"></div>
 
+        @if($hifastlinkEnabled && !$sale->voucher_redeemed_at)
+        <div class="line"></div>
+        <div style="text-align:center;font-size:10px;padding:4px 0;">
+            <div style="font-weight:bold;font-size:11px;">🎁 FREE INTERNET OFFER</div>
+            <div>Use invoice <strong>{{ $sale->invoice_number }}</strong></div>
+            <div>on HifastLink for 1 free day of internet!</div>
+            <div style="margin-top:2px;color:#555;">Visit hifastlink.com &gt; Pharmacy Voucher</div>
+        </div>
+        @endif
+
         <div class="footer">
             <p>Thank you for your patronage!</p>
             <p>{{ $pharmacyName ?: 'BasmelCare Pharmacy' }}</p>
             @if($pharmacyPhone)<p>{{ $pharmacyPhone }}</p>@endif
+            @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
         </div>
     </div>
 
@@ -142,6 +155,7 @@
             <h1>{{ $pharmacyName ?: 'BasmelCare Pharmacy' }}</h1>
             @if($pharmacyAddress)<p>{{ $pharmacyAddress }}</p>@endif
             @if($pharmacyPhone)<p>Tel: {{ $pharmacyPhone }}</p>@endif
+            @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
         </div>
 
         <div class="line"></div>
@@ -185,6 +199,7 @@
         <div class="footer">
             <p>{{ $pharmacyName ?: 'BasmelCare Pharmacy' }}</p>
             @if($pharmacyPhone)<p>{{ $pharmacyPhone }}</p>@endif
+            @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
         </div>
     </div>
 </body>
