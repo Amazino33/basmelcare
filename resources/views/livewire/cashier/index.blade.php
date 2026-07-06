@@ -160,6 +160,19 @@
                     @endif
                 @endif
 
+                {{-- Walk-in WhatsApp receipt --}}
+                @if(!$payingSale->customer_id)
+                    <div class="mt-3">
+                        <x-input
+                            wire:model="walkin_phone"
+                            label="WhatsApp for receipt"
+                            placeholder="08012345678 (optional)"
+                            icon="o-chat-bubble-left-ellipsis"
+                            hint="Leave blank to skip"
+                        />
+                    </div>
+                @endif
+
                 <x-slot:actions>
                     <x-button label="Cancel" @click="$wire.payModal = false" />
                     <x-button label="Confirm" type="submit" class="btn-primary" icon="o-check" />

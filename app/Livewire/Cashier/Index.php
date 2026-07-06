@@ -5,6 +5,7 @@ namespace App\Livewire\Cashier;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\Sale;
+use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -24,14 +25,15 @@ class Index extends Component
     public string $split_card = '';
     public string $part_amount = '';
     public string $part_method = 'cash';
+    public string $walkin_phone = '';
     public bool $payModal = false;
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
 
-    public function openPayment($saleId)
+    public function openPayment(int $saleId)
     {
         $this->payingSaleId = $saleId;
-        $this->reset(['payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method']);
+        $this->reset(['payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method', 'walkin_phone']);
         $this->payment_method = 'cash';
         $this->part_method = 'cash';
         $this->payModal = true;
@@ -39,7 +41,7 @@ class Index extends Component
 
     public function processPayment()
     {
-        $sale = Sale::with('customer')->findOrFail($this->payingSaleId);
+        $sale = Sale::with('customer', 'saleItems.product')->findOrFail($this->payingSaleId);
 
         if ($sale->status !== 'pending') {
             $this->error('This invoice is not pending.');
@@ -111,8 +113,8 @@ class Index extends Component
 
             if ($this->payment_method === 'part_payment') {
                 $paid = (float) $this->part_amount;
-                $balance = (float) $sale->total_amount - $paid;
 
+                /** @var Debt $debt */
                 $debt = Debt::create([
                     'sale_id' => $sale->id,
                     'customer_id' => $sale->customer_id,
@@ -133,13 +135,85 @@ class Index extends Component
 
         $this->lastPaidSaleId = $sale->id;
         $this->paySuccess = true;
+
+        // Send WhatsApp receipt — must not throw, payment is already done
+        try {
+            $phone = $sale->customer?->phone ?? $this->walkin_phone;
+            if ($phone) {
+                app(WhatsAppService::class)->send($phone, $this->buildReceiptMessage($sale));
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('[WhatsApp Receipt] ' . $e->getMessage());
+        }
+    }
+
+    private function buildReceiptMessage(Sale $sale): string
+    {
+        $pharmacy = \App\Models\AppSetting::get('pharmacy_name', 'BasmelCare Pharmacy');
+        $phone    = \App\Models\AppSetting::get('pharmacy_phone', '');
+
+        $lines = [];
+        $lines[] = "*{$pharmacy}*";
+        $lines[] = "━━━━━━━━━━━━━━━━━━━━";
+        $lines[] = "🧾 *{$sale->invoice_number}*";
+        $lines[] = "📅 " . ($sale->paid_at ?? now())->format('d/m/Y h:i A');
+
+        if ($sale->customer) {
+            $lines[] = "👤 " . $sale->customer->name;
+        }
+
+        $lines[] = "";
+        $lines[] = "*Items:*";
+        foreach ($sale->saleItems as $item) {
+            $lines[] = "• {$item->product->name} × {$item->quantity} — ₦" . number_format($item->subtotal, 2);
+        }
+
+        $lines[] = "━━━━━━━━━━━━━━━━━━━━";
+
+        if ($sale->payment_method === 'credit') {
+            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "*";
+            $lines[] = "⚠️ *Recorded as Credit — Full balance due*";
+            $lines[] = "";
+            $lines[] = "Please settle at your earliest convenience.";
+        } elseif ($sale->payment_method === 'part_payment' && $sale->payment_details) {
+            $paid    = $sale->payment_details['paid_now'] ?? 0;
+            $balance = $sale->payment_details['balance'] ?? 0;
+            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "*";
+            $lines[] = "✅ Paid now: ₦" . number_format($paid, 2);
+            $lines[] = "⚠️ Balance owed: ₦" . number_format($balance, 2);
+            $lines[] = "";
+            $lines[] = "Please settle the balance at your earliest convenience.";
+        } elseif ($sale->payment_method === 'split' && $sale->payment_details) {
+            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "* ✅ Paid";
+            $lines[] = "💳 Split payment:";
+            foreach ($sale->payment_details as $method => $amount) {
+                $lines[] = "  " . ucfirst($method) . ": ₦" . number_format($amount, 2);
+            }
+        } else {
+            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "* ✅ Paid";
+            $lines[] = "💳 " . ucfirst($sale->payment_method);
+        }
+
+        $lines[] = "━━━━━━━━━━━━━━━━━━━━";
+
+        if (\App\Models\AppSetting::get('hifastlink_api_key', '') !== '') {
+            $lines[] = "🎁 *FREE INTERNET OFFER*";
+            $lines[] = "Use your invoice *{$sale->invoice_number}* on HifastLink for 1 free day of internet!";
+            $lines[] = "Visit: hifastlink.com → Pharmacy Voucher";
+            $lines[] = "";
+        }
+
+        $lines[] = "Thank you for your patronage! 🙏";
+        $lines[] = "*{$pharmacy}*" . ($phone ? " | {$phone}" : "");
+
+        return implode("\n", $lines);
     }
 
     public function closePay(): void
     {
         $this->payModal = false;
         $this->paySuccess = false;
-        $this->reset(['payingSaleId', 'lastPaidSaleId', 'payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method']);
+        $this->reset(['payingSaleId', 'lastPaidSaleId', 'payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method', 'walkin_phone']);
         $this->payment_method = 'cash';
         $this->part_method = 'cash';
     }

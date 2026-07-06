@@ -34,16 +34,11 @@ class WhatsAppService
             ]);
 
             if ($response->successful()) {
-                $body = $response->json();
-                if (isset($body['status']) && $body['status'] === 'success') {
-                    Log::info("[WhatsApp] Sent to {$phone}");
-                    return true;
-                }
-                Log::warning("[WhatsApp] API returned non-success for {$phone}: " . $response->body());
-                return false;
+                Log::info("[WhatsApp] Sent to {$phone}");
+                return true;
             }
 
-            Log::warning("[WhatsApp] HTTP {$response->status()} for {$phone}");
+            Log::warning("[WhatsApp] HTTP {$response->status()} for {$phone}: " . $response->body());
             return false;
         } catch (\Throwable $e) {
             Log::error("[WhatsApp] Exception sending to {$phone}: " . $e->getMessage());
