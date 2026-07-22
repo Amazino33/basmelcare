@@ -19,7 +19,7 @@ class Index extends Component
     public string $email = '';
     public string $phone = '';
     public string $password = '';
-    public string $role = 'cashier';
+    public array $role = ['cashier'];
     public string $position = '';
     public string $employment_date = '';
     public string $salary = '';
@@ -51,7 +51,8 @@ class Index extends Component
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email,' . $this->staffId,
             'phone' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,pharmacist,branch_manager,sales,cashier,inventory_manager',
+            'role' => 'required|array|min:1',
+            'role.*' => 'in:admin,pharmacist,branch_manager,sales,cashier,inventory_manager',
             'branch_id' => 'nullable|exists:branches,id',
             'position' => 'nullable|string|max:255',
             'employment_date' => 'nullable|date',

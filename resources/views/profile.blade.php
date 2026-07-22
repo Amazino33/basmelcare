@@ -10,7 +10,9 @@
                     <div class="text-lg font-bold">{{ auth()->user()->name }}</div>
                     <div class="text-sm text-base-content/60">{{ auth()->user()->email }}</div>
                     <div class="flex gap-2 mt-1">
-                        <x-badge :value="ucfirst(str_replace('_', ' ', auth()->user()->role))" class="badge-primary badge-sm" />
+                        @foreach(auth()->user()->role ?? [] as $r)
+                            <x-badge :value="ucfirst(str_replace('_', ' ', $r))" class="badge-primary badge-sm" />
+                        @endforeach
                         @if(auth()->user()->branch)
                             <x-badge :value="auth()->user()->branch->name" class="badge-ghost badge-sm" />
                         @endif

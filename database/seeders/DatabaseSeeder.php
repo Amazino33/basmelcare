@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
         User::firstOrCreate(['email' => 'admin@basmelcare.com'], [
             'name'            => 'Admin',
             'password'        => bcrypt('password'),
-            'role'            => 'admin',
+            'role'            => ['admin'],
             'status'          => 'active',
             'employment_date' => now()->toDateString(),
         ]);

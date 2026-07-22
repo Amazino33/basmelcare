@@ -26,7 +26,7 @@
                 <span class="badge badge-error badge-xs ml-1">{{ $pendingHandoverCount }}</span>
             @endif
         </button>
-        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+        @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
         <button role="tab" wire:click="$set('tab','online')"
             @class(['tab', 'tab-active' => $tab === 'online'])>
             Online Orders
@@ -47,7 +47,7 @@
                 icon="o-banknotes"
                 color="text-primary"
             />
-            @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+            @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
             <x-stat
                 title="Profit"
                 value="₦{{ number_format($totalProfit, 2) }}"
@@ -288,7 +288,7 @@
                         <div>
                             <div class="font-semibold text-sm">{{ $item->product->name }}</div>
                             <div class="text-xs text-base-content/60">Batch: {{ $item->batch->batch_number }} | Qty: {{ $item->quantity }} × ₦{{ number_format($item->unit_price, 2) }}</div>
-                            @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+                            @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
                                 <div class="text-xs text-success">Profit: ₦{{ number_format(($item->unit_price - $item->cost_price) * $item->quantity, 2) }}</div>
                             @endif
                         </div>
@@ -304,7 +304,7 @@
                     <span>Total</span>
                     <span class="text-primary">₦{{ number_format($viewSale->total_amount, 2) }}</span>
                 </div>
-                @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+                @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
                 <div class="flex justify-between text-sm">
                     <span class="text-base-content/60">Profit</span>
                     <span class="text-success font-semibold">₦{{ number_format($saleProfit, 2) }}</span>
@@ -319,6 +319,27 @@
             <div class="mt-4">
                 <x-button label="Print Invoice" link="{{ route('invoice.show', $viewSale->id) }}" class="btn-primary btn-block" icon="o-printer" external />
             </div>
+
+            {{-- HiFastLink Wi-Fi access tied to this receipt --}}
+            @if($viewSale->voucher_redeemed_at)
+                <div class="mt-4 p-3 rounded-lg bg-base-200/60 text-sm space-y-2">
+                    <div class="flex items-center gap-2 font-semibold">
+                        <x-icon name="o-wifi" class="w-4 h-4" /> Wi-Fi Access
+                    </div>
+                    @if($viewSale->voucher_revoked_at)
+                        <div class="text-error">Revoked {{ $viewSale->voucher_revoked_at->diffForHumans() }}.</div>
+                    @elseif($viewSale->wifiActive())
+                        <div class="text-success">Active until {{ $viewSale->wifiExpiresAt()->format('D, d M Y h:i A') }}.</div>
+                        <x-button label="Revoke Wi-Fi access"
+                            wire:click="revokeWifi({{ $viewSale->id }})"
+                            wire:confirm="Revoke internet access for this receipt? The device will no longer be able to reconnect."
+                            class="btn-error btn-outline btn-block btn-sm" icon="o-no-symbol"
+                            spinner="revokeWifi" />
+                    @else
+                        <div class="text-base-content/60">Expired {{ $viewSale->wifiExpiresAt()?->diffForHumans() }}.</div>
+                    @endif
+                </div>
+            @endif
 
         @elseif($tab === 'online' && $viewOrder)
             <div class="space-y-2 mb-4">

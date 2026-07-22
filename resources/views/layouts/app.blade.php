@@ -21,7 +21,7 @@
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
 
-    @php $role = auth()->user()->role; @endphp
+    @php $roles = auth()->user()->role ?? []; @endphp
 
     <x-main full-width>
         <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-100 lg:bg-inherit">
@@ -37,7 +37,7 @@
                 <x-menu-separator />
                 <x-menu-item title="Dashboard" icon="o-chart-bar-square" link="{{ route('dashboard') }}" />
 
-                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
+                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-separator />
                     <x-menu-sub title="Catalog" icon="o-cube">
                         <x-menu-item title="Categories" icon="o-tag" link="{{ route('categories.index') }}" />
@@ -45,14 +45,14 @@
                     </x-menu-sub>
                 @endif
 
-                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
+                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
                     @php $onlineOrderCount = \App\Models\Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count(); @endphp
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
-                        @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales']))
                             <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
                             <x-menu-item title="Online Orders" icon="o-globe-alt" link="{{ route('online-orders.index') }}" badge="{{ $onlineOrderCount ?: '' }}" badge-classes="badge-error badge-xs" />
                         @endif
-                        @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'cashier']))
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
                         @endif
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
@@ -60,7 +60,7 @@
                     </x-menu-sub>
                 @endif
 
-                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
+                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Inventory" icon="o-archive-box">
                         <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
                         <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
@@ -77,21 +77,21 @@
                 @endif
 
                 <x-menu-sub title="People" icon="o-users">
-                    @if($role === 'admin')
+                    @if(in_array('admin', $roles))
                         <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     @endif
-                    @if(in_array($role, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
+                    @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
                         <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
                         <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
                     @endif
                 </x-menu-sub>
 
-                @if(in_array($role, ['admin', 'pharmacist', 'branch_manager']))
+                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager']))
                     <x-menu-separator />
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
                 @endif
 
-                @if($role === 'admin')
+                @if(in_array('admin', $roles))
                     <x-menu-item title="Branches" icon="o-building-storefront" link="{{ route('branches.index') }}" />
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
                 @endif

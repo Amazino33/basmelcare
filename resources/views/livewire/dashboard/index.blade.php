@@ -25,7 +25,7 @@
             color="text-primary"
             class="text-sm"
         />
-        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+        @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
         <x-stat
             title="Today's Profit"
             value="₦{{ number_format($todayProfit, 2) }}"
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Online Orders Stats (visible to roles that process online orders) -->
-    @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+    @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <x-stat
             title="Online Sales Today"
@@ -99,7 +99,7 @@
     @endif
 
     <!-- Potential Profit -->
-    @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager']))
+    @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
     <x-card title="Potential Profit" class="mb-4">
         <div class="grid grid-cols-3 gap-2">
             <div class="text-center p-2 sm:p-4 bg-base-200 rounded-lg">
@@ -190,7 +190,7 @@
             </div>
         </x-card>
 
-        @if(in_array(auth()->user()->role, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+        @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
         <!-- Recent Online Orders -->
         <x-card title="Recent Online Orders">
             @forelse($recentOnlineOrders as $order)

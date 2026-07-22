@@ -10,14 +10,18 @@
 
     <x-table :headers="$headers" :rows="$staff" with-pagination>
         @scope('cell_role', $member)
-            <x-badge :value="ucfirst(str_replace('_', ' ', $member->role))" @class([
-                'badge-primary' => $member->role === 'admin',
-                'badge-secondary' => $member->role === 'pharmacist',
-                'badge-accent' => $member->role === 'branch_manager',
-                'badge-warning' => $member->role === 'sales',
-                'badge-ghost' => $member->role === 'cashier',
-                'badge-info' => $member->role === 'inventory_manager',
-            ]) />
+            <div class="flex flex-wrap gap-1">
+                @foreach($member->role ?? [] as $r)
+                    <x-badge :value="ucfirst(str_replace('_', ' ', $r))" @class([
+                        'badge-primary' => $r === 'admin',
+                        'badge-secondary' => $r === 'pharmacist',
+                        'badge-accent' => $r === 'branch_manager',
+                        'badge-warning' => $r === 'sales',
+                        'badge-ghost' => $r === 'cashier',
+                        'badge-info' => $r === 'inventory_manager',
+                    ]) />
+                @endforeach
+            </div>
         @endscope
 
         @scope('cell_employment_date', $member)
@@ -53,14 +57,19 @@
                 <x-input label="Email" wire:model="email" type="email" />
                 <x-input label="Phone" wire:model="phone" />
                 <x-input label="Password" wire:model="password" type="password" hint="{{ $staffId ? 'Leave blank to keep current' : 'Min 6 characters' }}" />
-                <x-select label="Role" wire:model="role" :options="[
-                    ['id' => 'admin', 'name' => 'Admin'],
-                    ['id' => 'pharmacist', 'name' => 'Pharmacist'],
-                    ['id' => 'branch_manager', 'name' => 'Branch Manager'],
-                    ['id' => 'sales', 'name' => 'Sales'],
-                    ['id' => 'cashier', 'name' => 'Cashier'],
-                    ['id' => 'inventory_manager', 'name' => 'Inventory Manager'],
-                ]" option-value="id" option-label="name" />
+                <div class="col-span-1 md:col-span-2">
+                    <div class="label"><span class="label-text font-medium text-sm">Role(s)</span></div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-2 mt-1">
+                        @foreach(['admin' => 'Admin', 'pharmacist' => 'Pharmacist', 'branch_manager' => 'Branch Manager', 'sales' => 'Sales', 'cashier' => 'Cashier', 'inventory_manager' => 'Inventory Manager'] as $val => $label)
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model="role" value="{{ $val }}" class="checkbox checkbox-primary checkbox-sm" />
+                                <span class="text-sm">{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('role') <div class="text-error text-xs mt-1">{{ $message }}</div> @enderror
+                    @error('role.*') <div class="text-error text-xs mt-1">{{ $message }}</div> @enderror
+                </div>
                 <x-select label="Branch" wire:model="branch_id" :options="$branches" option-value="id" option-label="name" placeholder="All branches (admin)" />
                 <x-input label="Position/Title" wire:model="position" placeholder="e.g. Senior Pharmacist" />
                 <x-input label="Employment Date" wire:model="employment_date" type="date" />
@@ -88,7 +97,9 @@
                 <div class="text-center mb-4">
                     <x-avatar :value="$viewStaff->name" class="!w-16 !h-16 mx-auto mb-2" />
                     <div class="text-lg font-bold">{{ $viewStaff->name }}</div>
-                    <x-badge :value="ucfirst(str_replace('_', ' ', $viewStaff->role))" class="badge-primary" />
+                    @foreach($viewStaff->role ?? [] as $r)
+                        <x-badge :value="ucfirst(str_replace('_', ' ', $r))" class="badge-primary" />
+                    @endforeach
                     <x-badge :value="ucfirst($viewStaff->status)" @class([
                         'badge-success' => $viewStaff->status === 'active',
                         'badge-error' => $viewStaff->status === 'inactive',

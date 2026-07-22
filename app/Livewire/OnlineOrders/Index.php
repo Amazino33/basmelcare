@@ -104,7 +104,7 @@ class Index extends Component
     {
         $order = Order::with('items')->findOrFail($orderId);
 
-        if ($order->claimed_by && $order->claimed_by !== auth()->id() && auth()->user()->role !== 'admin') {
+        if ($order->claimed_by && $order->claimed_by !== auth()->id() && !auth()->user()->hasRole('admin')) {
             $this->error('You can only cancel orders you claimed.');
             return;
         }

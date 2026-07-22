@@ -15,7 +15,7 @@ class BranchScope implements Scope
         if (!$user) return;
 
         // Admin sees everything
-        if ($user->role === 'admin') return;
+        if ($user->hasRole('admin')) return;
 
         // Users with a branch only see their branch data
         if ($user->branch_id) {

@@ -27,6 +27,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'employment_date' => 'date',
             'salary' => 'decimal:2',
+            'role' => 'array',
         ];
     }
 
@@ -40,14 +41,19 @@ class User extends Authenticatable
         return $this->hasMany(Sale::class);
     }
 
+    public function hasRole(string $role): bool
+    {
+        return in_array($role, $this->role ?? []);
+    }
+
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->hasRole('admin');
     }
 
     public function isBranchManager(): bool
     {
-        return $this->role === 'branch_manager';
+        return $this->hasRole('branch_manager');
     }
 
     public function isActive(): bool
