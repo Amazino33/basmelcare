@@ -7,10 +7,12 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Mary\Traits\Toast;
 
 class Index extends Component
 {
     use WithPagination;
+    use Toast;
 
     public string $search = '';
     public string $period = 'today';
@@ -37,6 +39,36 @@ class Index extends Component
         $this->viewOrderId = $id;
         $this->viewSaleId = null;
         $this->detailsDrawer = true;
+    }
+
+    /**
+     * Revoke the free Wi-Fi access tied to a receipt (e.g. after a refund or
+     * dispute). Flags the sale locally, then pushes the revoke to HiFastLink so
+     * the device can no longer reconnect.
+     */
+    public function revokeWifi($saleId): void
+    {
+        $sale = Sale::find($saleId);
+
+        if (! $sale || ! $sale->voucher_redeemed_at) {
+            $this->error('This receipt has no active internet access to revoke.');
+            return;
+        }
+
+        if ($sale->voucher_revoked_at) {
+            $this->warning('This receipt\'s internet access is already revoked.');
+            return;
+        }
+
+        $sale->update(['voucher_revoked_at' => now()]);
+
+        $pushed = \App\Services\HifastlinkService::revoke($sale->invoice_number);
+
+        if ($pushed) {
+            $this->success('Internet access revoked. The device can no longer reconnect.');
+        } else {
+            $this->warning('Access revoked here, but HiFastLink could not be reached — verify the integration settings.');
+        }
     }
 
     private function periodQuery($query)

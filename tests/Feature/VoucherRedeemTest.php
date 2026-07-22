@@ -95,9 +95,12 @@ class VoucherRedeemTest extends TestCase
                  ->assertJson(['valid' => false]);
     }
 
-    public function test_rejects_already_redeemed_invoice(): void
+    public function test_rejects_revoked_invoice(): void
     {
-        $this->makeSale(['voucher_redeemed_at' => now()]);
+        $this->makeSale([
+            'voucher_redeemed_at' => now()->subHour(),
+            'voucher_revoked_at'  => now(),
+        ]);
 
         $response = $this->postJson('/api/voucher/redeem',
             ['invoice_number' => 'INV-20260706-0001'],
@@ -105,10 +108,34 @@ class VoucherRedeemTest extends TestCase
         );
 
         $response->assertStatus(422)
-                 ->assertJson([
-                     'valid'   => false,
-                     'message' => 'This receipt has already been redeemed.',
-                 ]);
+                 ->assertJson(['valid' => false]);
+    }
+
+    public function test_rejects_redeemed_but_expired_invoice(): void
+    {
+        // Redeemed 25h ago with a 24h window → window has closed.
+        $this->makeSale(['voucher_redeemed_at' => now()->subHours(25)]);
+
+        $response = $this->postJson('/api/voucher/redeem',
+            ['invoice_number' => 'INV-20260706-0001'],
+            ['X-API-Key' => $this->apiKey]
+        );
+
+        $response->assertStatus(422)
+                 ->assertJson(['valid' => false]);
+    }
+
+    public function test_matches_invoice_case_insensitively(): void
+    {
+        $this->makeSale(); // stored uppercase
+
+        $response = $this->postJson('/api/voucher/redeem',
+            ['invoice_number' => 'inv-20260706-0001'],
+            ['X-API-Key' => $this->apiKey]
+        );
+
+        $response->assertStatus(200)
+                 ->assertJson(['valid' => true]);
     }
 
     // ── Happy path ───────────────────────────────────────────────
@@ -169,21 +196,44 @@ class VoucherRedeemTest extends TestCase
         );
     }
 
-    public function test_cannot_redeem_same_invoice_twice(): void
+    public function test_allows_reconnect_within_window(): void
     {
-        $this->makeSale();
+        // Already redeemed an hour ago; still inside the 24h window.
+        $this->makeSale(['voucher_redeemed_at' => now()->subHour()]);
 
-        $this->postJson('/api/voucher/redeem',
+        $response = $this->postJson('/api/voucher/redeem',
             ['invoice_number' => 'INV-20260706-0001'],
             ['X-API-Key' => $this->apiKey]
         );
+
+        $response->assertStatus(200)
+                 ->assertJson(['valid' => true]);
+    }
+
+    public function test_reconnect_does_not_extend_the_window(): void
+    {
+        $this->makeSale();
+
+        $first = $this->postJson('/api/voucher/redeem',
+            ['invoice_number' => 'INV-20260706-0001'],
+            ['X-API-Key' => $this->apiKey]
+        );
+        $firstExpiry = Carbon::parse($first->json('expires_at'));
+
+        // Two hours later the customer reconnects.
+        $this->travel(2)->hours();
 
         $second = $this->postJson('/api/voucher/redeem',
             ['invoice_number' => 'INV-20260706-0001'],
             ['X-API-Key' => $this->apiKey]
         );
+        $second->assertStatus(200)->assertJson(['valid' => true]);
+        $secondExpiry = Carbon::parse($second->json('expires_at'));
 
-        $second->assertStatus(422)
-               ->assertJson(['valid' => false]);
+        // Expiry must be anchored to first redemption, not pushed forward.
+        $this->assertTrue(
+            $secondExpiry->between($firstExpiry->copy()->subMinute(), $firstExpiry->copy()->addMinute()),
+            "Reconnect extended the window: {$firstExpiry} → {$secondExpiry}"
+        );
     }
 }

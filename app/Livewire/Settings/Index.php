@@ -37,6 +37,7 @@ class Index extends Component
 
     // Incentives / HifastLink
     public string $hifastlink_api_key = '';
+    public string $hifastlink_url = '';
     public int    $voucher_validity_hours = 24;
 
     // Test message
@@ -64,6 +65,7 @@ class Index extends Component
         $this->expiry_alert_days = (int) AppSetting::get('expiry_alert_days', 90);
 
         $this->hifastlink_api_key = AppSetting::get('hifastlink_api_key', '');
+        $this->hifastlink_url = AppSetting::get('hifastlink_url', '');
         $this->voucher_validity_hours = (int) AppSetting::get('voucher_validity_hours', 24);
     }
 
@@ -126,9 +128,11 @@ class Index extends Component
     {
         $this->validate([
             'voucher_validity_hours' => 'required|integer|min:1|max:168',
+            'hifastlink_url'         => 'nullable|url|max:255',
         ]);
 
         AppSetting::set('voucher_validity_hours', $this->voucher_validity_hours);
+        AppSetting::set('hifastlink_url', rtrim(trim($this->hifastlink_url), '/'));
 
         $this->success('Incentive settings saved.');
     }

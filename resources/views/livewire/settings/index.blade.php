@@ -85,6 +85,9 @@
                     <x-input label="Voucher Validity (hours)" wire:model="voucher_validity_hours"
                         type="number" min="1" max="168"
                         hint="How long free internet lasts after redemption. Default: 24 hours" class="max-w-xs mt-4" />
+                    <x-input label="HifastLink URL" wire:model="hifastlink_url"
+                        placeholder="https://hifastlink.com"
+                        hint="Base URL of HifastLink — used to revoke a receipt's internet access." class="mt-4" />
                     <x-slot:actions>
                         <x-button label="Save" type="submit" class="btn-primary" />
                     </x-slot:actions>

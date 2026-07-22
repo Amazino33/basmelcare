@@ -20,8 +20,12 @@ class VoucherRedeemController extends Controller
 
         $request->validate(['invoice_number' => 'required|string']);
 
+        // Receipts are stored uppercase; normalise so casing off the printed
+        // receipt never causes a false "not found".
+        $invoiceNumber = strtoupper(trim($request->invoice_number));
+
         $sale = Sale::with('customer')
-            ->where('invoice_number', $request->invoice_number)
+            ->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])
             ->first();
 
         if (! $sale) {
@@ -32,14 +36,26 @@ class VoucherRedeemController extends Controller
             return response()->json(['valid' => false, 'message' => 'This invoice has not been paid yet.'], 422);
         }
 
-        if ($sale->voucher_redeemed_at) {
-            return response()->json(['valid' => false, 'message' => 'This receipt has already been redeemed.'], 422);
+        // Staff have pulled this receipt's access.
+        if ($sale->voucher_revoked_at) {
+            return response()->json(['valid' => false, 'message' => 'This receipt is no longer valid for internet access.'], 422);
         }
 
         $hours = (int) AppSetting::get('voucher_validity_hours', 24);
-        $expiresAt = now()->addHours($hours);
 
-        $sale->update(['voucher_redeemed_at' => now()]);
+        // First redemption — start the clock now.
+        if (! $sale->voucher_redeemed_at) {
+            $sale->update(['voucher_redeemed_at' => now()]);
+        }
+
+        // Expiry is measured from the FIRST redemption and never extended, so a
+        // customer reconnecting mid-window keeps the same 24h wall-clock. This
+        // also makes the endpoint idempotent — reconnecting simply re-validates.
+        $expiresAt = $sale->wifiExpiresAt();
+
+        if (! $expiresAt || $expiresAt->isPast()) {
+            return response()->json(['valid' => false, 'message' => 'This receipt\'s free internet window has expired.'], 422);
+        }
 
         return response()->json([
             'valid'          => true,
