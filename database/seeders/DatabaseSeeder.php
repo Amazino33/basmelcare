@@ -22,5 +22,7 @@ class DatabaseSeeder extends Seeder
         AppSetting::set('notify_low_stock', '1');
         AppSetting::set('notify_expiry', '1');
         AppSetting::set('expiry_alert_days', '90');
+
+        $this->call(DemoSeeder::class);
     }
 }
