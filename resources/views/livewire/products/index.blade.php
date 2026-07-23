@@ -68,7 +68,7 @@
 
             <x-slot:actions>
                 <x-button label="Done" @click="$wire.quickModal = false" />
-                <x-button label="Save & Next" type="submit" class="btn-primary" icon="o-arrow-right" icon-right />
+                <x-button label="Save & Next" type="submit" class="btn-primary" icon-right="o-arrow-right" />
             </x-slot:actions>
         </x-form>
     </x-modal>
