@@ -4,6 +4,7 @@
             <x-input icon="o-magnifying-glass" placeholder="Search by name or barcode..." wire:model.live.debounce="search" clearable />
         </x-slot:middle>
         <x-slot:actions>
+            <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
             <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
         </x-slot:actions>
     </x-header>
@@ -44,6 +45,33 @@
             </div>
         @endscope
     </x-table>
+
+    <!-- Quick Add Modal -->
+    <x-modal wire:model="quickModal" title="Quick Add Product" box-class="max-w-lg">
+        @if($quickAddCount > 0)
+            <div class="alert alert-success py-2 mb-4">
+                <x-icon name="o-check-circle" class="w-4 h-4" />
+                <span class="text-sm">{{ $quickAddCount }} {{ Str::plural('product', $quickAddCount) }} added this session.</span>
+            </div>
+        @endif
+
+        <x-form wire:submit="saveQuickAdd">
+            <x-input label="Product Name" wire:model="quick_name" id="quick-name-input" placeholder="e.g. Paracetamol 500mg" />
+            <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
+
+            <div class="grid grid-cols-2 gap-4">
+                <x-input label="Cost Price" wire:model="quick_cost_price" prefix="₦" type="number" step="0.01" />
+                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" />
+                <x-input label="Expiry Date" wire:model="quick_expiry_date" type="date" />
+                <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
+            </div>
+
+            <x-slot:actions>
+                <x-button label="Done" @click="$wire.quickModal = false" />
+                <x-button label="Save & Next" type="submit" class="btn-primary" icon="o-arrow-right" icon-right />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
 
     <!-- Product Modal -->
     <x-modal wire:model="productModal" title="{{ $productId ? 'Edit Product' : 'New Product' }}" box-class="max-w-2xl">
@@ -117,7 +145,7 @@
     <!-- Batch Modal -->
     <x-modal wire:model="batchModal" title="Add Batch">
         <x-form wire:submit="saveBatch">
-            <x-input label="Batch Number" wire:model="batch_number" placeholder="e.g. BN-2026-001" />
+            <x-input label="Batch Number" wire:model="batch_number" placeholder="Leave blank to auto-generate" hint="Optional" />
             <x-input label="Expiry Date" wire:model="expiry_date" type="date" />
             <x-input label="Cost Price" wire:model="cost_price" prefix="₦" type="number" step="0.01" />
             <x-input label="Quantity" wire:model="quantity" type="number" />
@@ -167,6 +195,13 @@
     $wire.on('focus-product-name', () => {
         setTimeout(() => {
             const el = document.querySelector('[wire\\:model="name"]');
+            if (el) el.focus();
+        }, 150);
+    });
+
+    $wire.on('focus-quick-name', () => {
+        setTimeout(() => {
+            const el = document.getElementById('quick-name-input');
             if (el) el.focus();
         }, 150);
     });

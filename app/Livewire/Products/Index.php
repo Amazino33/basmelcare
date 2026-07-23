@@ -45,6 +45,69 @@ class Index extends Component
     public ?int $viewBatchesProductId = null;
     public bool $batchesDrawer = false;
 
+    // Quick-add form
+    public string $quick_name = '';
+    public ?int $quick_category_id = null;
+    public string $quick_selling_price = '';
+    public string $quick_cost_price = '';
+    public string $quick_expiry_date = '';
+    public int $quick_quantity = 1;
+    public bool $quickModal = false;
+    public int $quickAddCount = 0;
+
+    public function openQuickAdd(): void
+    {
+        $this->reset(['quick_name', 'quick_selling_price', 'quick_cost_price', 'quick_expiry_date']);
+        $this->quick_quantity = 1;
+        $this->quickAddCount = 0;
+        $this->quickModal = true;
+        $this->dispatch('focus-quick-name');
+    }
+
+    public function saveQuickAdd(): void
+    {
+        $this->validate([
+            'quick_name'           => 'required|string|max:255',
+            'quick_category_id'    => 'required|exists:categories,id',
+            'quick_selling_price'  => 'required|numeric|min:0',
+            'quick_cost_price'     => 'required|numeric|min:0',
+            'quick_expiry_date'    => 'required|date|after:today',
+            'quick_quantity'       => 'required|integer|min:1',
+        ]);
+
+        $product = Product::create([
+            'name'          => $this->quick_name,
+            'category_id'   => $this->quick_category_id,
+            'selling_price' => $this->quick_selling_price,
+            'reorder_level' => 0,
+        ]);
+
+        $batch = Batch::create([
+            'product_id'   => $product->id,
+            'batch_number' => 'AUTO-' . now()->format('Ymd-His'),
+            'expiry_date'  => $this->quick_expiry_date,
+            'cost_price'   => $this->quick_cost_price,
+            'quantity'     => $this->quick_quantity,
+        ]);
+
+        StockMovement::create([
+            'batch_id'  => $batch->id,
+            'quantity'  => $this->quick_quantity,
+            'type'      => 'purchase',
+            'reference' => 'Initial stock',
+        ]);
+
+        $this->quickAddCount++;
+        $savedName = $this->quick_name;
+
+        // Reset per-product fields; keep category selected for faster entry
+        $this->reset(['quick_name', 'quick_selling_price', 'quick_cost_price', 'quick_expiry_date']);
+        $this->quick_quantity = 1;
+
+        $this->success("{$savedName} added. ({$this->quickAddCount} " . str('product')->plural($this->quickAddCount) . " so far)");
+        $this->dispatch('focus-quick-name');
+    }
+
     public function createProduct()
     {
         $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
@@ -143,7 +206,7 @@ class Index extends Component
     public function saveBatch()
     {
         $this->validate([
-            'batch_number' => 'required|string|max:100',
+            'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'required|date|after:today',
             'cost_price' => 'required|numeric|min:0',
             'quantity' => 'required|integer|min:1',
@@ -152,7 +215,7 @@ class Index extends Component
 
         $batch = Batch::create([
             'product_id' => $this->batchProductId,
-            'batch_number' => $this->batch_number,
+            'batch_number' => $this->batch_number ?: 'AUTO-' . now()->format('Ymd-His'),
             'expiry_date' => $this->expiry_date,
             'cost_price' => $this->cost_price,
             'quantity' => $this->quantity,
