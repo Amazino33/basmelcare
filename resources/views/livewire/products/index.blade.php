@@ -62,8 +62,8 @@
             <div class="grid grid-cols-2 gap-4">
                 <x-input label="Cost Price" wire:model="quick_cost_price" prefix="₦" type="number" step="0.01" />
                 <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" />
-                <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
                 <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
+                <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
             </div>
 
             <x-slot:actions>
