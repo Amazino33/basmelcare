@@ -94,7 +94,7 @@
                 </div>
             </div>
             <x-slot:actions>
-                <x-button label="Cancel" @click="$wire.productModal = false" />
+                <x-button :label="$productId ? 'Cancel' : 'Done'" @click="$wire.productModal = false" />
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
@@ -164,6 +164,13 @@
 
 @script
 <script>
+    $wire.on('focus-product-name', () => {
+        setTimeout(() => {
+            const el = document.querySelector('[wire\\:model="name"]');
+            if (el) el.focus();
+        }, 150);
+    });
+
     let barcodeStream = null;
 
     window.startBarcodeScanner = async function() {

@@ -66,6 +66,8 @@ class Index extends Component
             'photo' => 'nullable|image|max:2048',
         ]);
 
+        $isNew = !$this->productId;
+
         $data = [
             'name' => $this->name,
             'sku' => $this->sku,
@@ -87,9 +89,15 @@ class Index extends Component
             $data
         );
 
-        $this->productModal = false;
-        $this->success($this->productId ? 'Product updated.' : 'Product created.');
         $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+
+        if ($isNew) {
+            $this->success('Product saved. Add another or click Done.');
+            $this->dispatch('focus-product-name');
+        } else {
+            $this->productModal = false;
+            $this->success('Product updated.');
+        }
     }
 
     public function editProduct($id)
