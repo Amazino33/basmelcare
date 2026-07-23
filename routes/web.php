@@ -42,6 +42,7 @@ Route::prefix('desk')->group(function () {
         Route::middleware('role:admin,pharmacist,branch_manager,cashier')->group(function () {
             Route::get('cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
             Route::get('debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
+            Route::get('debt-payment/{debtPayment}/receipt', [App\Http\Controllers\InvoiceController::class, 'debtReceipt'])->name('debt-payment.receipt');
         });
 
         // Shared sales pages (admin, pharmacist, branch_manager, sales, cashier)

@@ -21,6 +21,7 @@ class Index extends Component
     public string $pay_method = 'cash';
     public string $pay_note = '';
     public bool $payModal = false;
+    public ?int $lastDebtPaymentId = null;
 
     // Details
     public ?int $viewDebtId = null;
@@ -52,7 +53,7 @@ class Index extends Component
             return;
         }
 
-        DebtPayment::create([
+        $debtPayment = DebtPayment::create([
             'debt_id' => $debt->id,
             'amount' => $amount,
             'payment_method' => $this->pay_method,
@@ -68,9 +69,11 @@ class Index extends Component
             $debt->update(['status' => 'partial']);
         }
 
+        $this->lastDebtPaymentId = $debtPayment->id;
         $this->payModal = false;
         $this->success('Payment of ₦' . number_format($amount, 2) . ' recorded.');
         $this->reset(['payDebtId', 'pay_amount', 'pay_method', 'pay_note']);
+        $this->dispatch('open-debt-receipt', id: $debtPayment->id);
     }
 
     public function viewDetails($debtId)

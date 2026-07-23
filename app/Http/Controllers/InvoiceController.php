@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\DebtPayment;
 use App\Models\Sale;
 
 class InvoiceController extends Controller
@@ -19,6 +20,19 @@ class InvoiceController extends Controller
         $sale->load('saleItems.product', 'user', 'customer');
 
         return view('receipts.show', $this->pharmacyData($sale));
+    }
+
+    public function debtReceipt(DebtPayment $debtPayment)
+    {
+        $debtPayment->load('debt.customer', 'debt.sale', 'receiver');
+
+        return view('receipts.debt-payment', [
+            'payment'         => $debtPayment,
+            'debt'            => $debtPayment->debt,
+            'pharmacyName'    => AppSetting::get('pharmacy_name', ''),
+            'pharmacyPhone'   => AppSetting::get('pharmacy_phone', ''),
+            'pharmacyAddress' => AppSetting::get('pharmacy_address', ''),
+        ]);
     }
 
     private function pharmacyData(Sale $sale): array

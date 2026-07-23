@@ -117,6 +117,14 @@
         </x-form>
     </x-modal>
 
+    @script
+    <script>
+        $wire.on('open-debt-receipt', ({ id }) => {
+            window.open(`/desk/debt-payment/${id}/receipt`, '_blank');
+        });
+    </script>
+    @endscript
+
     <!-- Debt Details Drawer -->
     <x-drawer wire:model="detailsDrawer" title="Debt Details" right class="w-96 lg:w-1/3">
         @if($viewDebt)
