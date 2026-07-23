@@ -38,15 +38,15 @@ Route::prefix('desk')->group(function () {
             Route::get('online-orders', App\Livewire\OnlineOrders\Index::class)->name('online-orders.index');
         });
 
-        // Cashier — processes payments (admin, pharmacist, branch_manager, cashier)
+        // Cashier — processes payments and debt book (admin, pharmacist, branch_manager, cashier)
         Route::middleware('role:admin,pharmacist,branch_manager,cashier')->group(function () {
             Route::get('cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
+            Route::get('debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
         });
 
         // Shared sales pages (admin, pharmacist, branch_manager, sales, cashier)
         Route::middleware('role:admin,pharmacist,branch_manager,sales,cashier')->group(function () {
             Route::get('sales', App\Livewire\Sales\Index::class)->name('sales.index');
-            Route::get('debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
             Route::get('invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
             Route::get('receipt/{sale}', [App\Http\Controllers\InvoiceController::class, 'receipt'])->name('receipt.show');
             Route::get('customers', App\Livewire\Customers\Index::class)->name('customers.index');
