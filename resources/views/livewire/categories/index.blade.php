@@ -22,9 +22,20 @@
             <x-input label="Name" wire:model="name" />
             <x-textarea label="Description" wire:model="description" />
             <x-slot:actions>
-                <x-button label="Cancel" @click="$wire.modal = false" />
+                <x-button :label="$categoryId ? 'Cancel' : 'Done'" @click="$wire.modal = false" />
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
     </x-modal>
 </div>
+
+@script
+<script>
+    $wire.on('focus-category-name', () => {
+        setTimeout(() => {
+            const el = document.querySelector('[wire\\:model="name"]');
+            if (el) el.focus();
+        }, 150);
+    });
+</script>
+@endscript

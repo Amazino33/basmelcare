@@ -28,14 +28,22 @@ class Index extends Component
             'description' => 'nullable|string',
         ]);
 
+        $isNew = !$this->categoryId;
+
         Category::updateOrCreate(
             ['id' => $this->categoryId],
             ['name' => $this->name, 'description' => $this->description]
         );
 
-        $this->modal = false;
-        $this->success($this->categoryId ? 'Category updated.' : 'Category created.');
         $this->reset(['name', 'description', 'categoryId']);
+
+        if ($isNew) {
+            $this->success('Category saved. Add another or click Done.');
+            $this->dispatch('focus-category-name');
+        } else {
+            $this->modal = false;
+            $this->success('Category updated.');
+        }
     }
 
     public function edit($id)
