@@ -56,7 +56,7 @@
         @endif
 
         <x-form wire:submit="saveQuickAdd">
-            <x-input label="Product Name" wire:model="quick_name" id="quick-name-input" placeholder="e.g. Paracetamol 500mg" />
+            <x-input label="Product Name" wire:model="quick_name" placeholder="e.g. Paracetamol 500mg" />
             <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
 
             <div class="grid grid-cols-2 gap-4">
@@ -201,9 +201,9 @@
 
     $wire.on('focus-quick-name', () => {
         setTimeout(() => {
-            const el = document.getElementById('quick-name-input');
+            const el = document.querySelector('input[wire\\:model="quick_name"]');
             if (el) el.focus();
-        }, 150);
+        }, 300);
     });
 
     let barcodeStream = null;
