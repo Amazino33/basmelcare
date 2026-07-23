@@ -33,6 +33,8 @@ class Index extends Component
     public function openPayment(int $saleId)
     {
         $this->payingSaleId = $saleId;
+        $this->paySuccess = false;
+        $this->lastPaidSaleId = null;
         $this->reset(['payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method', 'walkin_phone']);
         $this->payment_method = 'cash';
         $this->part_method = 'cash';
