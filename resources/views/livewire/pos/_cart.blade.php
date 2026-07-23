@@ -90,18 +90,6 @@
     <button wire:click="clearCart" wire:confirm="Clear all items?" class="btn btn-ghost btn-xs text-error btn-block mt-1">
         <x-icon name="o-trash" class="w-3 h-3" /> Clear Cart
     </button>
-{{-- Create Customer Modal --}}
-<x-modal wire:model="createCustomerModal" title="New Customer" box-class="max-w-sm">
-    <x-form wire:submit="createCustomer">
-        <x-input label="Name" wire:model="newCustomerName" placeholder="Full name" required autofocus />
-        <x-input label="Phone" wire:model="newCustomerPhone" placeholder="08012345678" />
-        <x-input label="Email" wire:model="newCustomerEmail" type="email" placeholder="optional" />
-        <x-slot:actions>
-            <x-button label="Cancel" @click="$wire.createCustomerModal = false" />
-            <x-button label="Create & Select" type="submit" class="btn-primary" icon="o-user-plus" />
-        </x-slot:actions>
-    </x-form>
-</x-modal>
 
 @else
     @if($lastSale)
@@ -119,3 +107,16 @@
         </div>
     @endif
 @endif
+
+{{-- Create Customer Modal — must be outside @if(cart) so Livewire always tracks it --}}
+<x-modal wire:model="createCustomerModal" title="New Customer" box-class="max-w-sm">
+    <x-form wire:submit="createCustomer">
+        <x-input label="Name" wire:model="newCustomerName" placeholder="Full name" required />
+        <x-input label="Phone" wire:model="newCustomerPhone" placeholder="08012345678" />
+        <x-input label="Email" wire:model="newCustomerEmail" type="email" placeholder="optional" />
+        <x-slot:actions>
+            <x-button label="Cancel" @click="$wire.createCustomerModal = false" />
+            <x-button label="Create & Select" type="submit" class="btn-primary" icon="o-user-plus" />
+        </x-slot:actions>
+    </x-form>
+</x-modal>
