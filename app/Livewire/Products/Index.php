@@ -6,6 +6,7 @@ use App\Models\Batch;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockMovement;
+use Carbon\Carbon;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -71,9 +72,15 @@ class Index extends Component
             'quick_category_id'    => 'required|exists:categories,id',
             'quick_selling_price'  => 'required|numeric|min:0',
             'quick_cost_price'     => 'required|numeric|min:0',
-            'quick_expiry_date'    => 'required|date|after:today',
+            'quick_expiry_date'    => ['required', 'date_format:Y-m', function ($attr, $value, $fail) {
+                if (Carbon::createFromFormat('Y-m', $value)->endOfMonth()->isPast()) {
+                    $fail('The expiry month has already passed.');
+                }
+            }],
             'quick_quantity'       => 'required|integer|min:1',
         ]);
+
+        $quickExpiry = Carbon::createFromFormat('Y-m', $this->quick_expiry_date)->endOfMonth()->toDateString();
 
         $product = Product::create([
             'name'          => $this->quick_name,
@@ -85,7 +92,7 @@ class Index extends Component
         $batch = Batch::create([
             'product_id'   => $product->id,
             'batch_number' => 'AUTO-' . now()->format('Ymd-His'),
-            'expiry_date'  => $this->quick_expiry_date,
+            'expiry_date'  => $quickExpiry,
             'cost_price'   => $this->quick_cost_price,
             'quantity'     => $this->quick_quantity,
         ]);
@@ -207,16 +214,22 @@ class Index extends Component
     {
         $this->validate([
             'batch_number' => 'nullable|string|max:100',
-            'expiry_date' => 'required|date|after:today',
-            'cost_price' => 'required|numeric|min:0',
-            'quantity' => 'required|integer|min:1',
-            'batch_note' => 'nullable|string',
+            'expiry_date'  => ['required', 'date_format:Y-m', function ($attr, $value, $fail) {
+                if (Carbon::createFromFormat('Y-m', $value)->endOfMonth()->isPast()) {
+                    $fail('The expiry month has already passed.');
+                }
+            }],
+            'cost_price'   => 'required|numeric|min:0',
+            'quantity'     => 'required|integer|min:1',
+            'batch_note'   => 'nullable|string',
         ]);
 
+        $expiry = Carbon::createFromFormat('Y-m', $this->expiry_date)->endOfMonth()->toDateString();
+
         $batch = Batch::create([
-            'product_id' => $this->batchProductId,
+            'product_id'   => $this->batchProductId,
             'batch_number' => $this->batch_number ?: 'AUTO-' . now()->format('Ymd-His'),
-            'expiry_date' => $this->expiry_date,
+            'expiry_date'  => $expiry,
             'cost_price' => $this->cost_price,
             'quantity' => $this->quantity,
             'note' => $this->batch_note,
