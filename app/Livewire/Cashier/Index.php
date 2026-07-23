@@ -239,6 +239,17 @@ class Index extends Component
             ? Sale::with('saleItems.product', 'customer', 'user')->find($this->payingSaleId)
             : null;
 
+        $customerDebt = null;
+        if ($payingSale?->customer_id) {
+            $customerDebt = Debt::where('customer_id', $payingSale->customer_id)
+                ->whereIn('status', ['unpaid', 'partial'])
+                ->selectRaw('SUM(amount_owed - COALESCE(amount_paid, 0)) as balance, COUNT(*) as debt_count')
+                ->first();
+            if (!$customerDebt?->debt_count) {
+                $customerDebt = null;
+            }
+        }
+
         $currentCount = $pendingInvoices->count();
         if ($currentCount > $this->lastPendingCount && $this->lastPendingCount > 0) {
             $this->dispatch('new-invoice');
@@ -250,6 +261,7 @@ class Index extends Component
             'pendingInvoices' => $pendingInvoices,
             'recentPaid' => $recentPaid,
             'payingSale' => $payingSale,
+            'customerDebt' => $customerDebt,
         ]);
     }
 }

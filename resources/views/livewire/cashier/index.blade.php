@@ -104,6 +104,19 @@
                 </div>
             </div>
 
+            @if($customerDebt)
+                <div class="alert alert-warning mb-4 py-3">
+                    <x-icon name="o-exclamation-triangle" class="w-5 h-5 shrink-0" />
+                    <div>
+                        <div class="font-bold text-sm">Outstanding Debt — {{ $payingSale->customer->name }}</div>
+                        <div class="text-xs mt-0.5">
+                            Owes <span class="font-bold">₦{{ number_format($customerDebt->balance, 2) }}</span>
+                            across {{ $customerDebt->debt_count }} unpaid {{ Str::plural('invoice', $customerDebt->debt_count) }}.
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <x-form wire:submit="processPayment">
                 <x-select label="Payment Method" wire:model.live="payment_method" :options="[
                     ['id' => 'cash', 'name' => 'Cash (Full)'],
