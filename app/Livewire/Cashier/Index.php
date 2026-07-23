@@ -243,7 +243,7 @@ class Index extends Component
         if ($payingSale?->customer_id) {
             $customerDebt = Debt::where('customer_id', $payingSale->customer_id)
                 ->whereIn('status', ['unpaid', 'partial'])
-                ->selectRaw('SUM(amount_owed - COALESCE(amount_paid, 0)) as balance, COUNT(*) as debt_count')
+                ->selectRaw('SUM(amount_owed - COALESCE(amount_paid, 0)) as total_balance, COUNT(*) as debt_count')
                 ->first();
             if (!$customerDebt?->debt_count) {
                 $customerDebt = null;

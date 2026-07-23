@@ -110,7 +110,7 @@
                     <div>
                         <div class="font-bold text-sm">Outstanding Debt — {{ $payingSale->customer->name }}</div>
                         <div class="text-xs mt-0.5">
-                            Owes <span class="font-bold">₦{{ number_format($customerDebt->balance, 2) }}</span>
+                            Owes <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
                             across {{ $customerDebt->debt_count }} unpaid {{ Str::plural('invoice', $customerDebt->debt_count) }}.
                         </div>
                     </div>
