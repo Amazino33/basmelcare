@@ -25,9 +25,6 @@
             @if($product->wholesale_price)
                 <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
             @endif
-            @if($product->has_pack)
-                <div class="text-xs text-secondary">Pack×{{ $product->pack_size }}: ₦{{ number_format($product->pack_price, 2) }}</div>
-            @endif
         @endscope
 
         @scope('cell_stock', $product)
@@ -120,16 +117,6 @@
                 <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
                 <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
                 <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
-
-                {{-- Pack Selling --}}
-                <div class="md:col-span-2">
-                    <x-checkbox label="Enable Pack Selling" wire:model.live="has_pack" hint="e.g. sell per tablet AND per strip of 10" />
-                </div>
-                @if($has_pack)
-                    <x-input label="Pack Size (units per pack)" wire:model="pack_size" type="number" min="2" hint="e.g. 10 means 1 pack = 10 singles" />
-                    <x-input label="Pack Price" wire:model="pack_price" prefix="₦" type="number" step="0.01" hint="Price for one full pack" />
-                @endif
-
                 <div class="md:col-span-2">
                     <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
                 </div>

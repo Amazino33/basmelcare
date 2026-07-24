@@ -104,10 +104,7 @@ class Index extends Component
         $key = $productId . '-' . $batch->id;
 
         if (isset($this->cart[$key])) {
-            $maxQty = ($this->cart[$key]['is_pack'] ?? false)
-                ? (int) floor($batch->quantity / $this->cart[$key]['pack_size'])
-                : $batch->quantity;
-            if ($this->cart[$key]['qty'] >= $maxQty) {
+            if ($this->cart[$key]['qty'] >= $batch->quantity) {
                 $this->error('Not enough stock in this batch.');
                 return;
             }
@@ -130,10 +127,6 @@ class Index extends Component
                 'qty' => 1,
                 'subtotal' => $price,
                 'max_qty' => $batch->quantity,
-                'has_pack' => (bool) $product->has_pack,
-                'pack_size' => $product->pack_size,
-                'pack_price' => $product->pack_price ? (float) $product->pack_price : null,
-                'is_pack' => false,
             ];
         }
         $this->saveCartToSession();
@@ -165,26 +158,6 @@ class Index extends Component
         $this->saveCartToSession();
     }
 
-    public function togglePack($key)
-    {
-        if (!isset($this->cart[$key]) || !$this->cart[$key]['has_pack']) return;
-
-        $item = &$this->cart[$key];
-        $item['is_pack'] = !$item['is_pack'];
-        $item['qty'] = 1;
-        $item['max_qty'] = $item['is_pack']
-            ? (int) floor($this->getMaxBatchQty($item['batch_id']) / $item['pack_size'])
-            : $this->getMaxBatchQty($item['batch_id']);
-
-        $this->resolvePrice($key);
-        $this->saveCartToSession();
-    }
-
-    private function getMaxBatchQty(int $batchId): int
-    {
-        return (int) \App\Models\Batch::where('id', $batchId)->value('quantity');
-    }
-
     public function getCartTotalProperty()
     {
         return array_sum(array_column($this->cart, 'subtotal'));
@@ -207,13 +180,6 @@ class Index extends Component
     private function resolvePrice(string $key)
     {
         $item = &$this->cart[$key];
-
-        if (!empty($item['is_pack'] ?? false) && $item['pack_price']) {
-            $item['unit_price'] = $item['pack_price'];
-            $item['subtotal'] = $item['qty'] * $item['pack_price'];
-            return;
-        }
-
         $customer = $this->customer_id ? Customer::find($this->customer_id) : null;
         $isWholesale = $customer && $customer->type === 'wholesale';
 
@@ -247,10 +213,6 @@ class Index extends Component
             ]);
 
             foreach ($this->cart as $item) {
-                $unitsDeducted = ($item['is_pack'] ?? false)
-                    ? $item['qty'] * ($item['pack_size'] ?? 1)
-                    : $item['qty'];
-
                 SaleItem::create([
                     'sale_id' => $sale->id,
                     'product_id' => $item['product_id'],
@@ -259,15 +221,13 @@ class Index extends Component
                     'unit_price' => $item['unit_price'],
                     'cost_price' => $item['cost_price'],
                     'subtotal' => $item['subtotal'],
-                    'is_pack' => $item['is_pack'],
-                    'pack_size' => $item['is_pack'] ? $item['pack_size'] : null,
                 ]);
 
-                Batch::where('id', $item['batch_id'])->decrement('quantity', $unitsDeducted);
+                Batch::where('id', $item['batch_id'])->decrement('quantity', $item['qty']);
 
                 StockMovement::create([
                     'batch_id' => $item['batch_id'],
-                    'quantity' => -$unitsDeducted,
+                    'quantity' => -$item['qty'],
                     'type' => 'sale',
                     'reference' => $sale->invoice_number,
                     'user_id' => auth()->id(),
@@ -317,15 +277,11 @@ class Index extends Component
 
         DB::transaction(function () use ($sale) {
             foreach ($sale->saleItems as $item) {
-                $unitsRestored = $item->is_pack
-                    ? $item->quantity * $item->pack_size
-                    : $item->quantity;
-
-                Batch::where('id', $item->batch_id)->increment('quantity', $unitsRestored);
+                Batch::where('id', $item->batch_id)->increment('quantity', $item->quantity);
 
                 StockMovement::create([
                     'batch_id' => $item->batch_id,
-                    'quantity' => $unitsRestored,
+                    'quantity' => $item->quantity,
                     'type' => 'return',
                     'reference' => $sale->invoice_number . ' (cancelled)',
                     'user_id' => auth()->id(),

@@ -32,9 +32,6 @@ class Index extends Component
     public ?string $existingImage = null;
     public ?int $productId = null;
     public bool $productModal = false;
-    public bool $has_pack = false;
-    public ?int $pack_size = null;
-    public ?string $pack_price = null;
 
     // Batch form
     public string $batch_number = '';
@@ -120,7 +117,7 @@ class Index extends Component
 
     public function createProduct()
     {
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId', 'has_pack', 'pack_size', 'pack_price']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
@@ -137,8 +134,6 @@ class Index extends Component
             'description' => 'nullable|string',
             'barcode' => 'nullable|string|max:100',
             'photo' => 'nullable|image|max:2048',
-            'pack_size' => $this->has_pack ? 'required|integer|min:2' : 'nullable',
-            'pack_price' => $this->has_pack ? 'required|numeric|min:0' : 'nullable',
         ]);
 
         $isNew = !$this->productId;
@@ -153,9 +148,6 @@ class Index extends Component
             'reorder_level' => $this->reorder_level,
             'description' => $this->description,
             'barcode' => $this->barcode,
-            'has_pack' => $this->has_pack,
-            'pack_size' => $this->has_pack ? $this->pack_size : null,
-            'pack_price' => $this->has_pack ? $this->pack_price : null,
         ];
 
         if ($this->photo) {
@@ -167,7 +159,7 @@ class Index extends Component
             $data
         );
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId', 'has_pack', 'pack_size', 'pack_price']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
 
         if ($isNew) {
             $this->success('Product saved. Add another or click Done.');
@@ -193,9 +185,6 @@ class Index extends Component
         $this->barcode = $product->barcode;
         $this->existingImage = $product->image;
         $this->photo = null;
-        $this->has_pack = (bool) $product->has_pack;
-        $this->pack_size = $product->pack_size;
-        $this->pack_price = $product->pack_price;
         $this->productModal = true;
     }
 
