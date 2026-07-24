@@ -2,11 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
-// Root redirects to desk
-Route::get('/', fn() => redirect('/desk'))->name('home');
-
 // Public pages
-Route::get('/home', fn() => view('public.home'))->name('public.home');
+Route::get('/', fn() => view('public.home'))->name('home');
 Route::get('/shop', App\Livewire\Shop\Index::class)->name('shop.index');
 Route::get('/shop/{product}', App\Livewire\Shop\Show::class)->name('shop.show');
 Route::get('/cart', App\Livewire\Shop\Cart::class)->name('cart');

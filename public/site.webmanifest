@@ -2,7 +2,7 @@
     "name": "BasmelCare Pharmacy",
     "short_name": "BasmelCare",
     "description": "Pharmacy management system for BasmelCare.",
-    "start_url": "/",
+    "start_url": "/desk",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#6D28D9",
