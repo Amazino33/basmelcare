@@ -35,7 +35,7 @@
             font-size: 10px;
             letter-spacing: 2px;
             margin: 12px 0;
-            color: #555;
+            color: #aaa;
         }
         .header h1 { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
         .header p { font-size: 10px; }
@@ -58,7 +58,13 @@
         @media print {
             .no-print { display: none !important; }
             body { width: 80mm; margin: 0; padding: 0; }
-            .cut-line { color: #000; }
+            .cut-line {
+                page-break-after: always;
+                break-after: page;
+                visibility: hidden;
+                height: 0;
+                margin: 0;
+            }
         }
         @media screen {
             body { max-width: 360px; border: 1px solid #ccc; margin: 20px auto; background: white; }
@@ -146,7 +152,7 @@
     </div>
 
     {{-- CUT LINE --}}
-    <div class="cut-line">- - - - - - - - - - CUT HERE - - - - - - - - - -</div>
+    <div class="cut-line">✂ - - - - - - - - - - - - - - - - - - - - - ✂</div>
 
     {{-- COPY 2: PROOF OF PAYMENT (returned to sales person) --}}
     <div class="copy">
