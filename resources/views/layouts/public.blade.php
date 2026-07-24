@@ -21,7 +21,7 @@
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex items-center justify-between h-14 md:h-16">
                 <!-- Logo -->
-                <a href="/" class="flex items-center gap-2">
+                <a href="/home" class="flex items-center gap-2">
                     <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <x-icon name="o-heart" class="w-5 h-5 text-primary-content" />
                     </div>
@@ -30,7 +30,7 @@
 
                 <!-- Desktop nav links -->
                 <div class="hidden md:flex items-center gap-6">
-                    <a href="/" class="text-sm font-medium hover:text-primary transition-colors">Home</a>
+                    <a href="/home" class="text-sm font-medium hover:text-primary transition-colors">Home</a>
                     <a href="/shop" class="text-sm font-medium hover:text-primary transition-colors">Shop</a>
                     <a href="#services" class="text-sm font-medium hover:text-primary transition-colors">Services</a>
                     <a href="#contact" class="text-sm font-medium hover:text-primary transition-colors">Contact</a>
@@ -123,7 +123,7 @@
     <!-- Mobile bottom nav (visible only on mobile) -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-200 shadow-lg">
         <div class="flex">
-            <a href="/" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('/') ? 'text-primary' : 'text-base-content/60' }}">
+            <a href="/home" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('home') ? 'text-primary' : 'text-base-content/60' }}">
                 <x-icon name="o-home" class="w-5 h-5" />
                 <span class="mt-0.5">Home</span>
             </a>
