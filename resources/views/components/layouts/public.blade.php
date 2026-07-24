@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'BasmelCare Pharmacy' }}</title>
+    @include('partials.head-icons')
     <meta name="description" content="{{ $description ?? 'Your trusted pharmacy for quality healthcare products, prescriptions, and wellness services.' }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />

@@ -3,14 +3,26 @@
         @foreach($cart as $key => $item)
             <div class="flex items-center gap-2 p-2 rounded bg-base-200">
                 <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-xs truncate">{{ $item['name'] }}</div>
+                    <div class="font-semibold text-xs truncate">
+                        {{ $item['name'] }}
+                        @if($item['is_pack'] ?? false)
+                            <span class="text-secondary text-[10px] ml-1">Pack×{{ $item['pack_size'] }}</span>
+                        @endif
+                    </div>
                     <div class="text-xs text-base-content/60">
                         ₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}
-                        @if($item['unit_price'] < $item['retail_price'])
+                        @if(!($item['is_pack'] ?? false) && $item['unit_price'] < $item['retail_price'])
                             <span class="text-info">(w/s)</span>
                         @endif
                     </div>
                 </div>
+                @if($item['has_pack'] ?? false)
+                    @php $isPack = $item['is_pack'] ?? false; @endphp
+                    <button wire:click="togglePack('{{ $key }}')"
+                        @class(['btn btn-xs', 'btn-secondary' => $isPack, 'btn-neutral' => !$isPack])>
+                        {{ $isPack ? 'Pack' : 'Unit' }}
+                    </button>
+                @endif
                 <input type="number" wire:change="updateQty('{{ $key }}', $event.target.value)" value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}" class="input input-xs input-bordered w-14 text-center" />
                 <x-button icon="o-x-mark" wire:click="removeFromCart('{{ $key }}')" class="btn-xs btn-ghost text-error" />
             </div>

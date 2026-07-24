@@ -76,7 +76,12 @@
 
         @foreach($sale->saleItems as $item)
             <div class="item">
-                <div class="item-name">{{ $item->product->name }}</div>
+                <div class="item-name">
+                    {{ $item->product->name }}
+                    @if($item->is_pack)
+                        <span style="font-size:9px;font-weight:normal;">(Pack×{{ $item->pack_size }})</span>
+                    @endif
+                </div>
                 @if($item->batch)
                     <div class="item-batch">Batch: {{ $item->batch->batch_number }}</div>
                 @endif
