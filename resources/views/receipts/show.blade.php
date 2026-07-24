@@ -51,9 +51,13 @@
         .btn-print { background: #2563eb; color: white; }
         .btn-back  { background: #e2e8f0; color: #333; }
 
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
         @media print {
             .no-print { display: none !important; }
-            body { width: 80mm; }
+            body { width: 80mm; margin: 0; padding: 0; }
             .cut-line { color: #000; }
         }
         @media screen {
