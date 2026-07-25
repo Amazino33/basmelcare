@@ -1,9 +1,6 @@
-<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <rect width="48" height="48" rx="11" fill="#6D28D9"/>
-  <g transform="rotate(-18,24,24)">
-    <path d="M24 17 L13 17 A7 7 0 0 0 13 31 L24 31 Z" fill="white" opacity="0.65"/>
-    <path d="M24 17 L35 17 A7 7 0 0 1 35 31 L24 31 Z" fill="white"/>
-    <line x1="24" y1="17" x2="24" y2="31" stroke="#6D28D9" stroke-width="1.5" stroke-linecap="round"/>
-    <ellipse cx="15" cy="20.5" rx="4.5" ry="2" fill="white" opacity="0.25"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="225.28" fill="#fff"></rect>
+  <g transform="translate(433.152 522.24) rotate(-45)"><rect x="-194.56" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#422ad5"></rect></g>
+  <g transform="translate(590.848 522.24) rotate(45)"><rect x="0" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#2fae7a"></rect></g>
+  <text x="512" y="686.08" font-family="&#39;Space Grotesk&#39;,sans-serif" font-weight="700" font-size="148.48" fill="#422ad5" text-anchor="middle">BC</text>
 </svg>
