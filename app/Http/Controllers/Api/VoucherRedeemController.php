@@ -24,9 +24,11 @@ class VoucherRedeemController extends Controller
         // receipt never causes a false "not found".
         $invoiceNumber = strtoupper(trim($request->invoice_number));
 
-        $sale = Sale::with('customer')
-            ->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])
-            ->first();
+        // Accept either the full invoice number (INV-YYYYMMDD-NNNN-SUFFIX) or just
+        // the short suffix (last 6 chars). No dashes = suffix-only lookup.
+        $sale = str_contains($invoiceNumber, '-')
+            ? Sale::with('customer')->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])->first()
+            : Sale::with('customer')->whereRaw('UPPER(invoice_number) LIKE ?', ['%-' . $invoiceNumber])->first();
 
         if (! $sale) {
             return response()->json(['valid' => false, 'message' => 'Invoice not found.'], 404);
