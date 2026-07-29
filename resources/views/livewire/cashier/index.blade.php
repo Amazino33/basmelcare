@@ -157,7 +157,7 @@
     @endif
 
     <!-- Payment Modal -->
-    <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : 'Process Payment' }}" box-class="max-w-lg">
+    <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : ($payReview ? 'Review & Confirm' : 'Process Payment') }}" box-class="max-w-lg relative overflow-hidden">
         @if($paySuccess && $payingSale)
             <div class="text-center py-6">
                 <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
@@ -351,20 +351,95 @@
                 <x-slot:actions>
                     <x-button label="Cancel" @click="$wire.payModal = false" />
                     <x-button
-                        label="Confirm Payment"
-                        type="submit"
+                        label="Review Payment"
+                        type="button"
+                        wire:click="$set('payReview', true)"
                         class="btn-primary"
-                        icon="o-check"
+                        icon="o-arrow-right"
                         :disabled="!$breakdown || !$breakdown['can_confirm']"
-                        wire:confirm="Confirm payment for {{ $payingSale->invoice_number }}?\n\nOnly proceed once the goods have been collected from the sales person and are ready to hand to the customer."
                     />
                 </x-slot:actions>
             </x-form>
+
+            @if($payReview && $breakdown)
+                {{-- Summary overlay --}}
+                <div class="absolute inset-0 bg-base-100 z-10 p-5 flex flex-col rounded-box">
+                    <div class="text-base font-bold mb-3">Confirm Payment</div>
+
+                    <div class="bg-base-200 rounded-lg p-3 space-y-1.5 text-sm flex-1 overflow-y-auto">
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Invoice</span>
+                            <span class="font-bold">{{ $payingSale->invoice_number }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Customer</span>
+                            <span>{{ $payingSale->customer?->name ?? 'Walk-in' }}</span>
+                        </div>
+
+                        <div class="border-t border-base-300 pt-2 mt-2 space-y-1">
+                            @if((float)($cash_tendered) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Cash</span><span>₦{{ number_format((float)$cash_tendered, 2) }}</span></div>
+                            @endif
+                            @if((float)($card_amount) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Card</span><span>₦{{ number_format((float)$card_amount, 2) }}</span></div>
+                            @endif
+                            @if((float)($transfer_amount) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Transfer</span><span>₦{{ number_format((float)$transfer_amount, 2) }}</span></div>
+                            @endif
+                            @if($breakdown['credit_used'] > 0.01)
+                                <div class="flex justify-between text-success"><span>Store credit</span><span>₦{{ number_format($breakdown['credit_used'], 2) }}</span></div>
+                            @endif
+                        </div>
+
+                        <div class="border-t border-base-300 pt-2 mt-2 space-y-1">
+                            <div class="flex justify-between font-bold text-base">
+                                <span>Invoice total</span>
+                                <span>₦{{ number_format($breakdown['sale_total'], 2) }}</span>
+                            </div>
+                            @if($breakdown['shortfall'] > 0.01)
+                                <div class="flex justify-between text-error font-semibold">
+                                    <span>Debt recorded</span>
+                                    <span>₦{{ number_format($breakdown['shortfall'], 2) }}</span>
+                                </div>
+                            @endif
+                            @if(!empty($breakdown['debt_allocations']))
+                                @foreach($breakdown['debt_allocations'] as $alloc)
+                                    <div class="flex justify-between text-success text-xs">
+                                        <span>Clears {{ $alloc['invoice'] }}</span>
+                                        <span>₦{{ number_format($alloc['paying'], 2) }}</span>
+                                    </div>
+                                @endforeach
+                            @endif
+                            @if($breakdown['stored_as_credit'] > 0.01)
+                                <div class="flex justify-between text-info font-semibold">
+                                    <span>Stored as credit</span>
+                                    <span>₦{{ number_format($breakdown['stored_as_credit'], 2) }}</span>
+                                </div>
+                            @elseif($breakdown['change_back'] > 0.01)
+                                <div class="flex justify-between text-success font-semibold">
+                                    <span>Change to give</span>
+                                    <span>₦{{ number_format($breakdown['change_back'], 2) }}</span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning py-2 mt-3 text-xs">
+                        <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                        Confirm only once the goods have been collected from the sales person.
+                    </div>
+
+                    <div class="flex gap-2 mt-3">
+                        <x-button label="Back" wire:click="$set('payReview', false)" class="btn-ghost flex-1" icon="o-arrow-left" />
+                        <x-button label="Confirm & Pay" wire:click="processPayment" class="btn-success flex-1" icon="o-check" />
+                    </div>
+                </div>
+            @endif
         @endif
     </x-modal>
 
     <!-- Online Order Payment Modal -->
-    <x-modal wire:model="orderPayModal" title="{{ $orderPaySuccess ? 'Payment Collected' : 'Collect Order Payment' }}" box-class="max-w-lg">
+    <x-modal wire:model="orderPayModal" title="{{ $orderPaySuccess ? 'Payment Collected' : ($orderPayReview ? 'Review & Confirm' : 'Collect Order Payment') }}" box-class="max-w-lg relative overflow-hidden">
         @if($orderPaySuccess && $payingOrder)
             <div class="text-center py-6">
                 <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
@@ -451,15 +526,71 @@
                 <x-slot:actions>
                     <x-button label="Cancel" @click="$wire.orderPayModal = false" />
                     <x-button
-                        label="Confirm & Complete Order"
-                        type="submit"
+                        label="Review Payment"
+                        type="button"
+                        wire:click="$set('orderPayReview', true)"
                         class="btn-warning"
-                        icon="o-check"
-                        wire:confirm="Confirm payment for {{ $payingOrder->order_number }}?\n\nOnly proceed once the goods have been handed over by the sales person."
+                        icon="o-arrow-right"
                         :disabled="!$orderBreakdown || !$orderBreakdown['can_confirm']"
                     />
                 </x-slot:actions>
             </x-form>
+
+            @if($orderPayReview && $orderBreakdown)
+                <div class="absolute inset-0 bg-base-100 z-10 p-5 flex flex-col rounded-box">
+                    <div class="text-base font-bold mb-3">Confirm Order Payment</div>
+
+                    <div class="bg-base-200 rounded-lg p-3 space-y-1.5 text-sm flex-1 overflow-y-auto">
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Order</span>
+                            <span class="font-bold">{{ $payingOrder->order_number }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Customer</span>
+                            <span>{{ $payingOrder->customer?->name ?? $payingOrder->guest_name ?? 'Guest' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Type</span>
+                            <span>{{ ucfirst($payingOrder->fulfillment_type) }} — Pickup</span>
+                        </div>
+
+                        <div class="border-t border-base-300 pt-2 mt-2 space-y-1">
+                            @if((float)($cash_tendered) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Cash</span><span>₦{{ number_format((float)$cash_tendered, 2) }}</span></div>
+                            @endif
+                            @if((float)($card_amount) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Card</span><span>₦{{ number_format((float)$card_amount, 2) }}</span></div>
+                            @endif
+                            @if((float)($transfer_amount) > 0)
+                                <div class="flex justify-between"><span class="text-base-content/60">Transfer</span><span>₦{{ number_format((float)$transfer_amount, 2) }}</span></div>
+                            @endif
+                        </div>
+
+                        <div class="border-t border-base-300 pt-2 mt-2 space-y-1">
+                            <div class="flex justify-between font-bold text-base">
+                                <span>Order total</span>
+                                <span>₦{{ number_format($orderBreakdown['order_total'], 2) }}</span>
+                            </div>
+                            @if($orderBreakdown['change'] > 0.01)
+                                <div class="flex justify-between text-success font-semibold">
+                                    <span>Change to give</span>
+                                    <span>₦{{ number_format($orderBreakdown['change'], 2) }}</span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning py-2 mt-3 text-xs">
+                        <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                        Confirm only once the goods have been handed over by the sales person.
+                    </div>
+
+                    <div class="flex gap-2 mt-3">
+                        <x-button label="Back" wire:click="$set('orderPayReview', false)" class="btn-ghost flex-1" icon="o-arrow-left" />
+                        <x-button label="Confirm & Pay" wire:click="processOrderPayment" class="btn-success flex-1" icon="o-check" />
+                    </div>
+                </div>
+            @endif
         @endif
     </x-modal>
 

@@ -27,24 +27,26 @@ class Index extends Component
     public bool $apply_credit = false;
     public bool $store_change_as_credit = false;
     public bool $payModal = false;
+    public bool $payReview = false;
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
 
     // Online order payment
     public ?int $payingOrderId = null;
     public bool $orderPayModal = false;
+    public bool $orderPayReview = false;
     public bool $orderPaySuccess = false;
     public ?int $lastPaidOrderId = null;
 
     public function openPayment(int $saleId)
     {
         $this->payingSaleId = $saleId;
-        $this->paySuccess = false;
+        $this->paySuccess   = false;
+        $this->payReview    = false;
         $this->lastPaidSaleId = null;
         $this->store_change_as_credit = false;
         $this->reset(['cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
 
-        // Auto-enable credit if customer has a balance
         $sale = Sale::with('customer')->find($saleId);
         $this->apply_credit = $sale?->customer_id && ($sale->customer->credit_balance ?? 0) > 0;
 
@@ -245,7 +247,8 @@ class Index extends Component
 
     public function closePay(): void
     {
-        $this->payModal = false;
+        $this->payModal   = false;
+        $this->payReview  = false;
         $this->paySuccess = false;
         $this->apply_credit = false;
         $this->store_change_as_credit = false;
@@ -291,11 +294,12 @@ class Index extends Component
     // COD pickup — collect payment at counter
     public function openOrderPayment(int $orderId): void
     {
-        $this->payingOrderId   = $orderId;
-        $this->orderPaySuccess = false;
-        $this->lastPaidOrderId = null;
+        $this->payingOrderId    = $orderId;
+        $this->orderPaySuccess  = false;
+        $this->orderPayReview   = false;
+        $this->lastPaidOrderId  = null;
         $this->reset(['cash_tendered', 'card_amount', 'transfer_amount']);
-        $this->orderPayModal   = true;
+        $this->orderPayModal    = true;
     }
 
     public function processOrderPayment(): void
@@ -342,6 +346,7 @@ class Index extends Component
     public function closeOrderPay(): void
     {
         $this->orderPayModal   = false;
+        $this->orderPayReview  = false;
         $this->orderPaySuccess = false;
         $this->reset(['payingOrderId', 'lastPaidOrderId', 'cash_tendered', 'card_amount', 'transfer_amount']);
     }
@@ -508,6 +513,8 @@ class Index extends Component
             'codPickupOrders'   => $codPickupOrders,
             'payingOrder'       => $payingOrder,
             'orderBreakdown'    => $orderBreakdown,
+            'payReview'         => $this->payReview,
+            'orderPayReview'    => $this->orderPayReview,
         ]);
     }
 }
