@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Credits;
 
+use App\Models\CreditPayout;
 use App\Models\Customer;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -34,9 +35,18 @@ class Index extends Component
             'payout_amount' => ['required', 'numeric', 'min:0.01', 'max:' . $customer->credit_balance],
         ]);
 
-        $amount = (float) $this->payout_amount;
+        $amount        = (float) $this->payout_amount;
+        $balanceBefore = (float) $customer->credit_balance;
 
         $customer->decrement('credit_balance', $amount);
+
+        CreditPayout::create([
+            'customer_id'    => $customer->id,
+            'amount'         => $amount,
+            'balance_before' => $balanceBefore,
+            'balance_after'  => max(0, $balanceBefore - $amount),
+            'cashier_id'     => auth()->id(),
+        ]);
 
         $this->payoutModal = false;
         $this->reset(['payingCustomerId', 'payout_amount']);
@@ -63,11 +73,20 @@ class Index extends Component
             ? Customer::find($this->payingCustomerId)
             : null;
 
+        $history = CreditPayout::with('customer', 'cashier')
+            ->when($this->search, fn($q) => $q->whereHas('customer', fn($c) =>
+                $c->where('name', 'like', "%{$this->search}%")
+                  ->orWhere('phone', 'like', "%{$this->search}%")
+            ))
+            ->latest()
+            ->paginate(20, ['*'], 'historyPage');
+
         return view('livewire.credits.index', [
             'customers'      => $customers,
             'totalCredit'    => $totalCredit,
             'totalCount'     => $totalCount,
             'payingCustomer' => $payingCustomer,
+            'history'        => $history,
         ]);
     }
 }

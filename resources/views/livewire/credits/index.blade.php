@@ -50,6 +50,35 @@
 
     {{ $customers->links() }}
 
+    <!-- Payout History -->
+    <div class="mt-8">
+        <div class="text-sm font-bold text-base-content/70 uppercase tracking-wide mb-3">Payout History</div>
+
+        @forelse($history as $payout)
+            <div class="flex justify-between items-center p-3 bg-base-200 rounded-lg mb-2 text-sm">
+                <div class="min-w-0 flex-1">
+                    <div class="font-semibold">{{ $payout->customer->name }}</div>
+                    <div class="text-xs text-base-content/60">
+                        {{ $payout->created_at->format('d M Y, h:i A') }}
+                        · by {{ $payout->cashier->name }}
+                    </div>
+                    @if($payout->balance_after > 0)
+                        <div class="text-xs text-warning mt-0.5">Balance after: ₦{{ number_format($payout->balance_after, 2) }}</div>
+                    @else
+                        <div class="text-xs text-success mt-0.5">Fully settled</div>
+                    @endif
+                </div>
+                <div class="text-right ml-3 shrink-0">
+                    <div class="font-bold text-success">₦{{ number_format($payout->amount, 2) }}</div>
+                </div>
+            </div>
+        @empty
+            <div class="text-center py-8 text-base-content/40 text-sm">No payouts recorded yet.</div>
+        @endforelse
+
+        {{ $history->links() }}
+    </div>
+
     <!-- Payout Modal -->
     <x-modal wire:model="payoutModal" title="Pay Out Credit" box-class="max-w-sm">
         @if($payingCustomer)
