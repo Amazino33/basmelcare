@@ -41,6 +41,32 @@ class Index extends Component
         $this->detailsDrawer = true;
     }
 
+    private function isElevated(): bool
+    {
+        return (bool) array_intersect(
+            auth()->user()->role ?? [],
+            ['admin', 'pharmacist', 'branch_manager']
+        );
+    }
+
+    public function completeHandover(int $saleId): void
+    {
+        $sale = Sale::find($saleId);
+
+        if (!$sale || $sale->status !== 'paid') {
+            $this->error('Sale not found or already completed.');
+            return;
+        }
+
+        if (!$this->isElevated() && $sale->user_id !== auth()->id()) {
+            $this->error('You can only complete handover for your own sales.');
+            return;
+        }
+
+        $sale->update(['status' => 'completed']);
+        $this->success('Handover completed — sale marked as given to customer.');
+    }
+
     /**
      * Revoke the free Wi-Fi access tied to a receipt (e.g. after a refund or
      * dispute). Flags the sale locally, then pushes the revoke to HiFastLink so
@@ -84,11 +110,14 @@ class Index extends Component
 
     public function render()
     {
+        $elevated = $this->isElevated();
+        $userId   = auth()->id();
+
         // --- POS Sales ---
         $posHeaders = [
             ['key' => 'id', 'label' => '#'],
             ['key' => 'created_at', 'label' => 'Date'],
-            ['key' => 'user.name', 'label' => 'Cashier'],
+            ['key' => 'user.name', 'label' => 'By'],
             ['key' => 'customer.name', 'label' => 'Customer'],
             ['key' => 'total_amount', 'label' => 'Total'],
             ['key' => 'payment_method', 'label' => 'Payment'],
@@ -96,6 +125,7 @@ class Index extends Component
         ];
 
         $salesQuery = Sale::with('user', 'customer')
+            ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
             ->when($this->search, fn($q) => $q->where('id', $this->search)
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
@@ -104,8 +134,9 @@ class Index extends Component
         $totalRevenue = $filteredSales->sum('total_amount');
         $totalTransactions = $filteredSales->count();
 
-        $filteredItems = SaleItem::whereHas('sale', function ($q) {
-            $this->periodQuery($q)->where('status', 'completed');
+        $filteredItems = SaleItem::whereHas('sale', function ($q) use ($elevated, $userId) {
+            $this->periodQuery($q)->where('status', 'completed')
+                ->when(!$elevated, fn($q2) => $q2->where('user_id', $userId));
         });
         $totalCost = 0;
         $totalItemsSold = 0;
@@ -116,8 +147,10 @@ class Index extends Component
         $totalProfit = $totalRevenue - $totalCost;
         $avgSale = $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0;
 
-        $paymentBreakdown = $this->periodQuery(Sale::where('status', 'completed'))
-            ->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
+        $paymentBreakdown = $this->periodQuery(
+            Sale::where('status', 'completed')
+                ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
+            )->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
             ->groupBy('payment_method')
             ->get();
 
@@ -130,6 +163,7 @@ class Index extends Component
         // --- Pending Handover (paid but not yet handed to customer) ---
         $handoverQuery = Sale::with('user', 'customer')
             ->where('status', 'paid')
+            ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
             ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
@@ -172,23 +206,24 @@ class Index extends Component
             : null;
 
         return view('livewire.sales.index', [
-            'posHeaders' => $posHeaders,
-            'sales' => $sales,
-            'viewSale' => $viewSale,
-            'totalRevenue' => $totalRevenue,
-            'totalProfit' => $totalProfit,
-            'totalTransactions' => $totalTransactions,
-            'totalItemsSold' => $totalItemsSold,
-            'avgSale' => $avgSale,
-            'paymentBreakdown' => $paymentBreakdown,
-            'onlineHeaders' => $onlineHeaders,
-            'onlineOrders' => $onlineOrders,
-            'viewOrder' => $viewOrder,
-            'onlineRevenue' => $onlineRevenue,
-            'onlineTransactions' => $onlineTransactions,
-            'pendingOnlineCount' => $pendingOnlineCount,
+            'elevated'             => $elevated,
+            'posHeaders'           => $posHeaders,
+            'sales'                => $sales,
+            'viewSale'             => $viewSale,
+            'totalRevenue'         => $totalRevenue,
+            'totalProfit'          => $totalProfit,
+            'totalTransactions'    => $totalTransactions,
+            'totalItemsSold'       => $totalItemsSold,
+            'avgSale'              => $avgSale,
+            'paymentBreakdown'     => $paymentBreakdown,
+            'onlineHeaders'        => $onlineHeaders,
+            'onlineOrders'         => $onlineOrders,
+            'viewOrder'            => $viewOrder,
+            'onlineRevenue'        => $onlineRevenue,
+            'onlineTransactions'   => $onlineTransactions,
+            'pendingOnlineCount'   => $pendingOnlineCount,
             'onlinePaymentBreakdown' => $onlinePaymentBreakdown,
-            'handoverSales' => $handoverSales,
+            'handoverSales'        => $handoverSales,
             'pendingHandoverCount' => $pendingHandoverCount,
             'pendingHandoverTotal' => $pendingHandoverTotal,
         ]);

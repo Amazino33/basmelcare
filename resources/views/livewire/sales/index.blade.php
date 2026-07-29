@@ -1,5 +1,5 @@
 <div>
-    <x-header title="Sales History" size="text-xl" />
+    <x-header title="Sales History" subtitle="{{ $elevated ? 'All staff' : 'Your sales only' }}" size="text-xl" />
 
     <!-- Filters -->
     <div class="flex flex-col sm:flex-row gap-2 mb-4">
@@ -173,7 +173,18 @@
             @endscope
 
             @scope('actions', $sale)
-                <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
+                <div class="flex gap-1">
+                    <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="View details" />
+                    @if($elevated || $sale->user_id === auth()->id())
+                        <x-button
+                            label="Hand Over"
+                            icon="o-check"
+                            wire:click="completeHandover({{ $sale->id }})"
+                            wire:confirm="Mark this sale as handed over to the customer?"
+                            class="btn-xs btn-success"
+                        />
+                    @endif
+                </div>
             @endscope
         </x-table>
         @endif
