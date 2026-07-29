@@ -97,17 +97,53 @@ class Index extends Component
             $paymentMethod = count($cashMethods) === 1 ? array_key_first($cashMethods) : 'split';
         }
 
+        $storeCredit = $this->store_change_as_credit;
+        $excess      = $totalCollected - $saleTotal;
+
+        // Pre-compute debt allocation plan so it can be recorded in payment_details
+        $debtsToClear = [];
+        $changeBack   = 0;
+        $storedCredit = 0;
+
+        if ($excess > 0.01 && $sale->customer_id) {
+            $oldDebts  = Debt::where('customer_id', $sale->customer_id)
+                ->whereIn('status', ['unpaid', 'partial'])
+                ->with('sale:id,invoice_number')
+                ->orderBy('created_at')
+                ->get();
+            $remaining = $excess;
+            foreach ($oldDebts as $oldDebt) {
+                if ($remaining <= 0.01) break;
+                $owed    = (float) $oldDebt->amount_owed - (float) ($oldDebt->amount_paid ?? 0);
+                $toApply = min($remaining, $owed);
+                $debtsToClear[] = ['debt' => $oldDebt, 'amount' => $toApply, 'invoice' => $oldDebt->sale->invoice_number ?? '—'];
+                $remaining -= $toApply;
+            }
+            $changeBack = max(0, $remaining);
+        } elseif ($excess > 0.01) {
+            $changeBack = $excess;
+        }
+
+        if ($storeCredit && $changeBack > 0.01 && $sale->customer_id) {
+            $storedCredit = $changeBack;
+            $changeBack   = 0;
+        }
+
+        // Build complete payment_details including the full outcome
         $paymentDetails = array_filter([
-            'cash'     => $cash > 0 ? $cash : null,
-            'card'     => $card > 0 ? $card : null,
-            'transfer' => $transfer > 0 ? $transfer : null,
-            'credit'   => $creditUsed > 0 ? $creditUsed : null,
+            'cash'          => $cash > 0 ? $cash : null,
+            'card'          => $card > 0 ? $card : null,
+            'transfer'      => $transfer > 0 ? $transfer : null,
+            'credit'        => $creditUsed > 0 ? $creditUsed : null,
+            'debts_cleared' => !empty($debtsToClear)
+                ? array_map(fn($d) => ['invoice' => $d['invoice'], 'amount' => round($d['amount'], 2)], $debtsToClear)
+                : null,
+            'shortfall'     => $shortfall > 0.01 ? round($shortfall, 2) : null,
+            'change_given'  => $changeBack > 0.01 ? round($changeBack, 2) : null,
+            'stored_credit' => $storedCredit > 0.01 ? round($storedCredit, 2) : null,
         ]);
 
-        $storeCredit = $this->store_change_as_credit;
-
-        DB::transaction(function () use ($sale, $saleTotal, $totalCash, $totalCollected, $creditUsed, $shortfall, $paymentMethod, $paymentDetails, $storeCredit) {
-            // Deduct store credit used
+        DB::transaction(function () use ($sale, $saleTotal, $totalCollected, $creditUsed, $shortfall, $paymentMethod, $paymentDetails, $debtsToClear, $storedCredit) {
             if ($creditUsed > 0) {
                 $sale->customer->decrement('credit_balance', $creditUsed);
             }
@@ -120,7 +156,7 @@ class Index extends Component
                 'paid_at'         => now(),
             ]);
 
-            // Shortfall → debt for the balance
+            // Shortfall → debt
             if ($shortfall > 0.01 && $sale->customer_id) {
                 $debt = Debt::create([
                     'sale_id'      => $sale->id,
@@ -141,44 +177,24 @@ class Index extends Component
                 }
             }
 
-            // Excess → apply to oldest outstanding debts, then change or credit
-            $excess = $totalCollected - $saleTotal;
-            $changeBack = 0;
+            // Execute pre-computed debt clearing
+            foreach ($debtsToClear as $item) {
+                $d = $item['debt'];
+                $d->amount_paid = ($d->amount_paid ?? 0) + $item['amount'];
+                $d->status      = abs($d->amount_paid - $d->amount_owed) < 0.01 ? 'paid' : 'partial';
+                $d->save();
 
-            if ($excess > 0.01 && $sale->customer_id) {
-                $debts = Debt::where('customer_id', $sale->customer_id)
-                    ->whereIn('status', ['unpaid', 'partial'])
-                    ->orderBy('created_at')
-                    ->get();
-
-                $remaining = $excess;
-                foreach ($debts as $debt) {
-                    if ($remaining <= 0.01) break;
-                    $owed    = (float) $debt->amount_owed - (float) ($debt->amount_paid ?? 0);
-                    $toApply = min($remaining, $owed);
-
-                    $debt->amount_paid = ($debt->amount_paid ?? 0) + $toApply;
-                    $debt->status      = abs($debt->amount_paid - $debt->amount_owed) < 0.01 ? 'paid' : 'partial';
-                    $debt->save();
-
-                    DebtPayment::create([
-                        'debt_id'        => $debt->id,
-                        'amount'         => $toApply,
-                        'payment_method' => $paymentMethod,
-                        'received_by'    => auth()->id(),
-                        'note'           => 'Auto-applied from overpayment on ' . $sale->invoice_number,
-                    ]);
-
-                    $remaining -= $toApply;
-                }
-                $changeBack = max(0, $remaining);
-            } elseif ($excess > 0.01) {
-                $changeBack = $excess;
+                DebtPayment::create([
+                    'debt_id'        => $d->id,
+                    'amount'         => $item['amount'],
+                    'payment_method' => $paymentMethod,
+                    'received_by'    => auth()->id(),
+                    'note'           => 'Auto-applied from overpayment on ' . $sale->invoice_number,
+                ]);
             }
 
-            // Store remaining change as customer credit
-            if ($storeCredit && $changeBack > 0.01 && $sale->customer_id) {
-                $sale->customer->increment('credit_balance', $changeBack);
+            if ($storedCredit > 0.01 && $sale->customer_id) {
+                $sale->customer->increment('credit_balance', $storedCredit);
             }
         });
 

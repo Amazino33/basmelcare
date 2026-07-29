@@ -80,6 +80,18 @@
     @php
         $items = $sale->saleItems;
         $hifastlinkEnabled = \App\Models\AppSetting::get('hifastlink_api_key', '') !== '';
+        $pd = $sale->payment_details ?? [];
+        // Payment inputs
+        $pmtCash     = $pd['cash']     ?? 0;
+        $pmtCard     = $pd['card']     ?? 0;
+        $pmtTransfer = $pd['transfer'] ?? 0;
+        $pmtCredit   = $pd['credit']   ?? 0;
+        // Outcome
+        $pmtDebtsCleared = $pd['debts_cleared'] ?? [];
+        $pmtShortfall    = $pd['shortfall']    ?? 0;
+        $pmtChange       = $pd['change_given'] ?? 0;
+        $pmtStored       = $pd['stored_credit'] ?? 0;
+        $pmtTotal        = $pmtCash + $pmtCard + $pmtTransfer + $pmtCredit;
     @endphp
 
     {{-- COPY 1: CUSTOMER RECEIPT --}}
@@ -123,15 +135,56 @@
 
         <div class="row"><span>Items:</span><span>{{ $items->sum('quantity') }}</span></div>
         <div class="row total-row"><span>TOTAL:</span><span>₦{{ number_format($sale->total_amount, 2) }}</span></div>
-        <div class="row"><span>Payment:</span><span>{{ ucfirst($sale->payment_method) }}</span></div>
-        @if($sale->payment_method === 'split' && $sale->payment_details)
-            @foreach($sale->payment_details as $method => $amount)
-                <div class="row"><span>&nbsp;&nbsp;{{ ucfirst($method) }}:</span><span>₦{{ number_format($amount, 2) }}</span></div>
+
+        <div class="line"></div>
+
+        {{-- Payment received breakdown --}}
+        @if($pmtCash > 0)
+            <div class="row"><span>Cash:</span><span>₦{{ number_format($pmtCash, 2) }}</span></div>
+        @endif
+        @if($pmtCard > 0)
+            <div class="row"><span>Card:</span><span>₦{{ number_format($pmtCard, 2) }}</span></div>
+        @endif
+        @if($pmtTransfer > 0)
+            <div class="row"><span>Transfer:</span><span>₦{{ number_format($pmtTransfer, 2) }}</span></div>
+        @endif
+        @if($pmtCredit > 0)
+            <div class="row"><span>Store credit:</span><span>₦{{ number_format($pmtCredit, 2) }}</span></div>
+        @endif
+        @if($pmtTotal > 0 && ($pmtCash + $pmtCard + $pmtTransfer + $pmtCredit > 0) && count(array_filter([$pmtCash, $pmtCard, $pmtTransfer, $pmtCredit])) > 1)
+            <div class="row bold"><span>Amount received:</span><span>₦{{ number_format($pmtTotal, 2) }}</span></div>
+        @elseif(!$pmtTotal && !$pmtShortfall)
+            <div class="row"><span>Payment:</span><span>{{ ucfirst($sale->payment_method) }}</span></div>
+        @endif
+
+        {{-- Debts cleared by overpayment --}}
+        @if(!empty($pmtDebtsCleared))
+            <div class="line"></div>
+            <div class="row bold" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;"><span>Debts settled</span><span></span></div>
+            @foreach($pmtDebtsCleared as $cleared)
+                <div class="row" style="font-size:10px;">
+                    <span>{{ $cleared['invoice'] }}</span>
+                    <span>₦{{ number_format($cleared['amount'], 2) }} ✓</span>
+                </div>
             @endforeach
         @endif
-        @if($sale->payment_method === 'credit')
+
+        {{-- Shortfall — new debt recorded --}}
+        @if($pmtShortfall > 0)
             <div class="line"></div>
-            <div class="center bold" style="color:#c00;">** CREDIT SALE **</div>
+            <div class="row bold" style="color:#c00;"><span>Balance due (debt):</span><span>₦{{ number_format($pmtShortfall, 2) }}</span></div>
+            <div style="font-size:9px;text-align:center;color:#c00;">** This balance has been recorded as a debt **</div>
+        @endif
+
+        {{-- Change / stored credit --}}
+        @if($pmtChange > 0)
+            <div class="line"></div>
+            <div class="row bold"><span>Change:</span><span>₦{{ number_format($pmtChange, 2) }}</span></div>
+        @endif
+        @if($pmtStored > 0)
+            <div class="line"></div>
+            <div class="row bold" style="color:#005;"><span>Stored as credit:</span><span>₦{{ number_format($pmtStored, 2) }}</span></div>
+            <div style="font-size:9px;text-align:center;color:#005;">** Redeemable on next purchase **</div>
         @endif
 
         <div class="line"></div>
@@ -199,15 +252,56 @@
 
         <div class="row"><span>Items:</span><span>{{ $items->sum('quantity') }}</span></div>
         <div class="row total-row"><span>TOTAL:</span><span>₦{{ number_format($sale->total_amount, 2) }}</span></div>
-        <div class="row"><span>Payment:</span><span>{{ ucfirst($sale->payment_method) }}</span></div>
-        @if($sale->payment_method === 'split' && $sale->payment_details)
-            @foreach($sale->payment_details as $method => $amount)
-                <div class="row"><span>&nbsp;&nbsp;{{ ucfirst($method) }}:</span><span>₦{{ number_format($amount, 2) }}</span></div>
+
+        <div class="line"></div>
+
+        {{-- Payment received breakdown --}}
+        @if($pmtCash > 0)
+            <div class="row"><span>Cash:</span><span>₦{{ number_format($pmtCash, 2) }}</span></div>
+        @endif
+        @if($pmtCard > 0)
+            <div class="row"><span>Card:</span><span>₦{{ number_format($pmtCard, 2) }}</span></div>
+        @endif
+        @if($pmtTransfer > 0)
+            <div class="row"><span>Transfer:</span><span>₦{{ number_format($pmtTransfer, 2) }}</span></div>
+        @endif
+        @if($pmtCredit > 0)
+            <div class="row"><span>Store credit:</span><span>₦{{ number_format($pmtCredit, 2) }}</span></div>
+        @endif
+        @if($pmtTotal > 0 && ($pmtCash + $pmtCard + $pmtTransfer + $pmtCredit > 0) && count(array_filter([$pmtCash, $pmtCard, $pmtTransfer, $pmtCredit])) > 1)
+            <div class="row bold"><span>Amount received:</span><span>₦{{ number_format($pmtTotal, 2) }}</span></div>
+        @elseif(!$pmtTotal && !$pmtShortfall)
+            <div class="row"><span>Payment:</span><span>{{ ucfirst($sale->payment_method) }}</span></div>
+        @endif
+
+        {{-- Debts cleared by overpayment --}}
+        @if(!empty($pmtDebtsCleared))
+            <div class="line"></div>
+            <div class="row bold" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;"><span>Debts settled</span><span></span></div>
+            @foreach($pmtDebtsCleared as $cleared)
+                <div class="row" style="font-size:10px;">
+                    <span>{{ $cleared['invoice'] }}</span>
+                    <span>₦{{ number_format($cleared['amount'], 2) }} ✓</span>
+                </div>
             @endforeach
         @endif
-        @if($sale->payment_method === 'credit')
+
+        {{-- Shortfall — new debt recorded --}}
+        @if($pmtShortfall > 0)
             <div class="line"></div>
-            <div class="center bold" style="color:#c00;">** CREDIT SALE **</div>
+            <div class="row bold" style="color:#c00;"><span>Balance due (debt):</span><span>₦{{ number_format($pmtShortfall, 2) }}</span></div>
+            <div style="font-size:9px;text-align:center;color:#c00;">** This balance has been recorded as a debt **</div>
+        @endif
+
+        {{-- Change / stored credit --}}
+        @if($pmtChange > 0)
+            <div class="line"></div>
+            <div class="row bold"><span>Change:</span><span>₦{{ number_format($pmtChange, 2) }}</span></div>
+        @endif
+        @if($pmtStored > 0)
+            <div class="line"></div>
+            <div class="row bold" style="color:#005;"><span>Stored as credit:</span><span>₦{{ number_format($pmtStored, 2) }}</span></div>
+            <div style="font-size:9px;text-align:center;color:#005;">** Redeemable on next purchase **</div>
         @endif
 
         <div class="line"></div>
