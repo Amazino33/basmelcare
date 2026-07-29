@@ -11,14 +11,14 @@ class InvoiceController extends Controller
 {
     public function show(Sale $sale)
     {
-        $sale->load('saleItems.product', 'saleItems.batch', 'user', 'customer');
+        $sale->load('saleItems.product', 'saleItems.batch', 'user', 'cashier', 'customer');
 
         return view('invoices.show', $this->pharmacyData($sale));
     }
 
     public function receipt(Sale $sale)
     {
-        $sale->load('saleItems.product', 'user', 'customer');
+        $sale->load('saleItems.product', 'user', 'cashier', 'customer');
 
         return view('receipts.show', $this->pharmacyData($sale));
     }

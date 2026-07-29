@@ -10,7 +10,7 @@ class Sale extends Model
     use BelongsToBranch;
 
     protected $fillable = [
-        'invoice_number', 'user_id', 'confirmed_by', 'customer_id',
+        'invoice_number', 'user_id', 'cashier_id', 'confirmed_by', 'customer_id',
         'total_amount', 'payment_method', 'payment_details',
         'status', 'paid_at', 'confirmed_at', 'note',
         'voucher_redeemed_at', 'voucher_revoked_at',
@@ -52,6 +52,11 @@ class Sale extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function cashier()
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
     }
 
     public function confirmedBy()

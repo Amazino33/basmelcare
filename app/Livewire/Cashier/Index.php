@@ -113,6 +113,7 @@ class Index extends Component
             $sale->update([
                 'payment_method'  => $paymentMethod,
                 'payment_details' => $paymentDetails,
+                'cashier_id'      => auth()->id(),
                 'status'          => 'paid',
                 'paid_at'         => now(),
             ]);

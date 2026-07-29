@@ -49,6 +49,9 @@
         <div class="row"><span>Order #:</span><span class="bold">{{ $order->order_number }}</span></div>
         <div class="row"><span>Date:</span><span>{{ $order->created_at->format('d/m/Y H:i') }}</span></div>
         <div class="row"><span>Type:</span><span class="bold">{{ ucfirst($order->fulfillment_type) }}</span></div>
+        @if($order->claimedByUser)
+            <div class="row"><span>Prepared by:</span><span>{{ $order->claimedByUser->name }}</span></div>
+        @endif
 
         <div class="line"></div>
 

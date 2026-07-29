@@ -99,7 +99,10 @@
 
         <div class="row"><span>Invoice:</span><span class="bold">{{ $sale->invoice_number ?? '#' . $sale->id }}</span></div>
         <div class="row"><span>Date:</span><span>{{ $sale->paid_at ? $sale->paid_at->format('d/m/Y H:i') : $sale->created_at->format('d/m/Y H:i') }}</span></div>
-        <div class="row"><span>Cashier:</span><span>{{ $sale->user->name }}</span></div>
+        <div class="row"><span>Served by:</span><span>{{ $sale->user->name }}</span></div>
+        @if($sale->cashier)
+            <div class="row"><span>Cashier:</span><span>{{ $sale->cashier->name }}</span></div>
+        @endif
         @if($sale->customer)
             <div class="row"><span>Customer:</span><span>{{ $sale->customer->name }}</span></div>
         @endif
@@ -172,7 +175,10 @@
 
         <div class="row"><span>Invoice:</span><span class="bold">{{ $sale->invoice_number ?? '#' . $sale->id }}</span></div>
         <div class="row"><span>Date:</span><span>{{ $sale->paid_at ? $sale->paid_at->format('d/m/Y H:i') : $sale->created_at->format('d/m/Y H:i') }}</span></div>
-        <div class="row"><span>Cashier:</span><span>{{ $sale->user->name }}</span></div>
+        <div class="row"><span>Served by:</span><span>{{ $sale->user->name }}</span></div>
+        @if($sale->cashier)
+            <div class="row"><span>Cashier:</span><span>{{ $sale->cashier->name }}</span></div>
+        @endif
         @if($sale->customer)
             <div class="row"><span>Customer:</span><span>{{ $sale->customer->name }}</span></div>
         @endif

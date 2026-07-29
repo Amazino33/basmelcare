@@ -62,7 +62,7 @@
 
         <div class="row"><span>Invoice:</span><span class="bold">{{ $sale->invoice_number ?? '#' . $sale->id }}</span></div>
         <div class="row"><span>Date:</span><span>{{ $sale->created_at->format('d/m/Y H:i') }}</span></div>
-        <div class="row"><span>Cashier:</span><span>{{ $sale->user->name }}</span></div>
+        <div class="row"><span>Served by:</span><span>{{ $sale->user->name }}</span></div>
         @if($sale->customer)
             <div class="row"><span>Customer:</span><span class="bold">{{ $sale->customer->name }}</span></div>
             @if($sale->customer->phone)

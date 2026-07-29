@@ -90,7 +90,7 @@
             <div class="row"><span>Ref:</span><span>{{ $order->payment_reference }}</span></div>
         @endif
         @if($order->verifiedBy)
-            <div class="row"><span>Verified by:</span><span>{{ $order->verifiedBy->name }}</span></div>
+            <div class="row"><span>Cashier:</span><span>{{ $order->verifiedBy->name }}</span></div>
         @endif
 
         <div class="line"></div>
