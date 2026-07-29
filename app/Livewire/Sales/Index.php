@@ -49,6 +49,12 @@ class Index extends Component
         );
     }
 
+    private function isCashier(): bool
+    {
+        return !$this->isElevated()
+            && in_array('cashier', auth()->user()->role ?? []);
+    }
+
     public function completeHandover(int $saleId): void
     {
         $sale = Sale::find($saleId);
@@ -110,8 +116,18 @@ class Index extends Component
 
     public function render()
     {
-        $elevated = $this->isElevated();
-        $userId   = auth()->id();
+        $elevated   = $this->isElevated();
+        $isCashier  = $this->isCashier();
+        $userId     = auth()->id();
+
+        // How to scope non-elevated users: sales person → user_id, cashier → cashier_id
+        $scopeFn = function ($q) use ($elevated, $isCashier, $userId) {
+            if (!$elevated) {
+                $isCashier
+                    ? $q->where('cashier_id', $userId)
+                    : $q->where('user_id', $userId);
+            }
+        };
 
         // --- POS Sales ---
         $posHeaders = [
@@ -125,7 +141,7 @@ class Index extends Component
         ];
 
         $salesQuery = Sale::with('user', 'customer')
-            ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
+            ->tap($scopeFn)
             ->when($this->search, fn($q) => $q->where('id', $this->search)
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
@@ -134,9 +150,8 @@ class Index extends Component
         $totalRevenue = $filteredSales->sum('total_amount');
         $totalTransactions = $filteredSales->count();
 
-        $filteredItems = SaleItem::whereHas('sale', function ($q) use ($elevated, $userId) {
-            $this->periodQuery($q)->where('status', 'completed')
-                ->when(!$elevated, fn($q2) => $q2->where('user_id', $userId));
+        $filteredItems = SaleItem::whereHas('sale', function ($q) use ($scopeFn) {
+            $this->periodQuery($q)->where('status', 'completed')->tap($scopeFn);
         });
         $totalCost = 0;
         $totalItemsSold = 0;
@@ -148,8 +163,7 @@ class Index extends Component
         $avgSale = $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0;
 
         $paymentBreakdown = $this->periodQuery(
-            Sale::where('status', 'completed')
-                ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
+            Sale::where('status', 'completed')->tap($scopeFn)
             )->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
             ->groupBy('payment_method')
             ->get();
@@ -163,7 +177,7 @@ class Index extends Component
         // --- Pending Handover (paid but not yet handed to customer) ---
         $handoverQuery = Sale::with('user', 'customer')
             ->where('status', 'paid')
-            ->when(!$elevated, fn($q) => $q->where('user_id', $userId))
+            ->tap($scopeFn)
             ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
@@ -207,6 +221,7 @@ class Index extends Component
 
         return view('livewire.sales.index', [
             'elevated'             => $elevated,
+            'isCashier'            => $isCashier,
             'posHeaders'           => $posHeaders,
             'sales'                => $sales,
             'viewSale'             => $viewSale,

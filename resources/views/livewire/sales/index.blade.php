@@ -1,5 +1,5 @@
 <div>
-    <x-header title="Sales History" subtitle="{{ $elevated ? 'All staff' : 'Your sales only' }}" size="text-xl" />
+    <x-header title="Sales History" subtitle="{{ $elevated ? 'All staff' : ($isCashier ? 'Payments you processed' : 'Your sales only') }}" size="text-xl" />
 
     <!-- Filters -->
     <div class="flex flex-col sm:flex-row gap-2 mb-4">
