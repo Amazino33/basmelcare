@@ -233,7 +233,7 @@
                     <x-choices-offline
                         label="Delivery Staff (optional)"
                         wire:model.live="dispatch_name"
-                        :options="$deliveryUsers->map(fn($u) => ['id' => $u->name, 'name' => $u->name . ($u->phone ? ' · '.$u->phone : '']))"
+                        :options="$deliveryUsers->map(fn($u) => ['id' => $u->name, 'name' => $u->name . ($u->phone ? ' · ' . $u->phone : '')])"
                         option-value="id"
                         option-label="name"
                         placeholder="Select or type below..."
