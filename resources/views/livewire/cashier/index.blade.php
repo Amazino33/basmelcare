@@ -50,12 +50,16 @@
         </x-card>
     </div>
 
-    <!-- Online Orders Awaiting Payment -->
-    @if($pendingOrderPayments->count() > 0)
-    <div class="mt-4">
-        <x-card title="Online Orders" subtitle="{{ $pendingOrderPayments->count() }} ready — awaiting payment at counter">
-            @foreach($pendingOrderPayments as $order)
-                <div class="flex justify-between items-center p-3 bg-warning/10 border border-warning/30 rounded-lg mb-2">
+    <!-- Online Orders — Cashier Actions -->
+    @php $totalOnline = $prePaidOrders->count() + $codDeliveryOrders->count() + $codPickupOrders->count(); @endphp
+    @if($totalOnline > 0)
+    <div class="mt-4 space-y-3">
+
+        {{-- 1. Pre-paid orders: verify payment --}}
+        @if($prePaidOrders->count() > 0)
+        <x-card title="Pre-paid Orders" subtitle="{{ $prePaidOrders->count() }} ready — verify payment before dispatch">
+            @foreach($prePaidOrders as $order)
+                <div class="flex justify-between items-center p-3 bg-info/10 border border-info/30 rounded-lg mb-2">
                     <div class="min-w-0 flex-1">
                         <div class="font-bold text-sm">{{ $order->order_number }}</div>
                         <div class="text-xs text-base-content/60 truncate">
@@ -63,14 +67,92 @@
                             · {{ ucfirst($order->fulfillment_type) }}
                         </div>
                         <div class="text-xs text-base-content/60">Packed by: {{ $order->claimedByUser?->name ?? '—' }}</div>
+                        @if($order->payment_reference)
+                            <div class="text-xs text-info font-medium">Ref: {{ $order->payment_reference }}</div>
+                        @endif
                     </div>
-                    <div class="text-right ml-3 shrink-0">
-                        <div class="font-bold text-warning">₦{{ number_format($order->total_amount, 2) }}</div>
-                        <x-button label="Collect" wire:click="openOrderPayment({{ $order->id }})" class="btn-xs btn-warning mt-1" icon="o-banknotes" />
+                    <div class="text-right ml-3 shrink-0 space-y-1">
+                        <div class="font-bold text-info">₦{{ number_format($order->total_amount, 2) }}</div>
+                        <a href="{{ route('order.invoice', $order->id) }}" target="_blank"
+                           class="btn btn-xs btn-outline btn-info">
+                            <x-icon name="o-printer" class="w-3 h-3" /> Invoice
+                        </a>
+                        <x-button
+                            label="Verify Paid"
+                            wire:click="verifyOrderPayment({{ $order->id }})"
+                            wire:confirm="Confirm that payment of ₦{{ number_format($order->total_amount, 2) }} has been received for order {{ $order->order_number }}?"
+                            class="btn-xs btn-success"
+                            icon="o-check-badge"
+                        />
                     </div>
                 </div>
             @endforeach
         </x-card>
+        @endif
+
+        {{-- 2. COD delivery orders: approve dispatch --}}
+        @if($codDeliveryOrders->count() > 0)
+        <x-card title="COD — Delivery" subtitle="{{ $codDeliveryOrders->count() }} ready — approve for dispatch (rider collects on delivery)">
+            @foreach($codDeliveryOrders as $order)
+                <div class="flex justify-between items-center p-3 bg-warning/10 border border-warning/30 rounded-lg mb-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-sm">{{ $order->order_number }}</div>
+                        <div class="text-xs text-base-content/60 truncate">
+                            {{ $order->customer?->name ?? $order->guest_name ?? 'Guest' }}
+                            @if($order->delivery_address)· <span class="italic">{{ Str::limit($order->delivery_address, 30) }}</span>@endif
+                        </div>
+                        <div class="text-xs text-base-content/60">Packed by: {{ $order->claimedByUser?->name ?? '—' }}</div>
+                    </div>
+                    <div class="text-right ml-3 shrink-0 space-y-1">
+                        <div class="font-bold text-warning">₦{{ number_format($order->total_amount, 2) }}</div>
+                        <a href="{{ route('order.invoice', $order->id) }}" target="_blank"
+                           class="btn btn-xs btn-outline btn-warning">
+                            <x-icon name="o-printer" class="w-3 h-3" /> Invoice
+                        </a>
+                        <x-button
+                            label="Approve Dispatch"
+                            wire:click="approveCodDispatch({{ $order->id }})"
+                            wire:confirm="Approve order {{ $order->order_number }} for COD delivery? Rider will collect ₦{{ number_format($order->total_amount, 2) }} on delivery."
+                            class="btn-xs btn-warning"
+                            icon="o-truck"
+                        />
+                    </div>
+                </div>
+            @endforeach
+        </x-card>
+        @endif
+
+        {{-- 3. COD pickup orders: collect payment at counter --}}
+        @if($codPickupOrders->count() > 0)
+        <x-card title="COD — Pickup" subtitle="{{ $codPickupOrders->count() }} ready — collect payment before handing over">
+            @foreach($codPickupOrders as $order)
+                <div class="flex justify-between items-center p-3 bg-error/10 border border-error/30 rounded-lg mb-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-sm">{{ $order->order_number }}</div>
+                        <div class="text-xs text-base-content/60 truncate">
+                            {{ $order->customer?->name ?? $order->guest_name ?? 'Guest' }}
+                            · Pickup
+                        </div>
+                        <div class="text-xs text-base-content/60">Packed by: {{ $order->claimedByUser?->name ?? '—' }}</div>
+                    </div>
+                    <div class="text-right ml-3 shrink-0 space-y-1">
+                        <div class="font-bold text-error">₦{{ number_format($order->total_amount, 2) }}</div>
+                        <a href="{{ route('order.invoice', $order->id) }}" target="_blank"
+                           class="btn btn-xs btn-outline btn-error">
+                            <x-icon name="o-printer" class="w-3 h-3" /> Invoice
+                        </a>
+                        <x-button
+                            label="Collect Cash"
+                            wire:click="openOrderPayment({{ $order->id }})"
+                            class="btn-xs btn-error"
+                            icon="o-banknotes"
+                        />
+                    </div>
+                </div>
+            @endforeach
+        </x-card>
+        @endif
+
     </div>
     @endif
 
@@ -288,8 +370,16 @@
                 <div class="text-xl font-bold mb-1">Payment Collected!</div>
                 <div class="text-base-content/60 text-sm mb-1">{{ $payingOrder->order_number }}</div>
                 <div class="text-2xl font-bold text-primary mb-4">₦{{ number_format($payingOrder->total_amount, 2) }}</div>
-                <p class="text-sm text-base-content/60 mb-4">Order is now marked as completed. Hand goods to customer.</p>
-                <x-button label="Done" wire:click="closeOrderPay" class="btn-primary" />
+                <p class="text-sm text-base-content/60 mb-4">Order is now completed. Print receipt and hand goods to customer.</p>
+                <div class="flex gap-2 justify-center">
+                    @if($lastPaidOrderId)
+                        <a href="{{ route('order.receipt', $lastPaidOrderId) }}" target="_blank"
+                           class="btn btn-primary gap-2">
+                            <x-icon name="o-printer" class="w-4 h-4" /> Print Receipt
+                        </a>
+                    @endif
+                    <x-button label="Done" wire:click="closeOrderPay" class="btn-ghost" />
+                </div>
             </div>
 
         @elseif($payingOrder)

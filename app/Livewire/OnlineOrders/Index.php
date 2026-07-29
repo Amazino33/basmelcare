@@ -19,6 +19,12 @@ class Index extends Component
     public bool $detailsModal = false;
     public int $lastNewCount = 0;
 
+    // Dispatch
+    public ?int $dispatchingOrderId = null;
+    public bool $dispatchModal = false;
+    public string $dispatch_name = '';
+    public string $dispatch_phone = '';
+
     public function mount()
     {
         $this->lastNewCount = Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count();
@@ -96,13 +102,56 @@ class Index extends Component
             return;
         }
 
+        if (is_null($order->cashier_verified_at)) {
+            $this->error('Cashier has not verified this order yet. Bring it to the cashier first.');
+            return;
+        }
+
         if ($order->payment_status !== 'paid') {
-            $this->error('Payment has not been collected yet. Send the customer to the cashier first.');
+            $this->error('Payment has not been collected. Ensure cashier has processed payment.');
             return;
         }
 
         $order->update(['status' => 'completed']);
         $this->success('Order ' . $order->order_number . ' completed.');
+    }
+
+    public function openDispatch(int $orderId): void
+    {
+        $this->dispatchingOrderId = $orderId;
+        $this->dispatch_name  = '';
+        $this->dispatch_phone = '';
+        $this->dispatchModal  = true;
+    }
+
+    public function dispatchOrder(): void
+    {
+        $order = Order::findOrFail($this->dispatchingOrderId);
+
+        if ($order->claimed_by !== auth()->id()) {
+            $this->error('You can only dispatch orders you claimed.');
+            return;
+        }
+
+        if (is_null($order->cashier_verified_at)) {
+            $this->error('Cashier has not approved this order for dispatch yet.');
+            return;
+        }
+
+        $this->validate([
+            'dispatch_name'  => 'required|string|max:100',
+            'dispatch_phone' => 'nullable|string|max:20',
+        ]);
+
+        $order->update([
+            'delivery_person_name'  => $this->dispatch_name,
+            'delivery_person_phone' => $this->dispatch_phone ?: null,
+            'dispatched_at'         => now(),
+            'status'                => 'dispatched',
+        ]);
+
+        $this->dispatchModal = false;
+        $this->success('Order ' . $order->order_number . ' dispatched to ' . $this->dispatch_name . '.');
     }
 
     public function cancelOrder($orderId)
@@ -159,6 +208,7 @@ class Index extends Component
             $query->where('status', $this->filter);
         }
 
+
         $orders = $query->latest()->get();
 
         $newCount = Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count();
@@ -169,13 +219,21 @@ class Index extends Component
         $this->lastNewCount = $newCount;
 
         $viewOrder = $this->viewOrderId
-            ? Order::with('customer', 'claimedByUser', 'items.product')->find($this->viewOrderId)
+            ? Order::with('customer', 'claimedByUser', 'items.product', 'verifiedBy')->find($this->viewOrderId)
             : null;
 
+        $dispatchingOrder = $this->dispatchingOrderId
+            ? Order::with('customer', 'items.product')->find($this->dispatchingOrderId)
+            : null;
+
+        $deliveryUsers = \App\Models\User::whereJsonContains('role', 'delivery')->get(['id', 'name', 'phone']);
+
         return view('livewire.online-orders.index', [
-            'orders' => $orders,
-            'newCount' => $newCount,
-            'viewOrder' => $viewOrder,
+            'orders'           => $orders,
+            'newCount'         => $newCount,
+            'viewOrder'        => $viewOrder,
+            'dispatchingOrder' => $dispatchingOrder,
+            'deliveryUsers'    => $deliveryUsers,
         ]);
     }
 }

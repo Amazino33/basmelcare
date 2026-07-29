@@ -251,8 +251,43 @@ class Index extends Component
         $this->reset(['payingSaleId', 'lastPaidSaleId', 'cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
     }
 
-    // ── Online Order Payment ─────────────────────────────────────────────────
+    // ── Online Order Flow ────────────────────────────────────────────────────
 
+    public function verifyOrderPayment(int $orderId): void
+    {
+        $order = Order::findOrFail($orderId);
+
+        if ($order->payment_status !== 'paid') {
+            $this->error('This order is not pre-paid. Use "Approve COD" instead.');
+            return;
+        }
+
+        $order->update([
+            'cashier_verified_at' => now(),
+            'verified_by'         => auth()->id(),
+        ]);
+
+        $this->success('Payment verified. Sales can now dispatch the order.');
+    }
+
+    public function approveCodDispatch(int $orderId): void
+    {
+        $order = Order::findOrFail($orderId);
+
+        if ($order->payment_status === 'paid') {
+            $this->error('This order is already paid — use Verify instead.');
+            return;
+        }
+
+        $order->update([
+            'cashier_verified_at' => now(),
+            'verified_by'         => auth()->id(),
+        ]);
+
+        $this->success('COD approved for dispatch. Rider will collect payment on delivery.');
+    }
+
+    // COD pickup — collect payment at counter
     public function openOrderPayment(int $orderId): void
     {
         $this->payingOrderId   = $orderId;
@@ -271,14 +306,9 @@ class Index extends Component
             return;
         }
 
-        if ($order->status !== 'ready') {
-            $this->error('Order is not ready yet — sales staff must pack it first.');
-            return;
-        }
-
-        $cash     = (float) ($this->cash_tendered ?: 0);
-        $card     = (float) ($this->card_amount ?: 0);
-        $transfer = (float) ($this->transfer_amount ?: 0);
+        $cash           = (float) ($this->cash_tendered ?: 0);
+        $card           = (float) ($this->card_amount ?: 0);
+        $transfer       = (float) ($this->transfer_amount ?: 0);
         $totalCollected = $cash + $card + $transfer;
 
         if ($totalCollected <= 0) {
@@ -288,7 +318,7 @@ class Index extends Component
 
         $orderTotal = (float) $order->total_amount;
         if ($totalCollected < $orderTotal - 0.01) {
-            $this->error('Online orders must be paid in full (₦' . number_format($orderTotal, 2) . ').');
+            $this->error('Must be paid in full (₦' . number_format($orderTotal, 2) . ').');
             return;
         }
 
@@ -296,10 +326,12 @@ class Index extends Component
         $paymentMethod = count($methods) === 1 ? array_key_first($methods) : 'split';
 
         $order->update([
-            'payment_method' => $paymentMethod,
-            'payment_status' => 'paid',
-            'paid_at'        => now(),
-            'status'         => 'completed',
+            'payment_method'      => $paymentMethod,
+            'payment_status'      => 'paid',
+            'paid_at'             => now(),
+            'cashier_verified_at' => now(),
+            'verified_by'         => auth()->id(),
+            'status'              => 'completed',
         ]);
 
         $this->lastPaidOrderId = $order->id;
@@ -411,12 +443,27 @@ class Index extends Component
             }
         }
 
-        // Online orders awaiting cash payment at counter
-        $pendingOrderPayments = Order::with('customer', 'claimedByUser', 'items')
+        // Online orders split by action needed
+        $readyBase = Order::with('customer', 'claimedByUser', 'items')
             ->where('status', 'ready')
+            ->whereNull('cashier_verified_at');
+
+        // Pre-paid online — cashier must verify payment before dispatch
+        $prePaidOrders = (clone $readyBase)
+            ->where('payment_status', 'paid')
+            ->latest()->get();
+
+        // COD delivery — cashier approves dispatch; rider collects on delivery
+        $codDeliveryOrders = (clone $readyBase)
             ->where('payment_status', 'pending')
-            ->latest()
-            ->get();
+            ->where('fulfillment_type', 'delivery')
+            ->latest()->get();
+
+        // COD pickup — customer pays at counter before collecting
+        $codPickupOrders = (clone $readyBase)
+            ->where('payment_status', 'pending')
+            ->where('fulfillment_type', 'pickup')
+            ->latest()->get();
 
         $payingOrder = $this->payingOrderId
             ? Order::with('items.product', 'customer', 'claimedByUser')->find($this->payingOrderId)
@@ -450,14 +497,16 @@ class Index extends Component
         $this->lastPendingCount = $currentCount;
 
         return view('livewire.cashier.index', [
-            'pendingInvoices'      => $pendingInvoices,
-            'recentPaid'           => $recentPaid,
-            'payingSale'           => $payingSale,
-            'customerDebt'         => $customerDebt,
-            'breakdown'            => $breakdown,
-            'pendingOrderPayments' => $pendingOrderPayments,
-            'payingOrder'          => $payingOrder,
-            'orderBreakdown'       => $orderBreakdown,
+            'pendingInvoices'   => $pendingInvoices,
+            'recentPaid'        => $recentPaid,
+            'payingSale'        => $payingSale,
+            'customerDebt'      => $customerDebt,
+            'breakdown'         => $breakdown,
+            'prePaidOrders'     => $prePaidOrders,
+            'codDeliveryOrders' => $codDeliveryOrders,
+            'codPickupOrders'   => $codPickupOrders,
+            'payingOrder'       => $payingOrder,
+            'orderBreakdown'    => $orderBreakdown,
         ]);
     }
 }

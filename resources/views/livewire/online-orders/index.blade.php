@@ -12,6 +12,7 @@
         <button wire:click="$set('filter', 'mine')" @class(['btn btn-sm', 'btn-primary' => $filter === 'mine', 'btn-ghost border border-base-300' => $filter !== 'mine'])>My Orders</button>
         <button wire:click="$set('filter', 'processing')" @class(['btn btn-sm', 'btn-primary' => $filter === 'processing', 'btn-ghost border border-base-300' => $filter !== 'processing'])>Processing</button>
         <button wire:click="$set('filter', 'ready')" @class(['btn btn-sm', 'btn-primary' => $filter === 'ready', 'btn-ghost border border-base-300' => $filter !== 'ready'])>Ready</button>
+        <button wire:click="$set('filter', 'dispatched')" @class(['btn btn-sm', 'btn-primary' => $filter === 'dispatched', 'btn-ghost border border-base-300' => $filter !== 'dispatched'])>Dispatched</button>
         <button wire:click="$set('filter', 'completed')" @class(['btn btn-sm', 'btn-primary' => $filter === 'completed', 'btn-ghost border border-base-300' => $filter !== 'completed'])>Completed</button>
         <button wire:click="$set('filter', 'all')" @class(['btn btn-sm', 'btn-primary' => $filter === 'all', 'btn-ghost border border-base-300' => $filter !== 'all'])>All</button>
     </div>
@@ -24,25 +25,30 @@
                 'bg-warning/5 border-warning/30' => $order->status === 'pending' && !$order->claimed_by,
                 'bg-info/5 border-info/30' => $order->status === 'processing',
                 'bg-primary/5 border-primary/30' => $order->status === 'ready',
+                'bg-purple-500/5 border-purple-500/30' => $order->status === 'dispatched',
                 'bg-base-100 border-base-200' => in_array($order->status, ['completed', 'cancelled']),
             ])>
                 <div class="flex justify-between items-start">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-bold text-sm">{{ $order->order_number }}</span>
                             <span @class([
                                 'badge badge-xs',
-                                'badge-warning' => $order->status === 'pending',
-                                'badge-info' => $order->status === 'processing',
-                                'badge-primary' => $order->status === 'ready',
-                                'badge-success' => $order->status === 'completed',
-                                'badge-error' => $order->status === 'cancelled',
+                                'badge-warning'  => $order->status === 'pending',
+                                'badge-info'     => $order->status === 'processing',
+                                'badge-primary'  => $order->status === 'ready',
+                                'badge-ghost'    => $order->status === 'dispatched',
+                                'badge-success'  => $order->status === 'completed',
+                                'badge-error'    => $order->status === 'cancelled',
                             ])>{{ ucfirst($order->status) }}</span>
                             <span @class([
                                 'badge badge-xs',
                                 'badge-warning' => $order->payment_status === 'pending',
                                 'badge-success' => $order->payment_status === 'paid',
-                            ])>{{ ucfirst($order->payment_status) }}</span>
+                            ])>{{ $order->payment_status === 'pending' ? 'COD' : 'Paid' }}</span>
+                            @if($order->cashier_verified_at)
+                                <span class="badge badge-xs badge-success">Cashier ✓</span>
+                            @endif
                         </div>
 
                         <div class="text-xs text-base-content/60 mt-1">
@@ -60,6 +66,13 @@
                                 <span class="text-info font-semibold">Claimed by: {{ $order->claimedByUser?->name }}</span>
                             </div>
                         @endif
+
+                        @if($order->status === 'dispatched' && $order->delivery_person_name)
+                            <div class="text-xs mt-1 text-purple-600 dark:text-purple-400 font-medium">
+                                Rider: {{ $order->delivery_person_name }}
+                                @if($order->delivery_person_phone) · {{ $order->delivery_person_phone }}@endif
+                            </div>
+                        @endif
                     </div>
 
                     <div class="text-right ml-3 shrink-0">
@@ -71,6 +84,13 @@
                 <div class="flex flex-wrap gap-2 mt-3">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $order->id }})" class="btn-xs btn-ghost" tooltip="Details" />
 
+                    {{-- Print invoice (once order is claimed) --}}
+                    @if($order->claimed_by)
+                        <a href="{{ route('order.invoice', $order->id) }}" target="_blank" class="btn btn-xs btn-ghost tooltip" data-tip="Print Invoice">
+                            <x-icon name="o-printer" class="w-3 h-3" />
+                        </a>
+                    @endif
+
                     @if(!$order->claimed_by && in_array($order->status, ['pending', 'processing']))
                         <x-button label="Claim" wire:click="claimOrder({{ $order->id }})" class="btn-xs btn-primary" icon="o-hand-raised" wire:confirm="Claim this order? You'll be responsible for processing it." />
                     @endif
@@ -79,12 +99,32 @@
                         @if($order->status === 'processing')
                             <x-button label="Ready" wire:click="markReady({{ $order->id }})" class="btn-xs btn-info" icon="o-check" />
                         @endif
-                        @if(in_array($order->status, ['ready', 'processing']))
-                            <x-button label="Complete" wire:click="completeOrder({{ $order->id }})" class="btn-xs btn-success" icon="o-check-circle" wire:confirm="Mark as completed?" />
+
+                        {{-- Dispatch — delivery orders that cashier has approved --}}
+                        @if($order->status === 'ready' && $order->cashier_verified_at && $order->fulfillment_type === 'delivery')
+                            <x-button label="Dispatch" wire:click="openDispatch({{ $order->id }})" class="btn-xs btn-primary" icon="o-truck" />
                         @endif
-                        @if($order->status !== 'completed')
+
+                        {{-- Complete — pickup orders that cashier verified + paid --}}
+                        @if($order->status === 'ready' && $order->cashier_verified_at && $order->payment_status === 'paid' && $order->fulfillment_type === 'pickup')
+                            <x-button label="Complete" wire:click="completeOrder({{ $order->id }})" class="btn-xs btn-success" icon="o-check-circle" wire:confirm="Mark as completed and handed over?" />
+                        @endif
+
+                        {{-- Awaiting cashier hint --}}
+                        @if($order->status === 'ready' && !$order->cashier_verified_at)
+                            <span class="text-xs text-warning italic self-center">Awaiting cashier verification</span>
+                        @endif
+
+                        @if($order->status !== 'completed' && $order->status !== 'dispatched')
                             <x-button icon="o-x-mark" wire:click="cancelOrder({{ $order->id }})" class="btn-xs btn-ghost text-error" tooltip="Cancel" wire:confirm="Cancel this order?" />
                         @endif
+                    @endif
+
+                    {{-- Print receipt after cashier verify --}}
+                    @if($order->cashier_verified_at && in_array($order->status, ['ready', 'dispatched', 'completed']))
+                        <a href="{{ route('order.receipt', $order->id) }}" target="_blank" class="btn btn-xs btn-outline btn-success">
+                            <x-icon name="o-document-check" class="w-3 h-3" /> Receipt
+                        </a>
                     @endif
                 </div>
             </div>
@@ -130,6 +170,21 @@
                             <span class="text-base-content/40">{{ $viewOrder->claimed_at?->diffForHumans() }}</span>
                         </div>
                     @endif
+                    @if($viewOrder->cashier_verified_at)
+                        <div class="mt-2 text-sm">
+                            <span class="text-base-content/60">Verified by cashier:</span>
+                            <span class="font-semibold text-success">{{ $viewOrder->verifiedBy?->name ?? '—' }}</span>
+                            <span class="text-base-content/40">{{ $viewOrder->cashier_verified_at->format('d/m H:i') }}</span>
+                        </div>
+                    @endif
+                    @if($viewOrder->dispatched_at)
+                        <div class="mt-2 text-sm">
+                            <span class="text-base-content/60">Dispatched:</span>
+                            <span class="font-semibold">{{ $viewOrder->dispatched_at->format('d/m H:i') }}</span>
+                            · {{ $viewOrder->delivery_person_name }}
+                            @if($viewOrder->delivery_person_phone)({{ $viewOrder->delivery_person_phone }})@endif
+                        </div>
+                    @endif
                 </div>
 
                 <div class="text-sm font-semibold">Items</div>
@@ -155,6 +210,56 @@
                     </a>
                 @endif
             </div>
+        @endif
+    </x-modal>
+
+    <!-- Dispatch Modal -->
+    <x-modal wire:model="dispatchModal" title="Assign & Dispatch" box-class="max-w-sm">
+        @if($dispatchingOrder)
+            <div class="bg-base-200 rounded-lg p-3 mb-4 text-sm">
+                <div class="font-bold">{{ $dispatchingOrder->order_number }}</div>
+                <div class="text-xs text-base-content/60">
+                    {{ $dispatchingOrder->customer?->name ?? $dispatchingOrder->guest_name ?? 'Guest' }}
+                    · ₦{{ number_format($dispatchingOrder->total_amount, 2) }}
+                    @if($dispatchingOrder->isCod()) · <span class="text-warning font-semibold">COD — rider collects on delivery</span>@endif
+                </div>
+                @if($dispatchingOrder->delivery_address)
+                    <div class="text-xs mt-1"><span class="text-base-content/60">Address:</span> {{ $dispatchingOrder->delivery_address }}</div>
+                @endif
+            </div>
+
+            <x-form wire:submit="dispatchOrder">
+                @if($deliveryUsers->count() > 0)
+                    <x-choices-offline
+                        label="Delivery Staff (optional)"
+                        wire:model.live="dispatch_name"
+                        :options="$deliveryUsers->map(fn($u) => ['id' => $u->name, 'name' => $u->name . ($u->phone ? ' · '.$u->phone : '']))"
+                        option-value="id"
+                        option-label="name"
+                        placeholder="Select or type below..."
+                        single
+                        searchable
+                        hint="Selecting will fill the name below"
+                    />
+                @endif
+
+                <x-input
+                    wire:model="dispatch_name"
+                    label="Rider Name"
+                    placeholder="e.g. Ahmed"
+                    required
+                />
+                <x-input
+                    wire:model="dispatch_phone"
+                    label="Rider Phone (optional)"
+                    placeholder="08012345678"
+                />
+
+                <x-slot:actions>
+                    <x-button label="Cancel" @click="$wire.dispatchModal = false" />
+                    <x-button label="Dispatch Now" type="submit" class="btn-primary" icon="o-truck" />
+                </x-slot:actions>
+            </x-form>
         @endif
     </x-modal>
 
