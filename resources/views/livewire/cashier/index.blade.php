@@ -356,6 +356,7 @@
                         class="btn-primary"
                         icon="o-check"
                         :disabled="!$breakdown || !$breakdown['can_confirm']"
+                        wire:confirm="Confirm payment for {{ $payingSale->invoice_number }}?\n\nOnly proceed once the goods have been collected from the sales person and are ready to hand to the customer."
                     />
                 </x-slot:actions>
             </x-form>
@@ -454,6 +455,7 @@
                         type="submit"
                         class="btn-warning"
                         icon="o-check"
+                        wire:confirm="Confirm payment for {{ $payingOrder->order_number }}?\n\nOnly proceed once the goods have been handed over by the sales person."
                         :disabled="!$orderBreakdown || !$orderBreakdown['can_confirm']"
                     />
                 </x-slot:actions>
