@@ -22,10 +22,7 @@
             <div class="flex items-center justify-between h-14 md:h-16">
                 <!-- Logo -->
                 <a href="/" class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                        <x-icon name="o-heart" class="w-5 h-5 text-primary-content" />
-                    </div>
-                    <span class="font-bold text-lg text-primary">BasmelCare</span>
+                    <img src="/images/logo.svg" class="h-10 w-auto" alt="BasmelCare Pharmacy">
                 </a>
 
                 <!-- Desktop nav links -->

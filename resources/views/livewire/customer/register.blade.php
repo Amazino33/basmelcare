@@ -1,9 +1,7 @@
 <div class="min-h-[70vh] flex items-center justify-center px-4 py-10">
     <div class="w-full max-w-sm">
         <div class="text-center mb-6">
-            <div class="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3">
-                <x-icon name="o-heart" class="w-7 h-7 text-primary-content" />
-            </div>
+            <img src="/images/logo.svg" class="h-14 w-auto mx-auto mb-3" alt="BasmelCare Pharmacy">
             <h1 class="text-xl font-bold">Create Account</h1>
             <p class="text-sm text-base-content/60 mt-1">Join BasmelCare for easy ordering</p>
         </div>

@@ -19,12 +19,9 @@ class Index extends Component
 
     // Payment form
     public ?int $payingSaleId = null;
-    public string $payment_method = 'cash';
-    public string $split_cash = '';
-    public string $split_transfer = '';
-    public string $split_card = '';
-    public string $part_amount = '';
-    public string $part_method = 'cash';
+    public string $cash_tendered = '';
+    public string $card_amount = '';
+    public string $transfer_amount = '';
     public string $walkin_phone = '';
     public bool $payModal = false;
     public bool $paySuccess = false;
@@ -35,9 +32,7 @@ class Index extends Component
         $this->payingSaleId = $saleId;
         $this->paySuccess = false;
         $this->lastPaidSaleId = null;
-        $this->reset(['payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method', 'walkin_phone']);
-        $this->payment_method = 'cash';
-        $this->part_method = 'cash';
+        $this->reset(['cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
         $this->payModal = true;
     }
 
@@ -50,88 +45,89 @@ class Index extends Component
             return;
         }
 
-        if (in_array($this->payment_method, ['credit', 'part_payment']) && !$sale->customer_id) {
-            $this->error('This option requires a customer on the invoice.');
+        $cash     = (float) ($this->cash_tendered ?: 0);
+        $card     = (float) ($this->card_amount ?: 0);
+        $transfer = (float) ($this->transfer_amount ?: 0);
+        $totalCollected = $cash + $card + $transfer;
+
+        if ($totalCollected <= 0) {
+            $this->error('Enter at least one payment amount.');
             return;
         }
 
-        $paymentDetails = null;
+        $saleTotal = (float) $sale->total_amount;
+        $shortfall = $saleTotal - $totalCollected;
 
-        if ($this->payment_method === 'split') {
-            $cash = (float) ($this->split_cash ?: 0);
-            $transfer = (float) ($this->split_transfer ?: 0);
-            $card = (float) ($this->split_card ?: 0);
-            $splitTotal = $cash + $transfer + $card;
-
-            if (abs($splitTotal - (float) $sale->total_amount) > 0.01) {
-                $this->error('Split amounts must equal ₦' . number_format($sale->total_amount, 2));
-                return;
-            }
-
-            $paymentDetails = [];
-            if ($cash > 0) $paymentDetails['cash'] = $cash;
-            if ($transfer > 0) $paymentDetails['transfer'] = $transfer;
-            if ($card > 0) $paymentDetails['card'] = $card;
+        if ($shortfall > 0.01 && !$sale->customer_id) {
+            $this->error('Walk-in customers must pay the full amount (₦' . number_format($saleTotal, 2) . ').');
+            return;
         }
 
-        if ($this->payment_method === 'part_payment') {
-            $paid = (float) ($this->part_amount ?: 0);
-            $total = (float) $sale->total_amount;
+        $methods = array_filter(['cash' => $cash, 'card' => $card, 'transfer' => $transfer]);
+        $paymentMethod  = count($methods) === 1 ? array_key_first($methods) : 'split';
+        $paymentDetails = array_filter([
+            'cash'     => $cash > 0 ? $cash : null,
+            'card'     => $card > 0 ? $card : null,
+            'transfer' => $transfer > 0 ? $transfer : null,
+        ]);
 
-            if ($paid <= 0) {
-                $this->error('Enter the amount being paid.');
-                return;
-            }
-            if ($paid >= $total) {
-                $this->error('Part payment must be less than the total. Use full payment instead.');
-                return;
-            }
-
-            $balance = $total - $paid;
-
-            $paymentDetails = [
-                'paid_now' => $paid,
-                'balance' => $balance,
-                'method' => $this->part_method,
-            ];
-        }
-
-        DB::transaction(function () use ($sale, $paymentDetails) {
+        DB::transaction(function () use ($sale, $saleTotal, $totalCollected, $shortfall, $paymentMethod, $paymentDetails) {
             $sale->update([
-                'payment_method' => $this->payment_method,
+                'payment_method' => $paymentMethod,
                 'payment_details' => $paymentDetails,
                 'status' => 'paid',
                 'paid_at' => now(),
             ]);
 
-            if ($this->payment_method === 'credit') {
-                Debt::create([
-                    'sale_id' => $sale->id,
-                    'customer_id' => $sale->customer_id,
-                    'amount_owed' => $sale->total_amount,
-                    'status' => 'unpaid',
+            // Shortfall → debt for the balance
+            if ($shortfall > 0.01 && $sale->customer_id) {
+                $debt = Debt::create([
+                    'sale_id'      => $sale->id,
+                    'customer_id'  => $sale->customer_id,
+                    'amount_owed'  => $saleTotal,
+                    'amount_paid'  => $totalCollected > 0 ? $totalCollected : null,
+                    'status'       => $totalCollected > 0 ? 'partial' : 'unpaid',
                 ]);
+
+                if ($totalCollected > 0) {
+                    DebtPayment::create([
+                        'debt_id'        => $debt->id,
+                        'amount'         => $totalCollected,
+                        'payment_method' => $paymentMethod,
+                        'received_by'    => auth()->id(),
+                        'note'           => 'Partial payment at checkout',
+                    ]);
+                }
             }
 
-            if ($this->payment_method === 'part_payment') {
-                $paid = (float) $this->part_amount;
+            // Excess → apply to oldest outstanding debts
+            $excess = $totalCollected - $saleTotal;
+            if ($excess > 0.01 && $sale->customer_id) {
+                $debts = Debt::where('customer_id', $sale->customer_id)
+                    ->whereIn('status', ['unpaid', 'partial'])
+                    ->orderBy('created_at')
+                    ->get();
 
-                /** @var Debt $debt */
-                $debt = Debt::create([
-                    'sale_id' => $sale->id,
-                    'customer_id' => $sale->customer_id,
-                    'amount_owed' => $sale->total_amount,
-                    'amount_paid' => $paid,
-                    'status' => 'partial',
-                ]);
+                $remaining = $excess;
+                foreach ($debts as $debt) {
+                    if ($remaining <= 0.01) break;
+                    $owed    = (float) $debt->amount_owed - (float) ($debt->amount_paid ?? 0);
+                    $toApply = min($remaining, $owed);
 
-                DebtPayment::create([
-                    'debt_id' => $debt->id,
-                    'amount' => $paid,
-                    'payment_method' => $this->part_method,
-                    'received_by' => auth()->id(),
-                    'note' => 'Initial part payment at checkout',
-                ]);
+                    $debt->amount_paid = ($debt->amount_paid ?? 0) + $toApply;
+                    $debt->status = abs($debt->amount_paid - $debt->amount_owed) < 0.01 ? 'paid' : 'partial';
+                    $debt->save();
+
+                    DebtPayment::create([
+                        'debt_id'        => $debt->id,
+                        'amount'         => $toApply,
+                        'payment_method' => $paymentMethod,
+                        'received_by'    => auth()->id(),
+                        'note'           => 'Auto-applied from overpayment on ' . $sale->invoice_number,
+                    ]);
+
+                    $remaining -= $toApply;
+                }
             }
         });
 
@@ -172,20 +168,7 @@ class Index extends Component
 
         $lines[] = "━━━━━━━━━━━━━━━━━━━━";
 
-        if ($sale->payment_method === 'credit') {
-            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "*";
-            $lines[] = "⚠️ *Recorded as Credit — Full balance due*";
-            $lines[] = "";
-            $lines[] = "Please settle at your earliest convenience.";
-        } elseif ($sale->payment_method === 'part_payment' && $sale->payment_details) {
-            $paid    = $sale->payment_details['paid_now'] ?? 0;
-            $balance = $sale->payment_details['balance'] ?? 0;
-            $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "*";
-            $lines[] = "✅ Paid now: ₦" . number_format($paid, 2);
-            $lines[] = "⚠️ Balance owed: ₦" . number_format($balance, 2);
-            $lines[] = "";
-            $lines[] = "Please settle the balance at your earliest convenience.";
-        } elseif ($sale->payment_method === 'split' && $sale->payment_details) {
+        if ($sale->payment_method === 'split' && $sale->payment_details) {
             $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "* ✅ Paid";
             $lines[] = "💳 Split payment:";
             foreach ($sale->payment_details as $method => $amount) {
@@ -215,9 +198,7 @@ class Index extends Component
     {
         $this->payModal = false;
         $this->paySuccess = false;
-        $this->reset(['payingSaleId', 'lastPaidSaleId', 'payment_method', 'split_cash', 'split_transfer', 'split_card', 'part_amount', 'part_method', 'walkin_phone']);
-        $this->payment_method = 'cash';
-        $this->part_method = 'cash';
+        $this->reset(['payingSaleId', 'lastPaidSaleId', 'cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
     }
 
     public function render()
@@ -250,6 +231,56 @@ class Index extends Component
             }
         }
 
+        // Live payment breakdown preview
+        $breakdown = null;
+        if ($payingSale && !$this->paySuccess) {
+            $cash     = (float) ($this->cash_tendered ?: 0);
+            $card     = (float) ($this->card_amount ?: 0);
+            $transfer = (float) ($this->transfer_amount ?: 0);
+            $totalCollected = $cash + $card + $transfer;
+
+            if ($totalCollected > 0) {
+                $saleTotal        = (float) $payingSale->total_amount;
+                $excess           = $totalCollected - $saleTotal;
+                $shortfall        = max(0, -$excess);
+                $debtAllocations  = [];
+                $changeBack       = 0;
+
+                if ($excess > 0.01 && $payingSale->customer_id) {
+                    $debts     = Debt::where('customer_id', $payingSale->customer_id)
+                        ->whereIn('status', ['unpaid', 'partial'])
+                        ->with('sale:id,invoice_number')
+                        ->orderBy('created_at')
+                        ->get();
+                    $remaining = $excess;
+                    foreach ($debts as $debt) {
+                        if ($remaining <= 0.01) break;
+                        $owed    = (float) $debt->amount_owed - (float) ($debt->amount_paid ?? 0);
+                        $toApply = min($remaining, $owed);
+                        $debtAllocations[] = [
+                            'invoice' => $debt->sale->invoice_number ?? '—',
+                            'owed'    => $owed,
+                            'paying'  => $toApply,
+                        ];
+                        $remaining -= $toApply;
+                    }
+                    $changeBack = max(0, $remaining);
+                } elseif ($excess > 0.01) {
+                    $changeBack = $excess;
+                }
+
+                $breakdown = [
+                    'total_collected' => $totalCollected,
+                    'sale_total'      => $saleTotal,
+                    'excess'          => $excess,
+                    'shortfall'       => $shortfall,
+                    'debt_allocations'=> $debtAllocations,
+                    'change_back'     => $changeBack,
+                    'can_confirm'     => $shortfall < 0.01 || (bool) $payingSale->customer_id,
+                ];
+            }
+        }
+
         $currentCount = $pendingInvoices->count();
         if ($currentCount > $this->lastPendingCount && $this->lastPendingCount > 0) {
             $this->dispatch('new-invoice');
@@ -259,9 +290,10 @@ class Index extends Component
 
         return view('livewire.cashier.index', [
             'pendingInvoices' => $pendingInvoices,
-            'recentPaid' => $recentPaid,
-            'payingSale' => $payingSale,
-            'customerDebt' => $customerDebt,
+            'recentPaid'      => $recentPaid,
+            'payingSale'      => $payingSale,
+            'customerDebt'    => $customerDebt,
+            'breakdown'       => $breakdown,
         ]);
     }
 }

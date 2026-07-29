@@ -59,15 +59,24 @@
                 <div class="text-base-content/60 text-sm mb-1">{{ $payingSale->invoice_number }}</div>
                 <div class="text-2xl font-bold text-primary mb-5">₦{{ number_format($payingSale->total_amount, 2) }}</div>
 
-                <div class="bg-base-200 rounded-lg p-3 mb-5 text-sm text-left">
-                    <div class="flex justify-between mb-1">
+                <div class="bg-base-200 rounded-lg p-3 mb-5 text-sm text-left space-y-1">
+                    <div class="flex justify-between">
                         <span class="text-base-content/60">Customer</span>
                         <span>{{ $payingSale->customer?->name ?? 'Walk-in' }}</span>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-base-content/60">Payment</span>
-                        <span>{{ ucfirst($payingSale->payment_method) }}</span>
-                    </div>
+                    @if($payingSale->payment_details)
+                        @foreach($payingSale->payment_details as $method => $amount)
+                            <div class="flex justify-between">
+                                <span class="text-base-content/60">{{ ucfirst($method) }}</span>
+                                <span>₦{{ number_format($amount, 2) }}</span>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Payment</span>
+                            <span>{{ ucfirst($payingSale->payment_method) }}</span>
+                        </div>
+                    @endif
                 </div>
 
                 <p class="text-sm text-base-content/60 mb-4">Print 2 copies — customer returns one to the sales person as proof of payment.</p>
@@ -83,6 +92,7 @@
             </div>
 
         @elseif($payingSale)
+            {{-- Invoice summary --}}
             <div class="bg-base-200 rounded-lg p-3 mb-4">
                 <div class="flex justify-between mb-1">
                     <span class="font-bold">{{ $payingSale->invoice_number }}</span>
@@ -91,10 +101,8 @@
                 <div class="text-xs text-base-content/60">
                     {{ $payingSale->customer?->name ?? 'Walk-in' }} | {{ $payingSale->user->name }}
                 </div>
-
                 <x-hr class="my-2" />
-
-                <div class="space-y-1 max-h-40 overflow-y-auto">
+                <div class="space-y-1 max-h-32 overflow-y-auto">
                     @foreach($payingSale->saleItems as $item)
                         <div class="flex justify-between text-xs">
                             <span class="truncate flex-1">{{ $item->product->name }} × {{ $item->quantity }}</span>
@@ -105,90 +113,99 @@
             </div>
 
             @if($customerDebt)
-                <div class="alert alert-warning mb-4 py-3">
-                    <x-icon name="o-exclamation-triangle" class="w-5 h-5 shrink-0" />
-                    <div>
-                        <div class="font-bold text-sm">Outstanding Debt — {{ $payingSale->customer->name }}</div>
-                        <div class="text-xs mt-0.5">
-                            Owes <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
-                            across {{ $customerDebt->debt_count }} unpaid {{ Str::plural('invoice', $customerDebt->debt_count) }}.
-                        </div>
+                <div class="alert alert-warning mb-3 py-2">
+                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                    <div class="text-xs">
+                        <span class="font-bold">{{ $payingSale->customer->name }}</span> has
+                        <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
+                        outstanding across {{ $customerDebt->debt_count }} {{ Str::plural('invoice', $customerDebt->debt_count) }}.
+                        Extra payment will auto-clear oldest debts first.
                     </div>
                 </div>
             @endif
 
             <x-form wire:submit="processPayment">
-                <x-select label="Payment Method" wire:model.live="payment_method" :options="[
-                    ['id' => 'cash', 'name' => 'Cash (Full)'],
-                    ['id' => 'card', 'name' => 'Card (Full)'],
-                    ['id' => 'transfer', 'name' => 'Transfer (Full)'],
-                    ['id' => 'split', 'name' => 'Split Payment'],
-                    ['id' => 'part_payment', 'name' => 'Part Payment (Balance on Debt)'],
-                    ['id' => 'credit', 'name' => 'Full Credit (Debt)'],
-                ]" option-value="id" option-label="name" />
+                {{-- Three payment inputs --}}
+                <div class="grid grid-cols-3 gap-2">
+                    <x-input wire:model.live="cash_tendered" prefix="₦" type="number" step="0.01" min="0" label="Cash" placeholder="0" />
+                    <x-input wire:model.live="card_amount" prefix="₦" type="number" step="0.01" min="0" label="Card" placeholder="0" />
+                    <x-input wire:model.live="transfer_amount" prefix="₦" type="number" step="0.01" min="0" label="Transfer" placeholder="0" />
+                </div>
 
-                @if($payment_method === 'split')
-                    <div class="bg-base-200 rounded-lg p-3 mt-3 space-y-2">
-                        <div class="text-xs font-semibold text-base-content/60 uppercase">Split (Total: ₦{{ number_format($payingSale->total_amount, 2) }})</div>
-                        <x-input wire:model.blur="split_cash" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Cash" />
-                        <x-input wire:model.blur="split_transfer" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Transfer" />
-                        <x-input wire:model.blur="split_card" prefix="₦" type="number" step="0.01" placeholder="0.00" label="Card" />
-                        @php $splitSum = (float)($split_cash ?: 0) + (float)($split_transfer ?: 0) + (float)($split_card ?: 0); @endphp
-                        <div class="flex justify-between text-sm pt-1 border-t border-base-300">
-                            <span>Total:</span>
-                            <span @class(['font-bold', 'text-success' => abs($splitSum - $payingSale->total_amount) < 0.01, 'text-error' => abs($splitSum - $payingSale->total_amount) >= 0.01])>
-                                ₦{{ number_format($splitSum, 2) }}
-                            </span>
+                {{-- Live breakdown --}}
+                @if($breakdown)
+                    <div class="bg-base-200 rounded-lg p-3 mt-3 text-sm space-y-1.5">
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Collected</span>
+                            <span class="font-bold">₦{{ number_format($breakdown['total_collected'], 2) }}</span>
                         </div>
-                    </div>
-                @endif
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Invoice total</span>
+                            <span>₦{{ number_format($breakdown['sale_total'], 2) }}</span>
+                        </div>
 
-                @if($payment_method === 'part_payment')
-                    <div class="bg-base-200 rounded-lg p-3 mt-3 space-y-2">
-                        <div class="text-xs font-semibold text-base-content/60 uppercase">Part Payment (Total: ₦{{ number_format($payingSale->total_amount, 2) }})</div>
-                        <x-input wire:model.blur="part_amount" prefix="₦" type="number" step="0.01" label="Paying Now" />
-                        <x-select label="Method" wire:model="part_method" :options="[
-                            ['id' => 'cash', 'name' => 'Cash'],
-                            ['id' => 'card', 'name' => 'Card'],
-                            ['id' => 'transfer', 'name' => 'Transfer'],
-                        ]" option-value="id" option-label="name" />
-                        @php $partPaid = (float)($part_amount ?: 0); @endphp
-                        @if($partPaid > 0)
-                            <div class="flex justify-between text-sm pt-1 border-t border-base-300">
-                                <span>To Debt:</span>
-                                <span class="font-bold text-error">₦{{ number_format(max(0, (float)$payingSale->total_amount - $partPaid), 2) }}</span>
+                        @if($breakdown['shortfall'] > 0.01)
+                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-1">
+                                <span class="font-semibold text-error">Shortfall</span>
+                                <span class="font-bold text-error">₦{{ number_format($breakdown['shortfall'], 2) }}</span>
+                            </div>
+                            @if($payingSale->customer_id)
+                                <p class="text-xs text-warning">
+                                    ₦{{ number_format($breakdown['shortfall'], 2) }} will be recorded as a debt for {{ $payingSale->customer->name }}.
+                                </p>
+                            @else
+                                <p class="text-xs text-error font-semibold">Walk-in must pay the full amount.</p>
+                            @endif
+                        @endif
+
+                        @if(!empty($breakdown['debt_allocations']))
+                            <div class="border-t border-base-300 pt-1.5 mt-1 space-y-1">
+                                <div class="text-xs font-semibold text-base-content/60 uppercase">Auto-clearing debts</div>
+                                @foreach($breakdown['debt_allocations'] as $alloc)
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-base-content/70">{{ $alloc['invoice'] }}</span>
+                                        <span class="text-success font-medium">−₦{{ number_format($alloc['paying'], 2) }}</span>
+                                    </div>
+                                @endforeach
                             </div>
                         @endif
-                        @if(!$payingSale->customer_id)
-                            <x-alert title="No customer" description="Part payment requires a customer." icon="o-x-circle" class="alert-error" />
+
+                        @if($breakdown['change_back'] > 0.01)
+                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-1">
+                                <span class="font-semibold text-success">Change back</span>
+                                <span class="font-bold text-success text-base">₦{{ number_format($breakdown['change_back'], 2) }}</span>
+                            </div>
+                        @endif
+
+                        @if($breakdown['shortfall'] < 0.01 && $breakdown['excess'] >= -0.01)
+                            <div class="text-center text-xs text-success font-semibold border-t border-base-300 pt-1.5 mt-1">
+                                ✓ Invoice fully covered
+                            </div>
                         @endif
                     </div>
                 @endif
 
-                @if($payment_method === 'credit')
-                    @if($payingSale->customer_id)
-                        <x-alert title="Full Credit" description="₦{{ number_format($payingSale->total_amount, 2) }} to {{ $payingSale->customer->name }}'s debt." icon="o-exclamation-triangle" class="alert-warning mt-3" />
-                    @else
-                        <x-alert title="No customer" description="Credit requires a customer." icon="o-x-circle" class="alert-error mt-3" />
-                    @endif
-                @endif
-
-                {{-- Walk-in WhatsApp receipt --}}
+                {{-- Walk-in WhatsApp --}}
                 @if(!$payingSale->customer_id)
-                    <div class="mt-3">
-                        <x-input
-                            wire:model="walkin_phone"
-                            label="WhatsApp for receipt"
-                            placeholder="08012345678 (optional)"
-                            icon="o-chat-bubble-left-ellipsis"
-                            hint="Leave blank to skip"
-                        />
-                    </div>
+                    <x-input
+                        wire:model="walkin_phone"
+                        label="WhatsApp for receipt (optional)"
+                        placeholder="08012345678"
+                        icon="o-chat-bubble-left-ellipsis"
+                        hint="Leave blank to skip"
+                        class="mt-2"
+                    />
                 @endif
 
                 <x-slot:actions>
                     <x-button label="Cancel" @click="$wire.payModal = false" />
-                    <x-button label="Confirm" type="submit" class="btn-primary" icon="o-check" />
+                    <x-button
+                        label="Confirm Payment"
+                        type="submit"
+                        class="btn-primary"
+                        icon="o-check"
+                        :disabled="!$breakdown || !$breakdown['can_confirm']"
+                    />
                 </x-slot:actions>
             </x-form>
         @endif
