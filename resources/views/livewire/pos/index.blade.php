@@ -93,6 +93,19 @@
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
+    {{-- Create Customer Modal — lives here so it's never nested inside a <dialog> --}}
+    <x-modal wire:model="createCustomerModal" title="New Customer" box-class="max-w-sm">
+        <x-form wire:submit="createCustomer">
+            <x-input label="Name" wire:model="newCustomerName" placeholder="Full name" required autofocus />
+            <x-input label="Phone" wire:model="newCustomerPhone" placeholder="08012345678" />
+            <x-input label="Email" wire:model="newCustomerEmail" type="email" placeholder="optional" />
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.createCustomerModal = false" />
+                <x-button label="Create & Select" type="submit" class="btn-primary" icon="o-user-plus" />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
+
     @script
     <script>
         $wire.on('invoice-paid', () => {
