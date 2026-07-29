@@ -41,6 +41,7 @@ Route::prefix('desk')->group(function () {
         // Cashier — processes payments and debt book (admin, pharmacist, branch_manager, cashier)
         Route::middleware('role:admin,pharmacist,branch_manager,cashier')->group(function () {
             Route::get('cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
+            Route::get('credits', App\Livewire\Credits\Index::class)->name('credits.index');
             Route::get('debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
             Route::get('debt-payment/{debtPayment}/receipt', [App\Http\Controllers\InvoiceController::class, 'debtReceipt'])->name('debt-payment.receipt');
         });
