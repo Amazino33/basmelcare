@@ -63,10 +63,8 @@
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
                         @endif
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
-                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'cashier']))
-                            <x-menu-item title="Change Owed" icon="o-gift" link="{{ route('credits.index') }}" />
-                            <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
-                        @endif
+                        <x-menu-item title="Change Owed" icon="o-gift" link="{{ route('credits.index') }}" />
+                        <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
                     </x-menu-sub>
                 @endif
 
