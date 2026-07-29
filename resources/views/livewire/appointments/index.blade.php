@@ -67,8 +67,8 @@
     <x-modal wire:model="modal" title="{{ $appointmentId ? 'Edit Appointment' : 'New Appointment' }}" box-class="max-w-lg">
         <x-form wire:submit="save">
             <x-input label="Title" wire:model="title" placeholder="e.g. Medication Review, Blood Pressure Check" />
-            <x-select label="Customer" wire:model="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Select customer" />
-            <x-select label="Assigned Staff" wire:model="staff_id" :options="$staff" option-value="id" option-label="name" placeholder="Optional" />
+            <x-choices-offline label="Customer" wire:model="customer_id" :options="$customers" option-value="id" option-label="name" placeholder="Search customer..." single searchable />
+            <x-choices-offline label="Assigned Staff" wire:model="staff_id" :options="$staff" option-value="id" option-label="name" placeholder="Search staff..." single searchable />
             <div class="grid grid-cols-2 gap-4">
                 <x-input label="Date" wire:model="scheduled_date" type="date" />
                 <x-input label="Time" wire:model="scheduled_time" type="time" />
