@@ -238,8 +238,11 @@ class Index extends Component
         if ($sale->payment_method === 'split' && $sale->payment_details) {
             $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "* ✅ Paid";
             $lines[] = "💳 Split payment:";
-            foreach ($sale->payment_details as $method => $amount) {
-                $lines[] = "  " . ucfirst($method) . ": ₦" . number_format($amount, 2);
+            $pd = $sale->payment_details;
+            foreach (['cash', 'card', 'transfer', 'credit'] as $m) {
+                if (!empty($pd[$m])) {
+                    $lines[] = "  " . ucfirst($m) . ": ₦" . number_format($pd[$m], 2);
+                }
             }
         } else {
             $lines[] = "*Total: ₦" . number_format($sale->total_amount, 2) . "* ✅ Paid";

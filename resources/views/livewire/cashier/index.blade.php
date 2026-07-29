@@ -165,18 +165,56 @@
                 <div class="text-base-content/60 text-sm mb-1">{{ $payingSale->invoice_number }}</div>
                 <div class="text-2xl font-bold text-primary mb-5">₦{{ number_format($payingSale->total_amount, 2) }}</div>
 
-                <div class="bg-base-200 rounded-lg p-3 mb-5 text-sm text-left space-y-1">
+                <div class="bg-base-200 rounded-lg p-3 mb-4 text-sm text-left space-y-1">
                     <div class="flex justify-between">
                         <span class="text-base-content/60">Customer</span>
                         <span>{{ $payingSale->customer?->name ?? 'Walk-in' }}</span>
                     </div>
                     @if($payingSale->payment_details)
-                        @foreach($payingSale->payment_details as $method => $amount)
+                        @php
+                            $pd = $payingSale->payment_details;
+                            $pmtMethods = array_filter([
+                                'cash'     => $pd['cash'] ?? null,
+                                'card'     => $pd['card'] ?? null,
+                                'transfer' => $pd['transfer'] ?? null,
+                                'credit'   => $pd['credit'] ?? null,
+                            ]);
+                        @endphp
+                        @foreach($pmtMethods as $method => $amount)
                             <div class="flex justify-between">
                                 <span class="text-base-content/60">{{ ucfirst($method) }}</span>
                                 <span>₦{{ number_format($amount, 2) }}</span>
                             </div>
                         @endforeach
+                        @if(!empty($pd['debts_cleared']))
+                            <div class="border-t border-base-300 pt-1.5 mt-0.5 space-y-0.5">
+                                <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Debts settled</div>
+                                @foreach($pd['debts_cleared'] as $cleared)
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-base-content/70">{{ $cleared['invoice'] }} ✓</span>
+                                        <span class="text-success font-medium">₦{{ number_format($cleared['amount'], 2) }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                        @if(!empty($pd['shortfall']))
+                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-0.5 text-error">
+                                <span class="font-semibold">New debt recorded</span>
+                                <span class="font-bold">₦{{ number_format($pd['shortfall'], 2) }}</span>
+                            </div>
+                        @endif
+                        @if(!empty($pd['change_given']))
+                            <div class="flex justify-between text-success border-t border-base-300 pt-1.5 mt-0.5">
+                                <span>Change given</span>
+                                <span class="font-medium">₦{{ number_format($pd['change_given'], 2) }}</span>
+                            </div>
+                        @endif
+                        @if(!empty($pd['stored_credit']))
+                            <div class="flex justify-between text-info border-t border-base-300 pt-1.5 mt-0.5">
+                                <span>Stored as credit</span>
+                                <span class="font-medium">₦{{ number_format($pd['stored_credit'], 2) }}</span>
+                            </div>
+                        @endif
                     @else
                         <div class="flex justify-between">
                             <span class="text-base-content/60">Payment</span>
@@ -185,8 +223,17 @@
                     @endif
                 </div>
 
-                @if($payingSale->customer_id && ($payingSale->customer->credit_balance ?? 0) > 0)
-                    <div class="text-xs text-info font-semibold mb-2">
+                @if($customerDebt && $customerDebt->debt_count > 0)
+                    <div class="alert alert-error py-2 mb-3 text-xs">
+                        <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                        <span>
+                            <span class="font-bold">{{ $payingSale->customer?->name }}</span>
+                            still owes <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
+                            across {{ $customerDebt->debt_count }} {{ Str::plural('invoice', $customerDebt->debt_count) }}.
+                        </span>
+                    </div>
+                @elseif($payingSale->customer_id && ($payingSale->customer->credit_balance ?? 0) > 0)
+                    <div class="text-xs text-info font-semibold mb-3">
                         {{ $payingSale->customer->name }}'s credit balance: ₦{{ number_format($payingSale->customer->credit_balance, 2) }}
                     </div>
                 @endif
