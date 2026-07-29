@@ -351,6 +351,7 @@
                         @endif
 
                         @if($breakdown['change_back'] > 0.01 || $breakdown['stored_as_credit'] > 0.01)
+                            @php $changeAmount = $breakdown['stored_as_credit'] > 0.01 ? $breakdown['stored_as_credit'] : $breakdown['change_back']; @endphp
                             <div class="border-t border-base-300 pt-1.5 mt-1">
                                 @if($breakdown['stored_as_credit'] > 0.01)
                                     <div class="flex justify-between text-info font-semibold">
@@ -362,15 +363,15 @@
                                         <span>Change back</span>
                                         <span class="text-base">₦{{ number_format($breakdown['change_back'], 2) }}</span>
                                     </div>
-                                    {{-- Store as credit option --}}
-                                    @if($payingSale->customer_id)
-                                        <label class="flex items-center gap-2 mt-2 cursor-pointer">
-                                            <input type="checkbox" wire:model.live="store_change_as_credit" class="checkbox checkbox-info checkbox-sm" />
-                                            <span class="text-xs text-info font-medium">
-                                                Store ₦{{ number_format($breakdown['change_back'], 2) }} as credit — cashier has no change
-                                            </span>
-                                        </label>
-                                    @endif
+                                @endif
+                                {{-- Store as credit option --}}
+                                @if($payingSale->customer_id)
+                                    <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                                        <input type="checkbox" wire:model.live="store_change_as_credit" class="checkbox checkbox-info checkbox-sm" />
+                                        <span class="text-xs {{ $breakdown['stored_as_credit'] > 0.01 ? 'text-info' : 'text-base-content/60' }} font-medium">
+                                            Store ₦{{ number_format($changeAmount, 2) }} as credit — cashier has no change
+                                        </span>
+                                    </label>
                                 @endif
                             </div>
                         @endif
