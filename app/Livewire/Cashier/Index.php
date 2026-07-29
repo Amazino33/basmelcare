@@ -4,6 +4,7 @@ namespace App\Livewire\Cashier;
 
 use App\Models\Debt;
 use App\Models\DebtPayment;
+use App\Models\Order;
 use App\Models\Sale;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,12 @@ class Index extends Component
     public bool $payModal = false;
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
+
+    // Online order payment
+    public ?int $payingOrderId = null;
+    public bool $orderPayModal = false;
+    public bool $orderPaySuccess = false;
+    public ?int $lastPaidOrderId = null;
 
     public function openPayment(int $saleId)
     {
@@ -244,6 +251,68 @@ class Index extends Component
         $this->reset(['payingSaleId', 'lastPaidSaleId', 'cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
     }
 
+    // ── Online Order Payment ─────────────────────────────────────────────────
+
+    public function openOrderPayment(int $orderId): void
+    {
+        $this->payingOrderId   = $orderId;
+        $this->orderPaySuccess = false;
+        $this->lastPaidOrderId = null;
+        $this->reset(['cash_tendered', 'card_amount', 'transfer_amount']);
+        $this->orderPayModal   = true;
+    }
+
+    public function processOrderPayment(): void
+    {
+        $order = Order::with('customer', 'items.product')->findOrFail($this->payingOrderId);
+
+        if ($order->payment_status === 'paid') {
+            $this->error('This order is already paid.');
+            return;
+        }
+
+        if ($order->status !== 'ready') {
+            $this->error('Order is not ready yet — sales staff must pack it first.');
+            return;
+        }
+
+        $cash     = (float) ($this->cash_tendered ?: 0);
+        $card     = (float) ($this->card_amount ?: 0);
+        $transfer = (float) ($this->transfer_amount ?: 0);
+        $totalCollected = $cash + $card + $transfer;
+
+        if ($totalCollected <= 0) {
+            $this->error('Enter at least one payment amount.');
+            return;
+        }
+
+        $orderTotal = (float) $order->total_amount;
+        if ($totalCollected < $orderTotal - 0.01) {
+            $this->error('Online orders must be paid in full (₦' . number_format($orderTotal, 2) . ').');
+            return;
+        }
+
+        $methods       = array_filter(['cash' => $cash, 'card' => $card, 'transfer' => $transfer]);
+        $paymentMethod = count($methods) === 1 ? array_key_first($methods) : 'split';
+
+        $order->update([
+            'payment_method' => $paymentMethod,
+            'payment_status' => 'paid',
+            'paid_at'        => now(),
+            'status'         => 'completed',
+        ]);
+
+        $this->lastPaidOrderId = $order->id;
+        $this->orderPaySuccess = true;
+    }
+
+    public function closeOrderPay(): void
+    {
+        $this->orderPayModal   = false;
+        $this->orderPaySuccess = false;
+        $this->reset(['payingOrderId', 'lastPaidOrderId', 'cash_tendered', 'card_amount', 'transfer_amount']);
+    }
+
     public function render()
     {
         $pendingInvoices = Sale::with('customer', 'user', 'saleItems.product')
@@ -342,6 +411,37 @@ class Index extends Component
             }
         }
 
+        // Online orders awaiting cash payment at counter
+        $pendingOrderPayments = Order::with('customer', 'claimedByUser', 'items')
+            ->where('status', 'ready')
+            ->where('payment_status', 'pending')
+            ->latest()
+            ->get();
+
+        $payingOrder = $this->payingOrderId
+            ? Order::with('items.product', 'customer', 'claimedByUser')->find($this->payingOrderId)
+            : null;
+
+        // Live breakdown for order payment modal
+        $orderBreakdown = null;
+        if ($payingOrder && !$this->orderPaySuccess) {
+            $cash     = (float) ($this->cash_tendered ?: 0);
+            $card     = (float) ($this->card_amount ?: 0);
+            $transfer = (float) ($this->transfer_amount ?: 0);
+            $totalCollected = $cash + $card + $transfer;
+
+            if ($totalCollected > 0) {
+                $orderTotal = (float) $payingOrder->total_amount;
+                $orderBreakdown = [
+                    'total_collected' => $totalCollected,
+                    'order_total'     => $orderTotal,
+                    'change'          => max(0, $totalCollected - $orderTotal),
+                    'shortfall'       => max(0, $orderTotal - $totalCollected),
+                    'can_confirm'     => $totalCollected >= $orderTotal - 0.01,
+                ];
+            }
+        }
+
         $currentCount = $pendingInvoices->count();
         if ($currentCount > $this->lastPendingCount && $this->lastPendingCount > 0) {
             $this->dispatch('new-invoice');
@@ -350,11 +450,14 @@ class Index extends Component
         $this->lastPendingCount = $currentCount;
 
         return view('livewire.cashier.index', [
-            'pendingInvoices' => $pendingInvoices,
-            'recentPaid'      => $recentPaid,
-            'payingSale'      => $payingSale,
-            'customerDebt'    => $customerDebt,
-            'breakdown'       => $breakdown,
+            'pendingInvoices'      => $pendingInvoices,
+            'recentPaid'           => $recentPaid,
+            'payingSale'           => $payingSale,
+            'customerDebt'         => $customerDebt,
+            'breakdown'            => $breakdown,
+            'pendingOrderPayments' => $pendingOrderPayments,
+            'payingOrder'          => $payingOrder,
+            'orderBreakdown'       => $orderBreakdown,
         ]);
     }
 }

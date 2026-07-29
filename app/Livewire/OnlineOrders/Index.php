@@ -96,6 +96,11 @@ class Index extends Component
             return;
         }
 
+        if ($order->payment_status !== 'paid') {
+            $this->error('Payment has not been collected yet. Send the customer to the cashier first.');
+            return;
+        }
+
         $order->update(['status' => 'completed']);
         $this->success('Order ' . $order->order_number . ' completed.');
     }

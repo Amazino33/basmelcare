@@ -50,6 +50,30 @@
         </x-card>
     </div>
 
+    <!-- Online Orders Awaiting Payment -->
+    @if($pendingOrderPayments->count() > 0)
+    <div class="mt-4">
+        <x-card title="Online Orders" subtitle="{{ $pendingOrderPayments->count() }} ready — awaiting payment at counter">
+            @foreach($pendingOrderPayments as $order)
+                <div class="flex justify-between items-center p-3 bg-warning/10 border border-warning/30 rounded-lg mb-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-sm">{{ $order->order_number }}</div>
+                        <div class="text-xs text-base-content/60 truncate">
+                            {{ $order->customer?->name ?? $order->guest_name ?? 'Guest' }}
+                            · {{ ucfirst($order->fulfillment_type) }}
+                        </div>
+                        <div class="text-xs text-base-content/60">Packed by: {{ $order->claimedByUser?->name ?? '—' }}</div>
+                    </div>
+                    <div class="text-right ml-3 shrink-0">
+                        <div class="font-bold text-warning">₦{{ number_format($order->total_amount, 2) }}</div>
+                        <x-button label="Collect" wire:click="openOrderPayment({{ $order->id }})" class="btn-xs btn-warning mt-1" icon="o-banknotes" />
+                    </div>
+                </div>
+            @endforeach
+        </x-card>
+    </div>
+    @endif
+
     <!-- Payment Modal -->
     <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : 'Process Payment' }}" box-class="max-w-lg">
         @if($paySuccess && $payingSale)
@@ -250,6 +274,97 @@
                         class="btn-primary"
                         icon="o-check"
                         :disabled="!$breakdown || !$breakdown['can_confirm']"
+                    />
+                </x-slot:actions>
+            </x-form>
+        @endif
+    </x-modal>
+
+    <!-- Online Order Payment Modal -->
+    <x-modal wire:model="orderPayModal" title="{{ $orderPaySuccess ? 'Payment Collected' : 'Collect Order Payment' }}" box-class="max-w-lg">
+        @if($orderPaySuccess && $payingOrder)
+            <div class="text-center py-6">
+                <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
+                <div class="text-xl font-bold mb-1">Payment Collected!</div>
+                <div class="text-base-content/60 text-sm mb-1">{{ $payingOrder->order_number }}</div>
+                <div class="text-2xl font-bold text-primary mb-4">₦{{ number_format($payingOrder->total_amount, 2) }}</div>
+                <p class="text-sm text-base-content/60 mb-4">Order is now marked as completed. Hand goods to customer.</p>
+                <x-button label="Done" wire:click="closeOrderPay" class="btn-primary" />
+            </div>
+
+        @elseif($payingOrder)
+            {{-- Order summary --}}
+            <div class="bg-base-200 rounded-lg p-3 mb-4">
+                <div class="flex justify-between mb-1">
+                    <span class="font-bold">{{ $payingOrder->order_number }}</span>
+                    <span class="font-bold text-warning">₦{{ number_format($payingOrder->total_amount, 2) }}</span>
+                </div>
+                <div class="text-xs text-base-content/60 mb-2">
+                    {{ $payingOrder->customer?->name ?? $payingOrder->guest_name ?? 'Guest' }}
+                    · {{ ucfirst($payingOrder->fulfillment_type) }}
+                    · Packed by {{ $payingOrder->claimedByUser?->name ?? '—' }}
+                </div>
+                <x-hr class="my-2" />
+                <div class="space-y-1 max-h-32 overflow-y-auto">
+                    @foreach($payingOrder->items as $item)
+                        <div class="flex justify-between text-xs">
+                            <span class="truncate flex-1">{{ $item->product->name }} × {{ $item->quantity }}</span>
+                            <span class="ml-2 shrink-0">₦{{ number_format($item->subtotal, 2) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+                @if($payingOrder->delivery_fee > 0)
+                    <div class="flex justify-between text-xs mt-1 pt-1 border-t border-base-300">
+                        <span class="text-base-content/60">Delivery fee</span>
+                        <span>₦{{ number_format($payingOrder->delivery_fee, 2) }}</span>
+                    </div>
+                @endif
+            </div>
+
+            <x-form wire:submit="processOrderPayment">
+                <div class="grid grid-cols-3 gap-2">
+                    <x-input wire:model.live="cash_tendered" prefix="₦" type="number" step="0.01" min="0" label="Cash" placeholder="0" />
+                    <x-input wire:model.live="card_amount" prefix="₦" type="number" step="0.01" min="0" label="Card" placeholder="0" />
+                    <x-input wire:model.live="transfer_amount" prefix="₦" type="number" step="0.01" min="0" label="Transfer" placeholder="0" />
+                </div>
+
+                @if($orderBreakdown)
+                    <div class="bg-base-200 rounded-lg p-3 mt-3 text-sm space-y-1.5">
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Collected</span>
+                            <span class="font-bold">₦{{ number_format($orderBreakdown['total_collected'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-base-content/60">Order total</span>
+                            <span>₦{{ number_format($orderBreakdown['order_total'], 2) }}</span>
+                        </div>
+                        @if($orderBreakdown['shortfall'] > 0.01)
+                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-1 text-error font-semibold">
+                                <span>Shortfall</span>
+                                <span>₦{{ number_format($orderBreakdown['shortfall'], 2) }}</span>
+                            </div>
+                            <p class="text-xs text-error">Online orders must be paid in full.</p>
+                        @elseif($orderBreakdown['change'] > 0.01)
+                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-1 text-success font-semibold">
+                                <span>Change back</span>
+                                <span>₦{{ number_format($orderBreakdown['change'], 2) }}</span>
+                            </div>
+                        @else
+                            <div class="text-center text-xs text-success font-semibold border-t border-base-300 pt-1.5 mt-1">
+                                ✓ Fully covered
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <x-slot:actions>
+                    <x-button label="Cancel" @click="$wire.orderPayModal = false" />
+                    <x-button
+                        label="Confirm & Complete Order"
+                        type="submit"
+                        class="btn-warning"
+                        icon="o-check"
+                        :disabled="!$orderBreakdown || !$orderBreakdown['can_confirm']"
                     />
                 </x-slot:actions>
             </x-form>
