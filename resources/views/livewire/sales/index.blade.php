@@ -172,7 +172,7 @@
                 <x-badge value="Paid – Awaiting Handover" class="badge-warning" />
             @endscope
 
-            @scope('actions', $sale)
+            @scope('actions', $sale, $elevated)
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="View details" />
                     @if($elevated || $sale->user_id === auth()->id())
