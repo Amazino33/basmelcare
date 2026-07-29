@@ -50,6 +50,34 @@
         </x-card>
     </div>
 
+    <!-- Credits Owed to Customers -->
+    @if($creditsOwed->count() > 0)
+    <div class="mt-4">
+        <x-card title="Change Owed to Customers" subtitle="{{ $creditsOwed->count() }} {{ Str::plural('customer', $creditsOwed->count()) }} — credit stored when cashier had no change">
+            @foreach($creditsOwed as $cx)
+                <div class="flex justify-between items-center p-3 bg-info/10 border border-info/30 rounded-lg mb-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-sm">{{ $cx->name }}</div>
+                        @if($cx->phone)
+                            <div class="text-xs text-base-content/60">{{ $cx->phone }}</div>
+                        @endif
+                    </div>
+                    <div class="text-right ml-3 shrink-0 space-y-1">
+                        <div class="font-bold text-info">₦{{ number_format($cx->credit_balance, 2) }}</div>
+                        <x-button
+                            label="Pay Out"
+                            wire:click="payOutCredit({{ $cx->id }})"
+                            wire:confirm="Pay ₦{{ number_format($cx->credit_balance, 2) }} in cash to {{ $cx->name }} and clear their credit balance?"
+                            class="btn-xs btn-info"
+                            icon="o-banknotes"
+                        />
+                    </div>
+                </div>
+            @endforeach
+        </x-card>
+    </div>
+    @endif
+
     <!-- Online Orders — Cashier Actions -->
     @php $totalOnline = $prePaidOrders->count() + $codDeliveryOrders->count() + $codPickupOrders->count(); @endphp
     @if($totalOnline > 0)

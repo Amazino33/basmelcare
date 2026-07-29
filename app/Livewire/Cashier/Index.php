@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Cashier;
 
+use App\Models\Customer;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\Order;
@@ -367,6 +368,25 @@ class Index extends Component
         $this->reset(['payingOrderId', 'lastPaidOrderId', 'cash_tendered', 'card_amount', 'transfer_amount']);
     }
 
+    // ── Credit Pay-out ───────────────────────────────────────────────────────
+
+    public function payOutCredit(int $customerId): void
+    {
+        $customer = Customer::findOrFail($customerId);
+
+        if ($customer->credit_balance <= 0) {
+            $this->error('This customer has no credit balance.');
+            return;
+        }
+
+        $amount = (float) $customer->credit_balance;
+        $customer->update(['credit_balance' => 0]);
+
+        $this->success(
+            'Paid out ₦' . number_format($amount, 2) . ' in cash to ' . $customer->name . '. Balance cleared.'
+        );
+    }
+
     public function render()
     {
         $pendingInvoices = Sale::with('customer', 'user', 'saleItems.product')
@@ -518,9 +538,14 @@ class Index extends Component
         }
         $this->lastPendingCount = $currentCount;
 
+        $creditsOwed = Customer::where('credit_balance', '>', 0)
+            ->orderByDesc('credit_balance')
+            ->get(['id', 'name', 'phone', 'credit_balance']);
+
         return view('livewire.cashier.index', [
             'pendingInvoices'   => $pendingInvoices,
             'recentPaid'        => $recentPaid,
+            'creditsOwed'       => $creditsOwed,
             'payingSale'        => $payingSale,
             'customerDebt'      => $customerDebt,
             'breakdown'         => $breakdown,
