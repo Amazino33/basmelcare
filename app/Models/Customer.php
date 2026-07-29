@@ -12,15 +12,16 @@ class Customer extends Authenticatable
 
     protected $fillable = [
         'name', 'type', 'phone', 'email', 'password', 'address', 'notes',
-        'otp', 'otp_expires_at',
+        'otp', 'otp_expires_at', 'credit_balance',
     ];
 
     protected $hidden = ['password', 'remember_token', 'otp'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'otp_expires_at' => 'datetime',
-        'password' => 'hashed',
+        'otp_expires_at'    => 'datetime',
+        'password'          => 'hashed',
+        'credit_balance'    => 'decimal:2',
     ];
 
     public function isWholesale(): bool

@@ -79,6 +79,11 @@
                     @endif
                 </div>
 
+                @if($payingSale->customer_id && ($payingSale->customer->credit_balance ?? 0) > 0)
+                    <div class="text-xs text-info font-semibold mb-2">
+                        {{ $payingSale->customer->name }}'s credit balance: ₦{{ number_format($payingSale->customer->credit_balance, 2) }}
+                    </div>
+                @endif
                 <p class="text-sm text-base-content/60 mb-4">Print 2 copies — customer returns one to the sales person as proof of payment.</p>
 
                 <div class="flex gap-2 justify-center">
@@ -112,16 +117,34 @@
                 </div>
             </div>
 
-            @if($customerDebt)
-                <div class="alert alert-warning mb-3 py-2">
-                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
-                    <div class="text-xs">
-                        <span class="font-bold">{{ $payingSale->customer->name }}</span> has
-                        <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
-                        outstanding across {{ $customerDebt->debt_count }} {{ Str::plural('invoice', $customerDebt->debt_count) }}.
-                        Extra payment will auto-clear oldest debts first.
+            {{-- Customer credit & debt notices --}}
+            @if($payingSale->customer_id)
+                @php $creditBal = (float)($payingSale->customer->credit_balance ?? 0); @endphp
+                @if($creditBal > 0)
+                    <div class="alert alert-success mb-3 py-2">
+                        <x-icon name="o-gift" class="w-4 h-4 shrink-0" />
+                        <div class="flex-1 text-xs">
+                            <span class="font-bold">{{ $payingSale->customer->name }}</span> has
+                            <span class="font-bold">₦{{ number_format($creditBal, 2) }}</span> store credit.
+                        </div>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" wire:model.live="apply_credit" class="checkbox checkbox-success checkbox-xs" />
+                            <span class="text-xs font-semibold">Apply</span>
+                        </label>
                     </div>
-                </div>
+                @endif
+
+                @if($customerDebt)
+                    <div class="alert alert-warning mb-3 py-2">
+                        <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                        <div class="text-xs">
+                            <span class="font-bold">{{ $payingSale->customer->name }}</span> owes
+                            <span class="font-bold">₦{{ number_format($customerDebt->total_balance, 2) }}</span>
+                            across {{ $customerDebt->debt_count }} {{ Str::plural('invoice', $customerDebt->debt_count) }}.
+                            Extra payment will auto-clear oldest first.
+                        </div>
+                    </div>
+                @endif
             @endif
 
             <x-form wire:submit="processPayment">
@@ -135,8 +158,14 @@
                 {{-- Live breakdown --}}
                 @if($breakdown)
                     <div class="bg-base-200 rounded-lg p-3 mt-3 text-sm space-y-1.5">
+                        @if($breakdown['credit_used'] > 0.01)
+                            <div class="flex justify-between text-success">
+                                <span>Store credit applied</span>
+                                <span class="font-medium">−₦{{ number_format($breakdown['credit_used'], 2) }}</span>
+                            </div>
+                        @endif
                         <div class="flex justify-between">
-                            <span class="text-base-content/60">Collected</span>
+                            <span class="text-base-content/60">Total covered</span>
                             <span class="font-bold">₦{{ number_format($breakdown['total_collected'], 2) }}</span>
                         </div>
                         <div class="flex justify-between">
@@ -150,9 +179,7 @@
                                 <span class="font-bold text-error">₦{{ number_format($breakdown['shortfall'], 2) }}</span>
                             </div>
                             @if($payingSale->customer_id)
-                                <p class="text-xs text-warning">
-                                    ₦{{ number_format($breakdown['shortfall'], 2) }} will be recorded as a debt for {{ $payingSale->customer->name }}.
-                                </p>
+                                <p class="text-xs text-warning">Will be recorded as a debt for {{ $payingSale->customer->name }}.</p>
                             @else
                                 <p class="text-xs text-error font-semibold">Walk-in must pay the full amount.</p>
                             @endif
@@ -170,10 +197,28 @@
                             </div>
                         @endif
 
-                        @if($breakdown['change_back'] > 0.01)
-                            <div class="flex justify-between border-t border-base-300 pt-1.5 mt-1">
-                                <span class="font-semibold text-success">Change back</span>
-                                <span class="font-bold text-success text-base">₦{{ number_format($breakdown['change_back'], 2) }}</span>
+                        @if($breakdown['change_back'] > 0.01 || $breakdown['stored_as_credit'] > 0.01)
+                            <div class="border-t border-base-300 pt-1.5 mt-1">
+                                @if($breakdown['stored_as_credit'] > 0.01)
+                                    <div class="flex justify-between text-info font-semibold">
+                                        <span>Stored as credit</span>
+                                        <span>₦{{ number_format($breakdown['stored_as_credit'], 2) }}</span>
+                                    </div>
+                                @else
+                                    <div class="flex justify-between text-success font-semibold">
+                                        <span>Change back</span>
+                                        <span class="text-base">₦{{ number_format($breakdown['change_back'], 2) }}</span>
+                                    </div>
+                                    {{-- Store as credit option --}}
+                                    @if($payingSale->customer_id)
+                                        <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                                            <input type="checkbox" wire:model.live="store_change_as_credit" class="checkbox checkbox-info checkbox-sm" />
+                                            <span class="text-xs text-info font-medium">
+                                                Store ₦{{ number_format($breakdown['change_back'], 2) }} as credit — cashier has no change
+                                            </span>
+                                        </label>
+                                    @endif
+                                @endif
                             </div>
                         @endif
 

@@ -23,6 +23,8 @@ class Index extends Component
     public string $card_amount = '';
     public string $transfer_amount = '';
     public string $walkin_phone = '';
+    public bool $apply_credit = false;
+    public bool $store_change_as_credit = false;
     public bool $payModal = false;
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
@@ -32,7 +34,13 @@ class Index extends Component
         $this->payingSaleId = $saleId;
         $this->paySuccess = false;
         $this->lastPaidSaleId = null;
+        $this->store_change_as_credit = false;
         $this->reset(['cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
+
+        // Auto-enable credit if customer has a balance
+        $sale = Sale::with('customer')->find($saleId);
+        $this->apply_credit = $sale?->customer_id && ($sale->customer->credit_balance ?? 0) > 0;
+
         $this->payModal = true;
     }
 
@@ -48,7 +56,17 @@ class Index extends Component
         $cash     = (float) ($this->cash_tendered ?: 0);
         $card     = (float) ($this->card_amount ?: 0);
         $transfer = (float) ($this->transfer_amount ?: 0);
-        $totalCollected = $cash + $card + $transfer;
+        $totalCash = $cash + $card + $transfer;
+
+        // Apply existing store credit if toggled
+        $creditUsed = 0;
+        if ($this->apply_credit && $sale->customer_id) {
+            $available  = (float) ($sale->customer->credit_balance ?? 0);
+            $saleTotal  = (float) $sale->total_amount;
+            $creditUsed = min($available, max(0, $saleTotal - $totalCash));
+        }
+
+        $totalCollected = $totalCash + $creditUsed;
 
         if ($totalCollected <= 0) {
             $this->error('Enter at least one payment amount.');
@@ -63,20 +81,33 @@ class Index extends Component
             return;
         }
 
-        $methods = array_filter(['cash' => $cash, 'card' => $card, 'transfer' => $transfer]);
-        $paymentMethod  = count($methods) === 1 ? array_key_first($methods) : 'split';
+        $cashMethods = array_filter(['cash' => $cash, 'card' => $card, 'transfer' => $transfer]);
+        if (empty($cashMethods) && $creditUsed > 0) {
+            $paymentMethod = 'credit';
+        } else {
+            $paymentMethod = count($cashMethods) === 1 ? array_key_first($cashMethods) : 'split';
+        }
+
         $paymentDetails = array_filter([
             'cash'     => $cash > 0 ? $cash : null,
             'card'     => $card > 0 ? $card : null,
             'transfer' => $transfer > 0 ? $transfer : null,
+            'credit'   => $creditUsed > 0 ? $creditUsed : null,
         ]);
 
-        DB::transaction(function () use ($sale, $saleTotal, $totalCollected, $shortfall, $paymentMethod, $paymentDetails) {
+        $storeCredit = $this->store_change_as_credit;
+
+        DB::transaction(function () use ($sale, $saleTotal, $totalCash, $totalCollected, $creditUsed, $shortfall, $paymentMethod, $paymentDetails, $storeCredit) {
+            // Deduct store credit used
+            if ($creditUsed > 0) {
+                $sale->customer->decrement('credit_balance', $creditUsed);
+            }
+
             $sale->update([
-                'payment_method' => $paymentMethod,
+                'payment_method'  => $paymentMethod,
                 'payment_details' => $paymentDetails,
-                'status' => 'paid',
-                'paid_at' => now(),
+                'status'          => 'paid',
+                'paid_at'         => now(),
             ]);
 
             // Shortfall → debt for the balance
@@ -100,8 +131,10 @@ class Index extends Component
                 }
             }
 
-            // Excess → apply to oldest outstanding debts
+            // Excess → apply to oldest outstanding debts, then change or credit
             $excess = $totalCollected - $saleTotal;
+            $changeBack = 0;
+
             if ($excess > 0.01 && $sale->customer_id) {
                 $debts = Debt::where('customer_id', $sale->customer_id)
                     ->whereIn('status', ['unpaid', 'partial'])
@@ -115,7 +148,7 @@ class Index extends Component
                     $toApply = min($remaining, $owed);
 
                     $debt->amount_paid = ($debt->amount_paid ?? 0) + $toApply;
-                    $debt->status = abs($debt->amount_paid - $debt->amount_owed) < 0.01 ? 'paid' : 'partial';
+                    $debt->status      = abs($debt->amount_paid - $debt->amount_owed) < 0.01 ? 'paid' : 'partial';
                     $debt->save();
 
                     DebtPayment::create([
@@ -128,6 +161,14 @@ class Index extends Component
 
                     $remaining -= $toApply;
                 }
+                $changeBack = max(0, $remaining);
+            } elseif ($excess > 0.01) {
+                $changeBack = $excess;
+            }
+
+            // Store remaining change as customer credit
+            if ($storeCredit && $changeBack > 0.01 && $sale->customer_id) {
+                $sale->customer->increment('credit_balance', $changeBack);
             }
         });
 
@@ -198,6 +239,8 @@ class Index extends Component
     {
         $this->payModal = false;
         $this->paySuccess = false;
+        $this->apply_credit = false;
+        $this->store_change_as_credit = false;
         $this->reset(['payingSaleId', 'lastPaidSaleId', 'cash_tendered', 'card_amount', 'transfer_amount', 'walkin_phone']);
     }
 
@@ -237,14 +280,24 @@ class Index extends Component
             $cash     = (float) ($this->cash_tendered ?: 0);
             $card     = (float) ($this->card_amount ?: 0);
             $transfer = (float) ($this->transfer_amount ?: 0);
-            $totalCollected = $cash + $card + $transfer;
+            $totalCash = $cash + $card + $transfer;
+
+            $creditBalance = (float) ($payingSale->customer?->credit_balance ?? 0);
+            $creditUsed    = 0;
+            $saleTotal     = (float) $payingSale->total_amount;
+
+            if ($this->apply_credit && $payingSale->customer_id && $creditBalance > 0) {
+                $creditUsed = min($creditBalance, max(0, $saleTotal - $totalCash));
+            }
+
+            $totalCollected = $totalCash + $creditUsed;
 
             if ($totalCollected > 0) {
-                $saleTotal        = (float) $payingSale->total_amount;
-                $excess           = $totalCollected - $saleTotal;
-                $shortfall        = max(0, -$excess);
-                $debtAllocations  = [];
-                $changeBack       = 0;
+                $excess          = $totalCollected - $saleTotal;
+                $shortfall       = max(0, -$excess);
+                $debtAllocations = [];
+                $changeBack      = 0;
+                $storedAsCredit  = 0;
 
                 if ($excess > 0.01 && $payingSale->customer_id) {
                     $debts     = Debt::where('customer_id', $payingSale->customer_id)
@@ -269,13 +322,21 @@ class Index extends Component
                     $changeBack = $excess;
                 }
 
+                if ($this->store_change_as_credit && $changeBack > 0.01 && $payingSale->customer_id) {
+                    $storedAsCredit = $changeBack;
+                    $changeBack     = 0;
+                }
+
                 $breakdown = [
+                    'total_cash'      => $totalCash,
+                    'credit_used'     => $creditUsed,
                     'total_collected' => $totalCollected,
                     'sale_total'      => $saleTotal,
                     'excess'          => $excess,
                     'shortfall'       => $shortfall,
                     'debt_allocations'=> $debtAllocations,
                     'change_back'     => $changeBack,
+                    'stored_as_credit'=> $storedAsCredit,
                     'can_confirm'     => $shortfall < 0.01 || (bool) $payingSale->customer_id,
                 ];
             }
