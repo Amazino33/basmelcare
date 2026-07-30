@@ -23,6 +23,7 @@ class Index extends Component
     public ?string $sku = null;
     public ?int $category_id = null;
     public string $selling_price = '';
+    public string $cost_price_hint = '';
     public ?string $wholesale_price = null;
     public ?int $wholesale_min_qty = null;
     public int $reorder_level = 0;
@@ -55,6 +56,27 @@ class Index extends Component
     public int $quick_quantity = 1;
     public bool $quickModal = false;
     public int $quickAddCount = 0;
+
+    private function calculateSellingPrice(float $cost): string
+    {
+        return (string) (round(($cost * 1.4) / 100) * 100);
+    }
+
+    public function updatedCostPriceHint(): void
+    {
+        $cost = (float) $this->cost_price_hint;
+        if ($cost > 0 && $this->selling_price === '') {
+            $this->selling_price = $this->calculateSellingPrice($cost);
+        }
+    }
+
+    public function updatedQuickCostPrice(): void
+    {
+        $cost = (float) $this->quick_cost_price;
+        if ($cost > 0 && $this->quick_selling_price === '') {
+            $this->quick_selling_price = $this->calculateSellingPrice($cost);
+        }
+    }
 
     public function openQuickAdd(): void
     {
@@ -117,7 +139,7 @@ class Index extends Component
 
     public function createProduct()
     {
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
@@ -159,7 +181,7 @@ class Index extends Component
             $data
         );
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
 
         if ($isNew) {
             $this->success('Product saved. Add another or click Done.');
@@ -184,6 +206,7 @@ class Index extends Component
         $this->description = $product->description ?? '';
         $this->barcode = $product->barcode;
         $this->existingImage = $product->image;
+        $this->cost_price_hint = '';
         $this->photo = null;
         $this->productModal = true;
     }
