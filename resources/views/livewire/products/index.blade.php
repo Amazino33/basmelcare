@@ -61,7 +61,7 @@
 
             <div class="grid grid-cols-2 gap-4">
                 <x-input label="Cost Price" wire:model.live.debounce.500ms="quick_cost_price" prefix="₦" type="number" step="0.01" />
-                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled · type to override" />
+                <x-input label="Selling Price" wire:model.live="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled · type to override" />
                 <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
                 <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
             </div>
@@ -123,7 +123,7 @@
                 />
                 <x-input
                     label="Selling Price (Retail)"
-                    wire:model="selling_price"
+                    wire:model.live="selling_price"
                     prefix="₦"
                     type="number"
                     step="0.01"
