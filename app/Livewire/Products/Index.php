@@ -89,8 +89,17 @@ class Index extends Component
 
     public function saveQuickAdd(): void
     {
+        // Auto-calculate selling price if the user left it blank
+        if (empty($this->quick_selling_price) && (float) $this->quick_cost_price > 0) {
+            $this->quick_selling_price = $this->calculateSellingPrice((float) $this->quick_cost_price);
+        }
+
         $this->validate([
-            'quick_name'           => 'required|string|max:255',
+            'quick_name' => ['required', 'string', 'max:255', function ($attr, $value, $fail) {
+                if (Product::whereRaw('LOWER(name) = ?', [strtolower($value)])->exists()) {
+                    $fail('A product named "' . $value . '" already exists.');
+                }
+            }],
             'quick_category_id'    => 'required|exists:categories,id',
             'quick_selling_price'  => 'required|numeric|min:0',
             'quick_cost_price'     => 'required|numeric|min:0',
@@ -146,7 +155,14 @@ class Index extends Component
     public function saveProduct()
     {
         $this->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', function ($attr, $value, $fail) {
+                $exists = Product::whereRaw('LOWER(name) = ?', [strtolower($value)])
+                    ->when($this->productId, fn($q) => $q->where('id', '!=', $this->productId))
+                    ->exists();
+                if ($exists) {
+                    $fail('A product named "' . $value . '" already exists.');
+                }
+            }],
             'sku' => 'nullable|string|max:100|unique:products,sku,' . $this->productId,
             'category_id' => 'required|exists:categories,id',
             'selling_price' => 'required|numeric|min:0',

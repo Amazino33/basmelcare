@@ -60,7 +60,17 @@
             <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
 
             <div class="grid grid-cols-2 gap-4">
-                <x-input label="Cost Price" wire:model.live.debounce.500ms="quick_cost_price" prefix="₦" type="number" step="0.01" />
+                <x-input
+                    label="Cost Price"
+                    wire:model="quick_cost_price"
+                    prefix="₦" type="number" step="0.01"
+                    x-on:input.debounce.500ms="
+                        const cost = parseFloat($event.target.value) || 0;
+                        if (cost > 0 && !$wire.quick_selling_price) {
+                            $wire.set('quick_selling_price', String(Math.round(cost * 1.4 / 100) * 100));
+                        }
+                    "
+                />
                 <x-input label="Selling Price" wire:model.live="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled · type to override" />
                 <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
                 <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
