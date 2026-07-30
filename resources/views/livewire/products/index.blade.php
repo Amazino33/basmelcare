@@ -60,8 +60,8 @@
             <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
 
             <div class="grid grid-cols-2 gap-4">
-                <x-input label="Cost Price" wire:model.live.debounce.300ms="quick_cost_price" prefix="₦" type="number" step="0.01" />
-                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-calculated on save · type to override" />
+                <x-input label="Cost Price" wire:model="quick_cost_price" prefix="₦" type="number" step="0.01" />
+                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled from cost · type to override" />
                 <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
                 <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
             </div>
@@ -219,6 +219,15 @@
             const el = document.querySelector('input[wire\\:model="quick_name"]');
             if (el) el.focus();
         }, 300);
+    });
+
+    document.addEventListener('input', function (e) {
+        const costInput = document.querySelector('input[wire\\:model="quick_cost_price"]');
+        if (!costInput || e.target !== costInput) return;
+        const cost = parseFloat(e.target.value) || 0;
+        if (cost <= 0) return;
+        const sellInput = document.querySelector('input[wire\\:model="quick_selling_price"]');
+        if (sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
     });
 
 

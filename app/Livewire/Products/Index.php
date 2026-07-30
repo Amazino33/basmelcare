@@ -59,7 +59,7 @@ class Index extends Component
 
     private function calculateSellingPrice(float $cost): string
     {
-        return (string) (round(($cost * 1.4) / 100) * 100);
+        return (string) (ceil(($cost * 1.4) / 100) * 100);
     }
 
     public function updatedCostPriceHint(): void
@@ -70,15 +70,7 @@ class Index extends Component
         }
     }
 
-    public function updatedQuickCostPrice(): void
-    {
-        $cost = (float) $this->quick_cost_price;
-        if ($cost > 0) {
-            $this->quick_selling_price = $this->calculateSellingPrice($cost);
-        }
-    }
-
-    public function openQuickAdd(): void
+public function openQuickAdd(): void
     {
         $this->reset(['quick_name', 'quick_selling_price', 'quick_cost_price', 'quick_expiry_date']);
         $this->quick_quantity = 1;
