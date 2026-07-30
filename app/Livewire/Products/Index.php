@@ -73,7 +73,7 @@ class Index extends Component
     public function updatedQuickCostPrice(): void
     {
         $cost = (float) $this->quick_cost_price;
-        if ($cost > 0 && $this->quick_selling_price === '') {
+        if ($cost > 0) {
             $this->quick_selling_price = $this->calculateSellingPrice($cost);
         }
     }
@@ -84,7 +84,6 @@ class Index extends Component
         $this->quick_quantity = 1;
         $this->quickAddCount = 0;
         $this->quickModal = true;
-        $this->dispatch('resetQuickPriceOverride');
         $this->dispatch('focus-quick-name');
     }
 
@@ -144,7 +143,6 @@ class Index extends Component
         $this->quick_quantity = 1;
 
         $this->success("{$savedName} added. ({$this->quickAddCount} " . str('product')->plural($this->quickAddCount) . " so far)");
-        $this->dispatch('resetQuickPriceOverride');
         $this->dispatch('focus-quick-name');
     }
 

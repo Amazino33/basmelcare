@@ -60,8 +60,8 @@
             <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
 
             <div class="grid grid-cols-2 gap-4">
-                <x-input label="Cost Price" wire:model="quick_cost_price" id="quick-cost-price" prefix="₦" type="number" step="0.01" />
-                <x-input label="Selling Price" wire:model.live="quick_selling_price" id="quick-sell-price" prefix="₦" type="number" step="0.01" hint="Auto-filled · type to override" />
+                <x-input label="Cost Price" wire:model.live.debounce.300ms="quick_cost_price" prefix="₦" type="number" step="0.01" />
+                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-calculated on save · type to override" />
                 <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
                 <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
             </div>
@@ -221,31 +221,6 @@
         }, 300);
     });
 
-    // Auto-calculate selling price from cost price in Quick Add.
-    // Event delegation on document avoids re-attaching after Livewire morphing.
-    let quickSellManual = false;
-
-    document.addEventListener('input', function (e) {
-        if (e.target.id === 'quick-sell-price') {
-            // User typed in selling price — flag as manual override
-            quickSellManual = true;
-        }
-
-        if (e.target.id === 'quick-cost-price') {
-            if (quickSellManual) return;
-            const cost = parseFloat(e.target.value) || 0;
-            if (cost <= 0) return;
-            const suggested = Math.round(cost * 1.4 / 100) * 100;
-            const sellEl = document.getElementById('quick-sell-price');
-            if (sellEl) {
-                sellEl.value = suggested;
-                $wire.set('quick_selling_price', String(suggested));
-            }
-        }
-    });
-
-    // Reset manual override flag whenever the Quick Add modal is freshly opened
-    $wire.on('resetQuickPriceOverride', () => { quickSellManual = false; });
 
     let barcodeStream = null;
 
