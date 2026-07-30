@@ -339,12 +339,22 @@
                         @endif
 
                         @if(!empty($breakdown['debt_allocations']))
-                            <div class="border-t border-base-300 pt-1.5 mt-1 space-y-1">
-                                <div class="text-xs font-semibold text-base-content/60 uppercase">Auto-clearing debts</div>
+                            <div class="border-t border-base-300 pt-1.5 mt-1 space-y-1.5">
+                                <div class="text-xs font-semibold text-base-content/60 uppercase">Debt payments</div>
                                 @foreach($breakdown['debt_allocations'] as $alloc)
-                                    <div class="flex justify-between text-xs">
-                                        <span class="text-base-content/70">{{ $alloc['invoice'] }}</span>
-                                        <span class="text-success font-medium">−₦{{ number_format($alloc['paying'], 2) }}</span>
+                                    <div class="bg-base-300/50 rounded p-1.5 text-xs space-y-0.5">
+                                        <div class="flex justify-between font-semibold">
+                                            <span>{{ $alloc['invoice'] }}</span>
+                                            <span class="text-base-content/60">Owed: ₦{{ number_format($alloc['owed'], 2) }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-success">Paying: ₦{{ number_format($alloc['paying'], 2) }}</span>
+                                            @if($alloc['remaining'] > 0.01)
+                                                <span class="text-error font-semibold">Still owes: ₦{{ number_format($alloc['remaining'], 2) }}</span>
+                                            @else
+                                                <span class="text-success font-semibold">Fully cleared ✓</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>

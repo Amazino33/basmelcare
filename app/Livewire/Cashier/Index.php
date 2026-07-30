@@ -437,9 +437,10 @@ class Index extends Component
                         $owed    = (float) $debt->amount_owed - (float) ($debt->amount_paid ?? 0);
                         $toApply = min($remaining, $owed);
                         $debtAllocations[] = [
-                            'invoice' => $debt->sale->invoice_number ?? '—',
-                            'owed'    => $owed,
-                            'paying'  => $toApply,
+                            'invoice'   => $debt->sale->invoice_number ?? '—',
+                            'owed'      => $owed,
+                            'paying'    => $toApply,
+                            'remaining' => round($owed - $toApply, 2),
                         ];
                         $remaining -= $toApply;
                     }
