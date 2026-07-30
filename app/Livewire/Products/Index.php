@@ -101,7 +101,7 @@ class Index extends Component
                 }
             }],
             'quick_category_id'    => 'required|exists:categories,id',
-            'quick_selling_price'  => 'required|numeric|min:0',
+            'quick_selling_price'  => 'nullable|numeric|min:0',
             'quick_cost_price'     => 'required|numeric|min:0',
             'quick_expiry_date'    => ['required', 'date_format:Y-m', function ($attr, $value, $fail) {
                 if (Carbon::createFromFormat('Y-m', $value)->endOfMonth()->isPast()) {
