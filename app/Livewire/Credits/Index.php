@@ -17,6 +17,8 @@ class Index extends Component
     public ?int $payingCustomerId = null;
     public string $payout_amount  = '';
     public bool $payoutModal      = false;
+    public bool $payoutSuccess    = false;
+    public ?int $lastPayoutId     = null;
 
     public function openPayout(int $customerId): void
     {
@@ -24,6 +26,8 @@ class Index extends Component
 
         $this->payingCustomerId = $customerId;
         $this->payout_amount    = (string) $customer->credit_balance;
+        $this->payoutSuccess    = false;
+        $this->lastPayoutId     = null;
         $this->payoutModal      = true;
     }
 
@@ -40,7 +44,7 @@ class Index extends Component
 
         $customer->decrement('credit_balance', $amount);
 
-        CreditPayout::create([
+        $payout = CreditPayout::create([
             'customer_id'    => $customer->id,
             'amount'         => $amount,
             'balance_before' => $balanceBefore,
@@ -48,7 +52,8 @@ class Index extends Component
             'cashier_id'     => auth()->id(),
         ]);
 
-        $this->payoutModal = false;
+        $this->lastPayoutId  = $payout->id;
+        $this->payoutSuccess = true;
         $this->reset(['payingCustomerId', 'payout_amount']);
         $this->success('₦' . number_format($amount, 2) . ' paid out to ' . $customer->name . '.');
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\CreditPayout;
 use App\Models\DebtPayment;
 use App\Models\Order;
 use App\Models\Sale;
@@ -34,6 +35,16 @@ class InvoiceController extends Controller
             'pharmacyPhone'   => AppSetting::get('pharmacy_phone', ''),
             'pharmacyAddress' => AppSetting::get('pharmacy_address', ''),
         ]);
+    }
+
+    public function creditPayoutReceipt(CreditPayout $creditPayout)
+    {
+        $creditPayout->load('customer', 'cashier');
+
+        return view('receipts.credit-payout', array_merge(
+            $this->pharmacySettings(),
+            ['payout' => $creditPayout]
+        ));
     }
 
     public function orderInvoice(Order $order)

@@ -68,8 +68,12 @@
                         <div class="text-xs text-success mt-0.5">Fully settled</div>
                     @endif
                 </div>
-                <div class="text-right ml-3 shrink-0">
+                <div class="text-right ml-3 shrink-0 space-y-1">
                     <div class="font-bold text-success">₦{{ number_format($payout->amount, 2) }}</div>
+                    <a href="{{ route('credit-payout.receipt', $payout->id) }}" target="_blank"
+                        class="btn btn-xs btn-ghost tooltip" data-tip="Print receipt">
+                        <x-icon name="o-printer" class="w-3 h-3" />
+                    </a>
                 </div>
             </div>
         @empty
@@ -80,8 +84,21 @@
     </div>
 
     <!-- Payout Modal -->
-    <x-modal wire:model="payoutModal" title="Pay Out Credit" box-class="max-w-sm">
-        @if($payingCustomer)
+    <x-modal wire:model="payoutModal" title="{{ $payoutSuccess ? 'Payout Complete' : 'Pay Out Credit' }}" box-class="max-w-sm">
+        @if($payoutSuccess && $lastPayoutId)
+            <div class="text-center py-4">
+                <x-icon name="o-check-circle" class="w-14 h-14 text-success mx-auto mb-3" />
+                <div class="font-bold text-lg mb-1">Paid Out Successfully</div>
+                <p class="text-sm text-base-content/60 mb-4">Print 2 copies — customer keeps one as proof of collection.</p>
+                <div class="flex gap-2 justify-center">
+                    <a href="{{ route('credit-payout.receipt', $lastPayoutId) }}" target="_blank"
+                        class="btn btn-primary btn-sm gap-2">
+                        <x-icon name="o-printer" class="w-4 h-4" /> Print Receipt
+                    </a>
+                    <x-button label="Done" @click="$wire.payoutModal = false" class="btn-ghost btn-sm" />
+                </div>
+            </div>
+        @elseif($payingCustomer)
             <div class="bg-base-200 rounded-lg p-3 mb-4 text-sm">
                 <div class="font-bold">{{ $payingCustomer->name }}</div>
                 @if($payingCustomer->phone)
