@@ -84,6 +84,7 @@ class Index extends Component
         $this->quick_quantity = 1;
         $this->quickAddCount = 0;
         $this->quickModal = true;
+        $this->dispatch('resetQuickPriceOverride');
         $this->dispatch('focus-quick-name');
     }
 
@@ -143,6 +144,7 @@ class Index extends Component
         $this->quick_quantity = 1;
 
         $this->success("{$savedName} added. ({$this->quickAddCount} " . str('product')->plural($this->quickAddCount) . " so far)");
+        $this->dispatch('resetQuickPriceOverride');
         $this->dispatch('focus-quick-name');
     }
 
