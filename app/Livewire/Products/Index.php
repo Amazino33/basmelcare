@@ -109,28 +109,35 @@ class Index extends Component
             ]);
 
             $newQty     = (int) ($data['qty'] ?? 0);
+            $newCost    = (float) ($data['cost_price'] ?? 0);
             $currentQty = $product->batches->sum('quantity');
             $diff       = $newQty - $currentQty;
+            $batch      = $product->batches->first();
 
-            if ($diff !== 0) {
-                $batch = $product->batches->first();
+            if ($batch) {
+                $batchUpdate = ['cost_price' => $newCost];
+                if ($diff !== 0) {
+                    $batchUpdate['quantity'] = max(0, $batch->quantity + $diff);
+                }
+                $batch->update($batchUpdate);
 
-                if ($batch) {
-                    $batch->update(['quantity' => max(0, $batch->quantity + $diff)]);
+                if ($diff !== 0) {
                     StockMovement::create([
                         'batch_id'  => $batch->id,
                         'quantity'  => abs($diff),
                         'type'      => 'adjustment',
                         'reference' => 'Bulk stock adjustment',
                     ]);
-                } elseif ($newQty > 0) {
-                    $batch = Batch::create([
-                        'product_id'   => $product->id,
-                        'batch_number' => 'INIT-' . now()->format('Ymd'),
-                        'expiry_date'  => now()->addYears(2)->endOfMonth()->toDateString(),
-                        'cost_price'   => 0,
-                        'quantity'     => $newQty,
-                    ]);
+                }
+            } elseif ($newQty > 0 || $newCost > 0) {
+                $batch = Batch::create([
+                    'product_id'   => $product->id,
+                    'batch_number' => 'INIT-' . now()->format('Ymd'),
+                    'expiry_date'  => now()->addYears(2)->endOfMonth()->toDateString(),
+                    'cost_price'   => $newCost,
+                    'quantity'     => $newQty,
+                ]);
+                if ($newQty > 0) {
                     StockMovement::create([
                         'batch_id'  => $batch->id,
                         'quantity'  => $newQty,
@@ -418,10 +425,12 @@ class Index extends Component
         if ($this->bulkEditMode) {
             foreach ($products as $product) {
                 if (!isset($this->bulkEdits[$product->id])) {
+                    $firstBatch = $product->batches->first();
                     $this->bulkEdits[$product->id] = [
                         'name'          => $product->name,
                         'category_id'   => $product->category_id,
                         'selling_price' => (string) $product->selling_price,
+                        'cost_price'    => (string) ($firstBatch?->cost_price ?? ''),
                         'qty'           => (string) $product->batches->sum('quantity'),
                     ];
                 }

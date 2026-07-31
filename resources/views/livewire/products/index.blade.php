@@ -46,6 +46,7 @@
                         <th class="w-8">#</th>
                         <th class="min-w-52">Name</th>
                         <th class="min-w-40">Category</th>
+                        <th class="min-w-32">Cost Price (₦)</th>
                         <th class="min-w-32">Selling Price (₦)</th>
                         <th class="min-w-28">Stock Qty</th>
                     </tr>
@@ -71,6 +72,15 @@
                                         <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    wire:model="bulkEdits.{{ $product->id }}.cost_price"
+                                    class="input input-sm input-bordered w-full"
+                                />
                             </td>
                             <td>
                                 <input
