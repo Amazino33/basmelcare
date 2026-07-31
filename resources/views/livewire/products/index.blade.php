@@ -5,47 +5,149 @@
         </x-slot:middle>
         <x-slot:actions>
             <x-button label="Import" wire:click="openImport" icon="o-arrow-up-tray" class="btn-outline btn-sm" />
-            <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
-            <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
+            <x-button
+                :label="$bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'"
+                wire:click="toggleBulkEdit"
+                icon="{{ $bulkEditMode ? 'o-x-mark' : 'o-pencil-square' }}"
+                class="{{ $bulkEditMode ? 'btn-warning' : 'btn-outline' }} btn-sm"
+            />
+            @if(!$bulkEditMode)
+                <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
+                <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
+            @endif
         </x-slot:actions>
     </x-header>
 
-    <x-table :headers="$headers" :rows="$products" with-pagination>
-        @scope('cell_image', $product)
-            @if($product->image)
-                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
-            @else
-                <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center">
-                    <x-icon name="o-cube" class="w-5 h-5 text-base-content/30" />
-                </div>
-            @endif
-        @endscope
-
-        @scope('cell_selling_price', $product)
-            ₦{{ number_format($product->selling_price, 2) }}
-            @if($product->wholesale_price)
-                <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
-            @endif
-        @endscope
-
-        @scope('cell_stock', $product)
-            @php $total = $product->batches->sum('quantity'); @endphp
-            <x-badge :value="$total" @class([
-                'badge-success' => $total > $product->reorder_level,
-                'badge-warning' => $total > 0 && $total <= $product->reorder_level,
-                'badge-error' => $total == 0,
-            ]) />
-        @endscope
-
-        @scope('actions', $product)
-            <div class="flex gap-1">
-                <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
-                <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
-                <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
-                <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
+    @if($bulkEditMode)
+        {{-- Bulk Edit Mode --}}
+        <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
+            <div class="flex items-center gap-2 flex-1">
+                <x-icon name="o-pencil-square" class="w-4 h-4 text-warning shrink-0" />
+                <span class="text-sm font-semibold">Bulk Edit Mode — {{ count($bulkEdits) }} {{ Str::plural('product', count($bulkEdits)) }} loaded</span>
+                <span class="text-xs text-base-content/50">Changes save across all pages</span>
             </div>
-        @endscope
-    </x-table>
+            <div class="flex gap-2">
+                <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-sm btn-ghost" />
+                <x-button
+                    label="Save All ({{ count($bulkEdits) }})"
+                    wire:click="saveBulkEdits"
+                    class="btn-sm btn-success"
+                    icon="o-check"
+                    wire:loading.attr="disabled"
+                    wire:target="saveBulkEdits"
+                />
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-base-300">
+            <table class="table table-sm w-full">
+                <thead class="bg-base-200 text-xs uppercase tracking-wide">
+                    <tr>
+                        <th class="w-8">#</th>
+                        <th class="min-w-52">Name</th>
+                        <th class="min-w-40">Category</th>
+                        <th class="min-w-32">Selling Price (₦)</th>
+                        <th class="min-w-28">Stock Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($products as $product)
+                        <tr class="hover:bg-base-100 border-b border-base-200">
+                            <td class="text-base-content/40 text-xs">{{ $product->id }}</td>
+                            <td>
+                                <input
+                                    type="text"
+                                    wire:model="bulkEdits.{{ $product->id }}.name"
+                                    class="input input-sm input-bordered w-full min-w-48"
+                                />
+                            </td>
+                            <td>
+                                <select
+                                    wire:model="bulkEdits.{{ $product->id }}.category_id"
+                                    class="select select-sm select-bordered w-full"
+                                >
+                                    <option value="">— Select —</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    wire:model="bulkEdits.{{ $product->id }}.selling_price"
+                                    class="input input-sm input-bordered w-full"
+                                />
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    wire:model="bulkEdits.{{ $product->id }}.qty"
+                                    class="input input-sm input-bordered w-24"
+                                />
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-3">{{ $products->links() }}</div>
+
+        <div class="mt-3 flex justify-end gap-2">
+            <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-ghost" />
+            <x-button
+                label="Save All Changes ({{ count($bulkEdits) }})"
+                wire:click="saveBulkEdits"
+                class="btn-success"
+                icon="o-check"
+                wire:loading.attr="disabled"
+                wire:target="saveBulkEdits"
+            />
+        </div>
+
+    @else
+        {{-- Normal table --}}
+        <x-table :headers="$headers" :rows="$products" with-pagination>
+            @scope('cell_image', $product)
+                @if($product->image)
+                    <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
+                @else
+                    <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center">
+                        <x-icon name="o-cube" class="w-5 h-5 text-base-content/30" />
+                    </div>
+                @endif
+            @endscope
+
+            @scope('cell_selling_price', $product)
+                ₦{{ number_format($product->selling_price, 2) }}
+                @if($product->wholesale_price)
+                    <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
+                @endif
+            @endscope
+
+            @scope('cell_stock', $product)
+                @php $total = $product->batches->sum('quantity'); @endphp
+                <x-badge :value="$total" @class([
+                    'badge-success' => $total > $product->reorder_level,
+                    'badge-warning' => $total > 0 && $total <= $product->reorder_level,
+                    'badge-error' => $total == 0,
+                ]) />
+            @endscope
+
+            @scope('actions', $product)
+                <div class="flex gap-1">
+                    <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
+                    <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
+                    <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                    <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
+                </div>
+            @endscope
+        </x-table>
+    @endif
 
     <!-- Quick Add Modal -->
     <x-modal wire:model="quickModal" title="Quick Add Product" box-class="max-w-lg">

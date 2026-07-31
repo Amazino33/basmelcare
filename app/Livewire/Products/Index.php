@@ -64,6 +64,10 @@ class Index extends Component
     public bool $importModal = false;
     public array $importResults = [];
 
+    // Bulk edit
+    public bool $bulkEditMode = false;
+    public array $bulkEdits = [];
+
     private function calculateSellingPrice(float $cost): string
     {
         return (string) (ceil(($cost * 1.4) / 100) * 100);
@@ -75,6 +79,73 @@ class Index extends Component
         if ($cost > 0 && $this->selling_price === '') {
             $this->selling_price = $this->calculateSellingPrice($cost);
         }
+    }
+
+    public function toggleBulkEdit(): void
+    {
+        $this->bulkEditMode = !$this->bulkEditMode;
+        if (!$this->bulkEditMode) {
+            $this->bulkEdits = [];
+        }
+    }
+
+    public function saveBulkEdits(): void
+    {
+        if (empty($this->bulkEdits)) {
+            $this->bulkEditMode = false;
+            return;
+        }
+
+        $saved = 0;
+
+        foreach ($this->bulkEdits as $productId => $data) {
+            $product = Product::with('batches')->find($productId);
+            if (!$product) continue;
+
+            $product->update([
+                'name'          => trim($data['name']),
+                'category_id'   => $data['category_id'] ?: $product->category_id,
+                'selling_price' => (float) $data['selling_price'],
+            ]);
+
+            $newQty     = (int) ($data['qty'] ?? 0);
+            $currentQty = $product->batches->sum('quantity');
+            $diff       = $newQty - $currentQty;
+
+            if ($diff !== 0) {
+                $batch = $product->batches->first();
+
+                if ($batch) {
+                    $batch->update(['quantity' => max(0, $batch->quantity + $diff)]);
+                    StockMovement::create([
+                        'batch_id'  => $batch->id,
+                        'quantity'  => abs($diff),
+                        'type'      => 'adjustment',
+                        'reference' => 'Bulk stock adjustment',
+                    ]);
+                } elseif ($newQty > 0) {
+                    $batch = Batch::create([
+                        'product_id'   => $product->id,
+                        'batch_number' => 'INIT-' . now()->format('Ymd'),
+                        'expiry_date'  => now()->addYears(2)->endOfMonth()->toDateString(),
+                        'cost_price'   => 0,
+                        'quantity'     => $newQty,
+                    ]);
+                    StockMovement::create([
+                        'batch_id'  => $batch->id,
+                        'quantity'  => $newQty,
+                        'type'      => 'adjustment',
+                        'reference' => 'Bulk stock adjustment',
+                    ]);
+                }
+            }
+
+            $saved++;
+        }
+
+        $this->bulkEditMode = false;
+        $this->bulkEdits    = [];
+        $this->success("{$saved} " . str('product')->plural($saved) . " updated.");
     }
 
     public function openImport(): void
@@ -339,18 +410,32 @@ class Index extends Component
             ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")
                 ->orWhere('barcode', 'like', "%{$this->search}%"))
             ->latest()
-            ->paginate(15);
+            ->paginate($this->bulkEditMode ? 50 : 15);
 
         $categories = Category::orderBy('name')->get();
+
+        // Populate bulkEdits for current page (preserves edits across page navigation)
+        if ($this->bulkEditMode) {
+            foreach ($products as $product) {
+                if (!isset($this->bulkEdits[$product->id])) {
+                    $this->bulkEdits[$product->id] = [
+                        'name'          => $product->name,
+                        'category_id'   => $product->category_id,
+                        'selling_price' => (string) $product->selling_price,
+                        'qty'           => (string) $product->batches->sum('quantity'),
+                    ];
+                }
+            }
+        }
 
         $viewProduct = $this->viewBatchesProductId
             ? Product::with(['batches' => fn($q) => $q->orderBy('expiry_date')])->find($this->viewBatchesProductId)
             : null;
 
         return view('livewire.products.index', [
-            'headers' => $headers,
-            'products' => $products,
-            'categories' => $categories,
+            'headers'     => $headers,
+            'products'    => $products,
+            'categories'  => $categories,
             'viewProduct' => $viewProduct,
         ]);
     }
