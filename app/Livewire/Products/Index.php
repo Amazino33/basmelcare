@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Products;
 
+use App\Imports\ProductsImport;
 use App\Models\Batch;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockMovement;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -57,6 +59,11 @@ class Index extends Component
     public bool $quickModal = false;
     public int $quickAddCount = 0;
 
+    // Import
+    public $importFile = null;
+    public bool $importModal = false;
+    public array $importResults = [];
+
     private function calculateSellingPrice(float $cost): string
     {
         return (string) (ceil(($cost * 1.4) / 100) * 100);
@@ -70,7 +77,40 @@ class Index extends Component
         }
     }
 
-public function openQuickAdd(): void
+    public function openImport(): void
+    {
+        $this->reset(['importFile', 'importResults']);
+        $this->importModal = true;
+    }
+
+    public function processImport(): void
+    {
+        $this->validate(['importFile' => 'required|file|mimes:xlsx,xls|max:10240']);
+
+        $path     = $this->importFile->store('imports/tmp', 'local');
+        $fullPath = Storage::disk('local')->path($path);
+
+        try {
+            $import = new ProductsImport();
+            $import->import($fullPath);
+
+            $this->importResults = [
+                'created'    => $import->created,
+                'batchAdded' => $import->batchAdded,
+                'errors'     => $import->errors,
+            ];
+
+            $total = count($import->created) + count($import->batchAdded);
+            if ($total > 0) {
+                $this->success("{$total} " . str('product')->plural($total) . " imported successfully.");
+            }
+        } finally {
+            Storage::disk('local')->delete($path);
+            $this->reset('importFile');
+        }
+    }
+
+    public function openQuickAdd(): void
     {
         $this->reset(['quick_name', 'quick_selling_price', 'quick_cost_price', 'quick_expiry_date']);
         $this->quick_quantity = 1;

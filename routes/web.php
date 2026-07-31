@@ -62,6 +62,7 @@ Route::prefix('desk')->group(function () {
         Route::middleware('role:admin,pharmacist,branch_manager,inventory_manager')->group(function () {
             Route::get('categories', App\Livewire\Categories\Index::class)->name('categories.index');
             Route::get('products', App\Livewire\Products\Index::class)->name('products.index');
+            Route::get('products/import-template', App\Http\Controllers\ProductImportTemplateController::class)->name('products.import-template');
             Route::get('inventory', App\Livewire\Inventory\Index::class)->name('inventory.index');
             Route::get('expiry-alerts', App\Livewire\ExpiryAlerts\Index::class)->name('expiry-alerts.index');
             Route::get('locations', App\Livewire\Locations\Index::class)->name('locations.index');

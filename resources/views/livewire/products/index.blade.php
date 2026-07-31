@@ -4,6 +4,7 @@
             <x-input icon="o-magnifying-glass" placeholder="Search by name or barcode..." wire:model.live.debounce="search" clearable />
         </x-slot:middle>
         <x-slot:actions>
+            <x-button label="Import" wire:click="openImport" icon="o-arrow-up-tray" class="btn-outline btn-sm" />
             <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
             <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
         </x-slot:actions>
@@ -141,6 +142,99 @@
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
+    </x-modal>
+
+    <!-- Import Modal -->
+    <x-modal wire:model="importModal" title="Import Products from Excel" box-class="max-w-lg">
+        @if(empty($importResults))
+            <div class="space-y-4">
+                <div class="alert alert-info py-2 text-sm">
+                    <x-icon name="o-information-circle" class="w-4 h-4 shrink-0" />
+                    <span>
+                        Download the template, fill it in Excel, then upload it here.
+                        <a href="{{ route('products.import-template') }}" class="font-semibold underline" target="_blank">Download template ↓</a>
+                    </span>
+                </div>
+
+                <div class="text-xs text-base-content/60 space-y-1">
+                    <div class="font-semibold text-base-content/80 mb-1">Template columns:</div>
+                    <div><span class="font-medium">A — Name</span> (required)</div>
+                    <div><span class="font-medium">B — Batch Number</span> (optional)</div>
+                    <div><span class="font-medium">C — Expiry Date</span> MM/YYYY format e.g. <code>08/2026</code></div>
+                    <div><span class="font-medium">D — Qty</span> (required)</div>
+                    <div><span class="font-medium">E — Cost Price</span> in ₦ (required)</div>
+                    <div><span class="font-medium">F — Selling Price</span> (optional — auto-calculated if blank)</div>
+                </div>
+
+                <x-form wire:submit="processImport">
+                    <div>
+                        <label class="label"><span class="label-text font-semibold">Upload Excel File (.xlsx)</span></label>
+                        <input type="file" wire:model="importFile" accept=".xlsx,.xls" class="file-input file-input-bordered w-full" />
+                        @error('importFile') <span class="text-error text-xs mt-1 block">{{ $message }}</span> @enderror
+                    </div>
+                    <x-slot:actions>
+                        <x-button label="Cancel" @click="$wire.importModal = false" />
+                        <x-button label="Import" type="submit" class="btn-primary" icon="o-arrow-up-tray" wire:loading.attr="disabled" />
+                    </x-slot:actions>
+                </x-form>
+            </div>
+        @else
+            {{-- Results view --}}
+            <div class="space-y-3">
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-success/10 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-success">{{ count($importResults['created']) }}</div>
+                        <div class="text-xs text-base-content/60">New products</div>
+                    </div>
+                    <div class="bg-info/10 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-info">{{ count($importResults['batchAdded']) }}</div>
+                        <div class="text-xs text-base-content/60">Batches added</div>
+                    </div>
+                    <div class="bg-error/10 rounded-lg p-3">
+                        <div class="text-2xl font-bold text-error">{{ count($importResults['errors']) }}</div>
+                        <div class="text-xs text-base-content/60">Errors</div>
+                    </div>
+                </div>
+
+                @if(!empty($importResults['created']))
+                    <div>
+                        <div class="text-xs font-semibold text-success uppercase tracking-wide mb-1">New products created</div>
+                        <div class="bg-base-200 rounded p-2 text-xs space-y-0.5 max-h-32 overflow-y-auto">
+                            @foreach($importResults['created'] as $name)
+                                <div class="flex items-center gap-1"><x-icon name="o-check-circle" class="w-3 h-3 text-success shrink-0" /> {{ $name }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                @if(!empty($importResults['batchAdded']))
+                    <div>
+                        <div class="text-xs font-semibold text-info uppercase tracking-wide mb-1">Batches added to existing products</div>
+                        <div class="bg-base-200 rounded p-2 text-xs space-y-0.5 max-h-32 overflow-y-auto">
+                            @foreach($importResults['batchAdded'] as $name)
+                                <div class="flex items-center gap-1"><x-icon name="o-plus-circle" class="w-3 h-3 text-info shrink-0" /> {{ $name }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                @if(!empty($importResults['errors']))
+                    <div>
+                        <div class="text-xs font-semibold text-error uppercase tracking-wide mb-1">Errors (rows skipped)</div>
+                        <div class="bg-error/5 border border-error/20 rounded p-2 text-xs space-y-0.5 max-h-32 overflow-y-auto">
+                            @foreach($importResults['errors'] as $error)
+                                <div class="text-error">{{ $error }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <x-slot:actions>
+                <x-button label="Import Another File" wire:click="openImport" icon="o-arrow-path" />
+                <x-button label="Done" @click="$wire.importModal = false" class="btn-primary" />
+            </x-slot:actions>
+        @endif
     </x-modal>
 
     <!-- Barcode Scanner Modal -->
