@@ -65,8 +65,9 @@ class Index extends Component
     public array $importResults = [];
 
     // Bulk edit
-    public bool $bulkEditMode = false;
-    public array $bulkEdits = [];
+    public bool $bulkEditMode    = false;
+    public array $bulkEdits      = [];
+    public bool $bulkApplyMarkup = false;
 
     private function calculateSellingPrice(float $cost): string
     {
@@ -85,7 +86,20 @@ class Index extends Component
     {
         $this->bulkEditMode = !$this->bulkEditMode;
         if (!$this->bulkEditMode) {
-            $this->bulkEdits = [];
+            $this->bulkEdits      = [];
+            $this->bulkApplyMarkup = false;
+        }
+    }
+
+    public function updatedBulkApplyMarkup(): void
+    {
+        if (!$this->bulkApplyMarkup) return;
+
+        foreach ($this->bulkEdits as $id => $data) {
+            $cost = (float) ($data['cost_price'] ?? 0);
+            if ($cost > 0) {
+                $this->bulkEdits[$id]['selling_price'] = (string) (ceil($cost * 1.4 / 100) * 100);
+            }
         }
     }
 
@@ -114,11 +128,15 @@ class Index extends Component
             $diff       = $newQty - $currentQty;
             $batch      = $product->batches->first();
 
+            $expiryRaw = trim($data['expiry_date'] ?? '');
+            $newExpiry = $expiryRaw
+                ? Carbon::createFromFormat('Y-m', $expiryRaw)->endOfMonth()->toDateString()
+                : null;
+
             if ($batch) {
                 $batchUpdate = ['cost_price' => $newCost];
-                if ($diff !== 0) {
-                    $batchUpdate['quantity'] = max(0, $batch->quantity + $diff);
-                }
+                if ($newExpiry) $batchUpdate['expiry_date'] = $newExpiry;
+                if ($diff !== 0) $batchUpdate['quantity'] = max(0, $batch->quantity + $diff);
                 $batch->update($batchUpdate);
 
                 if ($diff !== 0) {
@@ -133,7 +151,7 @@ class Index extends Component
                 $batch = Batch::create([
                     'product_id'   => $product->id,
                     'batch_number' => 'INIT-' . now()->format('Ymd'),
-                    'expiry_date'  => now()->addYears(2)->endOfMonth()->toDateString(),
+                    'expiry_date'  => $newExpiry ?? now()->addYears(2)->endOfMonth()->toDateString(),
                     'cost_price'   => $newCost,
                     'quantity'     => $newQty,
                 ]);
@@ -432,6 +450,9 @@ class Index extends Component
                         'selling_price' => (string) $product->selling_price,
                         'cost_price'    => (string) ($firstBatch?->cost_price ?? ''),
                         'qty'           => (string) $product->batches->sum('quantity'),
+                        'expiry_date'   => $firstBatch?->expiry_date
+                            ? Carbon::parse($firstBatch->expiry_date)->format('Y-m')
+                            : '',
                     ];
                 }
             }

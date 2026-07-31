@@ -20,23 +20,39 @@
 
     @if($bulkEditMode)
         {{-- Bulk Edit Mode --}}
-        <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
-            <div class="flex items-center gap-2 flex-1">
-                <x-icon name="o-pencil-square" class="w-4 h-4 text-warning shrink-0" />
-                <span class="text-sm font-semibold">Bulk Edit Mode — {{ count($bulkEdits) }} {{ Str::plural('product', count($bulkEdits)) }} loaded</span>
-                <span class="text-xs text-base-content/50">Changes save across all pages</span>
+        <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 space-y-2">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div class="flex items-center gap-2 flex-1">
+                    <x-icon name="o-pencil-square" class="w-4 h-4 text-warning shrink-0" />
+                    <span class="text-sm font-semibold">Bulk Edit Mode — {{ count($bulkEdits) }} {{ Str::plural('product', count($bulkEdits)) }} loaded</span>
+                    <span class="text-xs text-base-content/50 hidden sm:inline">Changes save across all pages</span>
+                </div>
+                <div class="flex gap-2">
+                    <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-sm btn-ghost" />
+                    <x-button
+                        label="Save All ({{ count($bulkEdits) }})"
+                        wire:click="saveBulkEdits"
+                        class="btn-sm btn-success"
+                        icon="o-check"
+                        wire:loading.attr="disabled"
+                        wire:target="saveBulkEdits"
+                    />
+                </div>
             </div>
-            <div class="flex gap-2">
-                <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-sm btn-ghost" />
-                <x-button
-                    label="Save All ({{ count($bulkEdits) }})"
-                    wire:click="saveBulkEdits"
-                    class="btn-sm btn-success"
-                    icon="o-check"
-                    wire:loading.attr="disabled"
-                    wire:target="saveBulkEdits"
+            <label class="flex items-center gap-2 cursor-pointer w-fit">
+                <input
+                    type="checkbox"
+                    id="bulk-markup-toggle"
+                    wire:model.live="bulkApplyMarkup"
+                    class="checkbox checkbox-warning checkbox-sm"
                 />
-            </div>
+                <span class="text-xs font-medium">
+                    Auto-apply markup formula <span class="text-base-content/50">(cost × 1.4 → nearest ₦100)</span>
+                    @if($bulkApplyMarkup)
+                        <span class="text-warning font-semibold ml-1">— ON: overwrites all selling prices</span>
+                    @endif
+                </span>
+            </label>
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-base-300">
@@ -49,6 +65,7 @@
                         <th class="min-w-32">Cost Price (₦)</th>
                         <th class="min-w-32">Selling Price (₦)</th>
                         <th class="min-w-28">Stock Qty</th>
+                        <th class="min-w-32">Expiry Date</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,6 +96,7 @@
                                     step="0.01"
                                     min="0"
                                     wire:model="bulkEdits.{{ $product->id }}.cost_price"
+                                    data-bulk-cost
                                     class="input input-sm input-bordered w-full"
                                 />
                             </td>
@@ -88,6 +106,7 @@
                                     step="0.01"
                                     min="0"
                                     wire:model="bulkEdits.{{ $product->id }}.selling_price"
+                                    data-bulk-sell
                                     class="input input-sm input-bordered w-full"
                                 />
                             </td>
@@ -97,6 +116,13 @@
                                     min="0"
                                     wire:model="bulkEdits.{{ $product->id }}.qty"
                                     class="input input-sm input-bordered w-24"
+                                />
+                            </td>
+                            <td>
+                                <input
+                                    type="month"
+                                    wire:model="bulkEdits.{{ $product->id }}.expiry_date"
+                                    class="input input-sm input-bordered w-full"
                                 />
                             </td>
                         </tr>
@@ -427,12 +453,25 @@
         }, 300);
     });
 
+    // Quick Add: auto-fill selling price from cost
     document.addEventListener('input', function (e) {
         const costInput = document.querySelector('input[wire\\:model="quick_cost_price"]');
         if (!costInput || e.target !== costInput) return;
         const cost = parseFloat(e.target.value) || 0;
         if (cost <= 0) return;
         const sellInput = document.querySelector('input[wire\\:model="quick_selling_price"]');
+        if (sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
+    });
+
+    // Bulk Edit: auto-fill selling price from cost when markup toggle is ON
+    document.addEventListener('input', function (e) {
+        if (!e.target.dataset.bulkCost) return;
+        const toggle = document.getElementById('bulk-markup-toggle');
+        if (!toggle || !toggle.checked) return;
+        const cost = parseFloat(e.target.value) || 0;
+        if (cost <= 0) return;
+        const row = e.target.closest('tr');
+        const sellInput = row?.querySelector('[data-bulk-sell]');
         if (sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
     });
 
