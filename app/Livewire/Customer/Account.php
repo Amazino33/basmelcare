@@ -29,6 +29,7 @@ class Account extends Component
         $debts = $customer->debts()->with('sale', 'payments')->latest()->get();
         $appointments = $customer->appointments()->with('staff')->latest()->get();
         $medicalRecords = $customer->medicalRecords()->with('recorder')->latest()->get();
+        $creditPayouts = $customer->creditPayouts()->latest()->get();
 
         $totalSpent = $customer->sales()->where('status', 'completed')->sum('total_amount')
             + $customer->orders()->where('payment_status', 'paid')->sum('total_amount');
@@ -43,6 +44,7 @@ class Account extends Component
             'onlineOrders' => $onlineOrders,
             'appointments' => $appointments,
             'medicalRecords' => $medicalRecords,
+            'creditPayouts' => $creditPayouts,
             'totalSpent' => $totalSpent,
             'totalDebt' => $totalDebt,
             'totalOrders' => $totalOrders,

@@ -117,7 +117,7 @@ class Index extends Component
             if (!$product) continue;
 
             $product->update([
-                'name'          => trim($data['name']),
+                'name'          => strtoupper(trim($data['name'])),
                 'category_id'   => $data['category_id'] ?: $product->category_id,
                 'selling_price' => (float) $data['selling_price'],
             ]);

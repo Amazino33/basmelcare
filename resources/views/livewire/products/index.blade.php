@@ -76,13 +76,13 @@
                                 <input
                                     type="text"
                                     wire:model="bulkEdits.{{ $product->id }}.name"
-                                    class="input input-sm input-bordered w-full min-w-48"
+                                    class="input input-sm input-bordered w-full min-w-48 uppercase"
                                 />
                             </td>
                             <td>
                                 <select
                                     wire:model="bulkEdits.{{ $product->id }}.category_id"
-                                    class="select select-sm select-bordered w-full"
+                                    class="select select-sm select-bordered w-full uppercase"
                                 >
                                     <option value="">— Select —</option>
                                     @foreach($categories as $cat)

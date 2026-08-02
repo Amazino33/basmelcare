@@ -54,6 +54,11 @@ class Customer extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function creditPayouts()
+    {
+        return $this->hasMany(CreditPayout::class);
+    }
+
     public function getTotalDebtAttribute(): float
     {
         return $this->debts()->whereIn('status', ['unpaid', 'partial'])->sum('amount_owed')

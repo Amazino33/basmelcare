@@ -16,7 +16,7 @@
     </div>
 
     <!-- Quick Stats -->
-    <div class="grid grid-cols-3 gap-3 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div class="bg-base-200 rounded-lg p-3 text-center">
             <div class="text-lg font-bold text-primary">{{ $totalOrders }}</div>
             <div class="text-xs text-base-content/60">Orders</div>
@@ -25,15 +25,19 @@
             <div class="text-lg font-bold">₦{{ number_format($totalSpent, 0) }}</div>
             <div class="text-xs text-base-content/60">Spent</div>
         </div>
+        <div class="bg-success/10 rounded-lg p-3 text-center">
+            <div class="text-lg font-bold text-success">₦{{ number_format($customer->credit_balance, 0) }}</div>
+            <div class="text-xs text-base-content/60">Wallet</div>
+        </div>
         <div class="bg-base-200 rounded-lg p-3 text-center">
             <div class="text-lg font-bold {{ $totalDebt > 0 ? 'text-error' : 'text-success' }}">₦{{ number_format($totalDebt, 0) }}</div>
-            <div class="text-xs text-base-content/60">Balance</div>
+            <div class="text-xs text-base-content/60">Debt</div>
         </div>
     </div>
 
     <!-- Tab Navigation -->
     <div class="flex overflow-x-auto gap-1 mb-4 border-b border-base-200 pb-1 scrollbar-hide">
-        @foreach(['overview' => 'Overview', 'orders' => 'In-Store', 'online' => 'Online Orders', 'debts' => 'Debts', 'appointments' => 'Appointments', 'records' => 'Records'] as $tab => $label)
+        @foreach(['overview' => 'Overview', 'orders' => 'In-Store', 'online' => 'Online Orders', 'debts' => 'Debts', 'appointments' => 'Appointments', 'records' => 'Records', 'wallet' => 'Wallet'] as $tab => $label)
             <button wire:click="$set('activeTab', '{{ $tab }}')" @class([
                 'px-4 py-2 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors',
                 'bg-primary text-primary-content' => $activeTab === $tab,
@@ -312,6 +316,42 @@
                     <p class="text-sm">No medical records</p>
                 </div>
             @endforelse
+        </div>
+    @endif
+
+    {{-- Wallet Tab --}}
+    @if ($activeTab === 'wallet')
+        <div class="space-y-4">
+
+            <div class="card bg-success/10 border border-success/30 p-5 text-center">
+                <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1">Available Balance</div>
+                <div class="text-4xl font-bold text-success">₦{{ number_format($customer->credit_balance, 2) }}</div>
+                <p class="text-xs text-base-content/60 mt-2">Usable at the pharmacy counter on your next purchase</p>
+            </div>
+
+            <div>
+                <h3 class="font-semibold text-sm mb-3">Payout History</h3>
+                @forelse($creditPayouts as $payout)
+                    <div class="flex justify-between items-center py-2.5 border-b border-base-200 last:border-0">
+                        <div>
+                            <div class="text-sm font-medium">Cash paid out</div>
+                            <div class="text-xs text-base-content/60">{{ $payout->created_at->format('M d, Y · h:i A') }}</div>
+                            @if($payout->note)
+                                <div class="text-xs text-base-content/50 italic">{{ $payout->note }}</div>
+                            @endif
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-error">-₦{{ number_format($payout->amount, 2)}}</div>
+                            <div class="text-xs text-base-content/60">After: ₦{{ number_format($payout->balance_after, 2) }}</div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="text-center py-8 text-base-content/60">
+                        <x-icon name="o-banknotes" class="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p class="text-sm">No payouts record yet</p>
+                    </div>
+                @endforelse
+            </div>
         </div>
     @endif
 </div>
