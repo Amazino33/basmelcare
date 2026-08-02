@@ -567,9 +567,9 @@ class Index extends Component
         }
         $this->lastPendingCount = $currentCount;
 
-        $customer = Customer::when($this->customerSearch,
-                fn($q) => $q->where('name', 'like', "%($this->customerSearch)%")
-                        ->orWhere('phone', 'like', "%($this->customerSearch)%")
+        $customers = Customer::when($this->customerSearch,
+                fn($q) => $q->where('name', 'like', "%{$this->customerSearch}%")
+                        ->orWhere('phone', 'like', "%{$this->customerSearch}%")
             )
             ->orderBy('name')
             ->limit(10)
@@ -588,6 +588,7 @@ class Index extends Component
             'orderBreakdown'    => $orderBreakdown,
             'payReview'         => $this->payReview,
             'orderPayReview'    => $this->orderPayReview,
+            'customers'         => $customers,
         ]);
     }
 }
