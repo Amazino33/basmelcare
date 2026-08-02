@@ -64,6 +64,7 @@ Route::prefix('desk')->group(function () {
             Route::get('products', App\Livewire\Products\Index::class)->name('products.index');
             Route::get('products/import-template', App\Http\Controllers\ProductImportTemplateController::class)->name('products.import-template');
             Route::get('inventory', App\Livewire\Inventory\Index::class)->name('inventory.index');
+            Route::get('inventory/print', App\Http\Controllers\InventoryPrintController::class)->name('inventory.print');
             Route::get('expiry-alerts', App\Livewire\ExpiryAlerts\Index::class)->name('expiry-alerts.index');
             Route::get('locations', App\Livewire\Locations\Index::class)->name('locations.index');
             Route::get('stock/transfers', App\Livewire\Stock\Transfers::class)->name('stock.transfers');
