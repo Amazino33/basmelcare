@@ -125,5 +125,30 @@
                 </x-form>
             </x-card>
         </x-tab>
+
+        <x-tab name="returns" label="Returns" icon="o-arrow-uturn-left">
+            <x-card title="Return Policy" subtitle="Controls when and how product returns are accepted" class="mt-4">
+                <x-form wire:submit="saveReturnSettings">
+                    <x-input
+                        label="Return Window (hours)"
+                        wire:model="return_window_hours"
+                        type="number"
+                        min="1"
+                        max="168"
+                        hint="How many hours after a sale a return is allowed. Default: 48 hours."
+                        class="max-w-xs"
+                    />
+                    <x-toggle
+                        label="Require Customer on Return"
+                        wire:model="return_require_customer"
+                        hint="Block returns on walk-in sales (no customer attached). Disable to allow walk-in returns without credit."
+                        class="mt-4"
+                    />
+                    <x-slot:actions>
+                        <x-button label="Save Return Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
     </x-tabs>
 </div>

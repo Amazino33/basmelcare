@@ -2,9 +2,14 @@
 
 namespace App\Livewire\Sales;
 
+use App\Models\AppSetting;
 use App\Models\Order;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
+use App\Models\StockMovement;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -20,6 +25,13 @@ class Index extends Component
     public bool $detailsDrawer = false;
     public ?int $viewSaleId = null;
     public ?int $viewOrderId = null;
+
+    // Return
+    public bool $returnModal = false;
+    public ?int $returnSaleId = null;
+    public array $returnQtys = [];
+    public array $returnableQtys = [];
+    public string $returnReason = '';
 
     public function updatingTab(): void
     {
@@ -103,6 +115,115 @@ class Index extends Component
         }
     }
 
+    public function openReturn(int $saleId): void
+    {
+        $sale = Sale::with('saleItems.product', 'saleItems.batch')->findOrFail($saleId);
+
+        $requireCustomer = AppSetting::bool('return_require_customer', true);
+        if ($requireCustomer && !$sale->customer_id) {
+            $this->error('This sale has no customer attached. Attach a customer to the sale before processing a return.');
+            return;
+        }
+
+        $windowHours = (int) AppSetting::get('return_window_hours', 48);
+        if ($sale->created_at->diffInHours(now()) > $windowHours) {
+            $this->error("Returns are only allowed within {$windowHours} hours of the sale.");
+            return;
+        }
+
+        $this->returnQtys      = [];
+        $this->returnableQtys  = [];
+
+        foreach ($sale->saleItems as $item) {
+            $alreadyReturned               = SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+            $returnable                    = $item->quantity - $alreadyReturned;
+            $this->returnableQtys[$item->id] = max(0, $returnable);
+            $this->returnQtys[$item->id]     = 0;
+        }
+
+        $this->returnSaleId = $saleId;
+        $this->returnReason = '';
+        $this->returnModal  = true;
+    }
+
+    public function processReturn(): void
+    {
+        $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
+
+        $requireCustomer = AppSetting::bool('return_require_customer', true);
+        if ($requireCustomer && !$sale->customer_id) {
+            $this->error('No customer attached to this sale.');
+            return;
+        }
+
+        $windowHours = (int) AppSetting::get('return_window_hours', 48);
+        if ($sale->created_at->diffInHours(now()) > $windowHours) {
+            $this->error("Return window of {$windowHours} hours has passed.");
+            return;
+        }
+
+        if (collect($this->returnQtys)->sum() <= 0) {
+            $this->error('Select at least one item to return.');
+            return;
+        }
+
+        $totalCredit = 0;
+
+        DB::transaction(function () use ($sale, &$totalCredit) {
+            $saleReturn = SaleReturn::create([
+                'sale_id'      => $sale->id,
+                'processed_by' => auth()->id(),
+                'reason'       => $this->returnReason ?: null,
+                'total_credit' => 0,
+            ]);
+
+            foreach ($sale->saleItems as $item) {
+                $qty = (int) ($this->returnQtys[$item->id] ?? 0);
+                if ($qty <= 0) continue;
+
+                $maxReturnable = $this->returnableQtys[$item->id] ?? 0;
+                if ($qty > $maxReturnable) {
+                    throw new \Exception("Return qty for {$item->product->name} exceeds returnable amount.");
+                }
+
+                $subtotal     = $qty * $item->unit_price;
+                $totalCredit += $subtotal;
+
+                SaleReturnItem::create([
+                    'sale_return_id'    => $saleReturn->id,
+                    'sale_item_id'      => $item->id,
+                    'product_id'        => $item->product_id,
+                    'batch_id'          => $item->batch_id,
+                    'quantity_returned' => $qty,
+                    'unit_price'        => $item->unit_price,
+                    'subtotal'          => $subtotal,
+                ]);
+
+                if ($item->batch_id) {
+                    $item->batch->increment('quantity', $qty);
+                    StockMovement::create([
+                        'batch_id'  => $item->batch_id,
+                        'quantity'  => $qty,
+                        'type'      => 'return',
+                        'reference' => "Return from Sale #{$sale->id}",
+                        'user_id'   => auth()->id(),
+                    ]);
+                }
+            }
+
+            $saleReturn->update(['total_credit' => $totalCredit]);
+
+            if ($sale->customer_id && $totalCredit > 0) {
+                $sale->customer->increment('credit_balance', $totalCredit);
+            }
+        });
+
+        $this->returnModal  = false;
+        $this->returnSaleId = null;
+        $this->returnQtys   = [];
+        $this->success('Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
+    }
+
     private function periodQuery($query)
     {
         return match ($this->period) {
@@ -174,6 +295,11 @@ class Index extends Component
             ? Sale::with('saleItems.product', 'saleItems.batch', 'user', 'customer')->find($this->viewSaleId)
             : null;
 
+        $returnableSale   = $this->returnSaleId
+            ? Sale::with('saleItems.product', 'saleItems.batch', 'customer')->find($this->returnSaleId)
+            : null;
+        $returnWindowHours = (int) AppSetting::get('return_window_hours', 48);
+
         // --- Pending Handover (paid but not yet handed to customer) ---
         $handoverQuery = Sale::with('user', 'customer')
             ->where('status', 'paid')
@@ -220,6 +346,8 @@ class Index extends Component
             : null;
 
         return view('livewire.sales.index', [
+            'returnableSale'       => $returnableSale,
+            'returnWindowHours'    => $returnWindowHours,
             'elevated'             => $elevated,
             'isCashier'            => $isCashier,
             'posHeaders'           => $posHeaders,

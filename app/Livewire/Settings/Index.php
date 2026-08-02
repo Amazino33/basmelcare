@@ -42,6 +42,10 @@ class Index extends Component
     public bool $notify_expiry = true;
     public int $expiry_alert_days = 90;
 
+    // Returns
+    public int  $return_window_hours    = 48;
+    public bool $return_require_customer = true;
+
     // Incentives / HifastLink
     public string $hifastlink_api_key = '';
     public string $hifastlink_url = '';
@@ -76,9 +80,24 @@ class Index extends Component
         $this->notify_expiry = AppSetting::bool('notify_expiry', true);
         $this->expiry_alert_days = (int) AppSetting::get('expiry_alert_days', 90);
 
+        $this->return_window_hours     = (int) AppSetting::get('return_window_hours', 48);
+        $this->return_require_customer = AppSetting::bool('return_require_customer', true);
+
         $this->hifastlink_api_key = AppSetting::get('hifastlink_api_key', '');
         $this->hifastlink_url = AppSetting::get('hifastlink_url', '');
         $this->voucher_validity_hours = (int) AppSetting::get('voucher_validity_hours', 24);
+    }
+
+    public function saveReturnSettings(): void
+    {
+        $this->validate([
+            'return_window_hours' => 'required|integer|min:1|max:168',
+        ]);
+
+        AppSetting::set('return_window_hours', $this->return_window_hours);
+        AppSetting::set('return_require_customer', $this->return_require_customer ? '1' : '0');
+
+        $this->success('Return settings saved.');
     }
 
     public function savePaystack()

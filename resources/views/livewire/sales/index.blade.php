@@ -114,10 +114,13 @@
                 ]) />
             @endscope
 
-            @scope('actions', $sale)
+            @scope('actions', $sale, $returnWindowHours)
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                     <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-xs btn-ghost" tooltip="Invoice" external />
+                    @if($sale->status === 'completed' && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
+                        <x-button icon="o-arrow-uturn-left" wire:click="openReturn({{ $sale->id }})" class="btn-xs btn-ghost text-warning" tooltip="Return items" />
+                    @endif
                 </div>
             @endscope
         </x-table>
@@ -271,6 +274,74 @@
             @endscope
         </x-table>
     @endif
+
+    <!-- Return Modal -->
+    <x-modal wire:model="returnModal" title="Process Return" class="backdrop-blur">
+        @if($returnableSale)
+            <div class="space-y-3">
+                <div class="text-sm text-base-content/60">
+                    Sale #{{ $returnableSale->id }} &mdash; {{ $returnableSale->created_at->format('M d, Y H:i') }}
+                    @if($returnableSale->customer)
+                        &mdash; {{ $returnableSale->customer->name }}
+                    @endif
+                </div>
+
+                @foreach($returnableSale->saleItems as $item)
+                    @php $maxQty = $returnableQtys[$item->id] ?? 0; @endphp
+                    <div @class(['flex items-center justify-between gap-3 p-3 bg-base-200 rounded-lg', 'opacity-40' => $maxQty == 0])>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-semibold text-sm truncate">{{ $item->product->name }}</div>
+                            <div class="text-xs text-base-content/60">
+                                ₦{{ number_format($item->unit_price, 2) }} &times; {{ $item->quantity }}
+                                @if($maxQty < $item->quantity)
+                                    <span class="text-warning ml-1">({{ $maxQty }} returnable)</span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs text-base-content/60">Qty:</span>
+                            <input
+                                type="number"
+                                wire:model.live="returnQtys.{{ $item->id }}"
+                                min="0"
+                                max="{{ $maxQty }}"
+                                class="input input-bordered input-sm w-16 text-center"
+                                {{ $maxQty == 0 ? 'disabled' : '' }}
+                            />
+                            <span class="text-xs text-base-content/60">/ {{ $maxQty }}</span>
+                        </div>
+                    </div>
+                @endforeach
+
+                <x-textarea wire:model="returnReason" label="Reason (optional)" placeholder="Describe why items are being returned..." rows="2" />
+
+                @php
+                    $liveTotal = 0;
+                    foreach ($returnableSale->saleItems as $item) {
+                        $liveTotal += ((int) ($returnQtys[$item->id] ?? 0)) * $item->unit_price;
+                    }
+                @endphp
+                @if($liveTotal > 0)
+                    <div class="flex justify-between items-center p-3 bg-success/10 rounded-lg border border-success/20">
+                        <span class="text-sm font-semibold text-success">Credit to be issued:</span>
+                        <span class="text-lg font-bold text-success">₦{{ number_format($liveTotal, 2) }}</span>
+                    </div>
+                @endif
+            </div>
+
+            <x-slot:actions>
+                <x-button label="Cancel" wire:click="$set('returnModal', false)" class="btn-ghost" />
+                <x-button
+                    label="Process Return"
+                    wire:click="processReturn"
+                    class="btn-error"
+                    icon="o-arrow-uturn-left"
+                    spinner="processReturn"
+                    :disabled="$liveTotal == 0"
+                />
+            </x-slot:actions>
+        @endif
+    </x-modal>
 
     <!-- Sale / Order Details Drawer -->
     <x-drawer wire:model="detailsDrawer" title="{{ $tab === 'online' ? 'Order ' . $viewOrder?->order_number : 'Sale #' . $viewSale?->id }}" right class="w-96 lg:w-1/3">
