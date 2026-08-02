@@ -32,6 +32,12 @@ class Index extends Component
     public array $returnQtys = [];
     public array $returnableQtys = [];
     public string $returnReason = '';
+    public string $returnError  = '';
+
+    public function updatedReturnQtys(): void
+    {
+        $this->returnError = '';
+    }
 
     public function updatingTab(): void
     {
@@ -148,6 +154,7 @@ class Index extends Component
 
         $this->returnSaleId = $saleId;
         $this->returnReason = '';
+        $this->returnError  = '';
         $this->returnModal  = true;
     }
 
@@ -167,61 +174,75 @@ class Index extends Component
             return;
         }
 
-        if (collect($this->returnQtys)->sum() <= 0) {
-            $this->error('Select at least one item to return.');
+        if (collect($this->returnQtys)->sum(fn($v) => (int) $v) <= 0) {
+            $this->returnError = 'Select at least one item to return.';
             return;
         }
 
-        $totalCredit = 0;
+        $totalCredit = 0.0;
 
-        DB::transaction(function () use ($sale, &$totalCredit) {
-            $saleReturn = SaleReturn::create([
-                'sale_id'      => $sale->id,
-                'processed_by' => auth()->id(),
-                'reason'       => $this->returnReason ?: null,
-                'total_credit' => 0,
-            ]);
-
-            foreach ($sale->saleItems as $item) {
-                $qty = (int) ($this->returnQtys[$item->id] ?? 0);
-                if ($qty <= 0) continue;
-
-                $maxReturnable = $this->returnableQtys[$item->id] ?? 0;
-                if ($qty > $maxReturnable) {
-                    throw new \Exception("Return qty for {$item->product->name} exceeds returnable amount.");
-                }
-
-                $subtotal     = $qty * $item->unit_price;
-                $totalCredit += $subtotal;
-
-                SaleReturnItem::create([
-                    'sale_return_id'    => $saleReturn->id,
-                    'sale_item_id'      => $item->id,
-                    'product_id'        => $item->product_id,
-                    'batch_id'          => $item->batch_id,
-                    'quantity_returned' => $qty,
-                    'unit_price'        => $item->unit_price,
-                    'subtotal'          => $subtotal,
+        try {
+            DB::transaction(function () use ($sale, &$totalCredit) {
+                $saleReturn = SaleReturn::create([
+                    'sale_id'      => $sale->id,
+                    'processed_by' => auth()->id(),
+                    'reason'       => $this->returnReason ?: null,
+                    'total_credit' => 0,
                 ]);
 
-                if ($item->batch_id) {
-                    $item->batch->increment('quantity', $qty);
-                    StockMovement::create([
-                        'batch_id'  => $item->batch_id,
-                        'quantity'  => $qty,
-                        'type'      => 'return',
-                        'reference' => "Return from Sale #{$sale->id}",
-                        'user_id'   => auth()->id(),
+                foreach ($sale->saleItems as $item) {
+                    $qty = (int) ($this->returnQtys[$item->id] ?? 0);
+                    if ($qty <= 0) continue;
+
+                    $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+                    $maxReturnable   = $item->quantity - $alreadyReturned;
+
+                    if ($qty > $maxReturnable) {
+                        throw new \RuntimeException(
+                            $maxReturnable > 0
+                                ? "Only {$maxReturnable} unit(s) of \"{$item->product->name}\" can still be returned."
+                                : "\"{$item->product->name}\" has already been fully returned."
+                        );
+                    }
+
+                    $subtotal     = $qty * (float) $item->unit_price;
+                    $totalCredit += $subtotal;
+
+                    SaleReturnItem::create([
+                        'sale_return_id'    => $saleReturn->id,
+                        'sale_item_id'      => $item->id,
+                        'product_id'        => $item->product_id,
+                        'batch_id'          => $item->batch_id,
+                        'quantity_returned' => $qty,
+                        'unit_price'        => $item->unit_price,
+                        'subtotal'          => $subtotal,
                     ]);
+
+                    if ($item->batch_id) {
+                        $item->batch->increment('quantity', $qty);
+                        StockMovement::create([
+                            'batch_id'  => $item->batch_id,
+                            'quantity'  => $qty,
+                            'type'      => 'return',
+                            'reference' => "Return from Sale #{$sale->id}",
+                            'user_id'   => auth()->id(),
+                        ]);
+                    }
                 }
-            }
 
-            $saleReturn->update(['total_credit' => $totalCredit]);
+                $saleReturn->update(['total_credit' => $totalCredit]);
 
-            if ($sale->customer_id && $totalCredit > 0) {
-                $sale->customer->increment('credit_balance', $totalCredit);
-            }
-        });
+                if ($sale->customer_id && $totalCredit > 0) {
+                    $sale->customer->increment('credit_balance', $totalCredit);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            $this->returnError = $e->getMessage();
+            return;
+        } catch (\Throwable $e) {
+            $this->returnError = 'Return could not be processed. Please try again or contact support.';
+            return;
+        }
 
         $this->returnModal  = false;
         $this->returnSaleId = null;

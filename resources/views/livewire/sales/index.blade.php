@@ -279,6 +279,13 @@
     <x-modal wire:model="returnModal" title="Process Return" class="backdrop-blur">
         @if($returnableSale)
             <div class="space-y-3">
+                @if($returnError)
+                    <div role="alert" class="alert alert-error">
+                        <x-icon name="o-exclamation-circle" class="w-5 h-5 shrink-0" />
+                        <span>{{ $returnError }}</span>
+                    </div>
+                @endif
+
                 <div class="text-sm text-base-content/60">
                     Sale #{{ $returnableSale->id }} &mdash; {{ $returnableSale->created_at->format('M d, Y H:i') }}
                     @if($returnableSale->customer)
@@ -316,9 +323,9 @@
                 <x-textarea wire:model="returnReason" label="Reason (optional)" placeholder="Describe why items are being returned..." rows="2" />
 
                 @php
-                    $liveTotal = 0;
+                    $liveTotal = 0.0;
                     foreach ($returnableSale->saleItems as $item) {
-                        $liveTotal += ((int) ($returnQtys[$item->id] ?? 0)) * $item->unit_price;
+                        $liveTotal += ((int) ($returnQtys[$item->id] ?? 0)) * (float) $item->unit_price;
                     }
                 @endphp
                 @if($liveTotal > 0)
