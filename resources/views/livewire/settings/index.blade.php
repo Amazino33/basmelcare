@@ -41,6 +41,22 @@
                 </x-form>
             </x-card>
 
+            <x-card title="SMS Fallback (KudiSMS)" class="mt-4">
+                <p class="text-sm text-base-content/60 mb-4">
+                    When WhatsApp is unavailable or fails, messages are automatically sent via SMS instead.
+                </p>
+                <x-form wire:submit="saveKudiSms">
+                    <x-toggle label="Enable SMS Fallback" wire:model="kudisms_enabled" hint="Send via KudiSMS when WhatsApp fails" />
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <x-input label="KudiSMS API Token" wire:model="kudisms_token" type="password" placeholder="k4u3Ww..." />
+                        <x-input label="Sender ID" wire:model="kudisms_sender_id" placeholder="BasmelCare" hint="Max 11 characters" />
+                    </div>
+                    <x-slot:actions>
+                        <x-button label="Save SMS Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+
             <x-card title="Send Test Message" class="mt-4">
                 <x-form wire:submit="sendTest">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -48,7 +64,8 @@
                         <x-input label="Message" wire:model="test_message" />
                     </div>
                     <x-slot:actions>
-                        <x-button label="Send Test" type="submit" class="btn-secondary" icon="o-paper-airplane" />
+                        <x-button label="Test WhatsApp" type="submit" class="btn-secondary" icon="o-paper-airplane" />
+                        <x-button label="Test SMS" wire:click="sendSmsTest" class="btn-outline" icon="o-device-phone-mobile" />
                     </x-slot:actions>
                 </x-form>
             </x-card>

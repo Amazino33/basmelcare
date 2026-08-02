@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\AppSetting;
+use App\Services\KudiSmsService;
 use App\Services\WhatsAppService;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -25,6 +26,11 @@ class Index extends Component
     public string $wawp_instance_id = '';
     public string $wawp_access_token = '';
     public bool $wawp_enabled = false;
+
+    // KudiSMS
+    public bool   $kudisms_enabled   = false;
+    public string $kudisms_token     = '';
+    public string $kudisms_sender_id = '';
 
     // Paystack
     public string $paystack_public_key = '';
@@ -56,6 +62,10 @@ class Index extends Component
         $this->wawp_instance_id = AppSetting::get('wawp_instance_id', '');
         $this->wawp_access_token = AppSetting::get('wawp_access_token', '');
         $this->wawp_enabled = AppSetting::bool('wawp_enabled', false);
+
+        $this->kudisms_enabled   = AppSetting::bool('kudisms_enabled', false);
+        $this->kudisms_token     = AppSetting::get('kudisms_token', '');
+        $this->kudisms_sender_id = AppSetting::get('kudisms_sender_id', 'BasmelCare');
 
         $this->paystack_public_key = AppSetting::get('paystack_public_key', '');
         $this->paystack_secret_key = AppSetting::get('paystack_secret_key', '');
@@ -100,7 +110,7 @@ class Index extends Component
     public function saveWhatsApp()
     {
         $this->validate([
-            'wawp_instance_id' => 'nullable|string|max:255',
+            'wawp_instance_id'  => 'nullable|string|max:255',
             'wawp_access_token' => 'nullable|string|max:255',
         ]);
 
@@ -109,6 +119,34 @@ class Index extends Component
         AppSetting::set('wawp_enabled', $this->wawp_enabled ? '1' : '0');
 
         $this->success('WhatsApp settings saved.');
+    }
+
+    public function saveKudiSms(): void
+    {
+        $this->validate([
+            'kudisms_token'     => 'nullable|string|max:255',
+            'kudisms_sender_id' => 'nullable|string|max:50',
+        ]);
+
+        AppSetting::set('kudisms_enabled', $this->kudisms_enabled ? '1' : '0');
+        AppSetting::set('kudisms_token', $this->kudisms_token);
+        AppSetting::set('kudisms_sender_id', $this->kudisms_sender_id ?: 'BasmelCare');
+
+        $this->success('KudiSMS settings saved.');
+    }
+
+    public function sendSmsTest(): void
+    {
+        $this->validate([
+            'test_phone'   => 'required|string|max:20',
+            'test_message' => 'required|string|max:500',
+        ]);
+
+        $result = app(KudiSmsService::class)->send($this->test_phone, $this->test_message);
+
+        $result
+            ? $this->success('SMS sent via KudiSMS!')
+            : $this->error('SMS failed. Check KudiSMS credentials and logs.');
     }
 
     public function saveNotifications()
@@ -152,8 +190,7 @@ class Index extends Component
             'test_message' => 'required|string|max:500',
         ]);
 
-        $service = new WhatsAppService();
-        $result = $service->send($this->test_phone, $this->test_message);
+        $result = app(WhatsAppService::class)->send($this->test_phone, $this->test_message);
 
         if ($result) {
             $this->success('Test message sent!');

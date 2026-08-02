@@ -8,11 +8,22 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppService
 {
+    public function __construct(protected KudiSmsService $sms) {}
+
     public function send(string $phone, string $message): bool
     {
-        $enabled = AppSetting::bool('wawp_enabled', false);
+        if ($this->sendWhatsApp($phone, $message)) {
+            return true;
+        }
+
+        return $this->sms->send($phone, $message);
+    }
+
+    private function sendWhatsApp(string $phone, string $message): bool
+    {
+        $enabled    = AppSetting::bool('wawp_enabled', false);
         $instanceId = AppSetting::get('wawp_instance_id', '');
-        $token = AppSetting::get('wawp_access_token', '');
+        $token      = AppSetting::get('wawp_access_token', '');
 
         if (!$enabled || empty($instanceId) || empty($token)) {
             Log::info("[WhatsApp] Not configured. Would send to {$phone}: {$message}");
@@ -27,10 +38,10 @@ class WhatsAppService
 
         try {
             $response = Http::get('https://api.wawp.net/v2/send/text', [
-                'instance_id' => $instanceId,
+                'instance_id'  => $instanceId,
                 'access_token' => $token,
-                'chatId' => $number . '@c.us',
-                'message' => $message,
+                'chatId'       => $number . '@c.us',
+                'message'      => $message,
             ]);
 
             if ($response->successful()) {
