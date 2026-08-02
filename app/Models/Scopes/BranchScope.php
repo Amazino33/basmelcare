@@ -2,6 +2,7 @@
 
 namespace App\Models\Scopes;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -12,7 +13,7 @@ class BranchScope implements Scope
     {
         $user = auth()->user();
 
-        if (!$user) return;
+        if (!($user instanceof User)) return;
 
         // Admin sees everything
         if ($user->hasRole('admin')) return;
