@@ -61,6 +61,15 @@ class Index extends Component
         $this->payModal = true;
     }
 
+    public function detachCustomer(): void
+    {
+        $sale = Sale::findOrFail($this->payingSaleId);
+        $sale->update(['customer_id' => null]);
+        $this->apply_credit = false;
+        $this->customerSearch = '';
+        $this->success('Customer removed from this sale.');
+    }
+
     public function attachCustomer(int $customerId): void
     {
         $sale = Sale::findOrFail($this->payingSaleId);

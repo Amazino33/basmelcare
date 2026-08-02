@@ -450,6 +450,10 @@
                             <p class="text-xs text-success font-semibold">Customer Attached</p>
                             <p class="text-sm font-bold truncate">{{ $payingSale->customer->name }}</p>
                         </div>
+                        <button type="button" wire:click="detachCustomer"
+                            class="btn btn-ghost btn-xs text-error shrink-0">
+                            Change
+                        </button>
                     </div>
                 @endif
                 </div>
