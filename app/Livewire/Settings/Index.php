@@ -31,6 +31,7 @@ class Index extends Component
     public bool   $kudisms_enabled   = false;
     public string $kudisms_token     = '';
     public string $kudisms_sender_id = '';
+    public int    $kudisms_gateway   = 2;
 
     // Paystack
     public string $paystack_public_key = '';
@@ -66,6 +67,7 @@ class Index extends Component
         $this->kudisms_enabled   = AppSetting::bool('kudisms_enabled', false);
         $this->kudisms_token     = AppSetting::get('kudisms_token', '');
         $this->kudisms_sender_id = AppSetting::get('kudisms_sender_id', 'BasmelCare');
+        $this->kudisms_gateway   = (int) AppSetting::get('kudisms_gateway', 2);
 
         $this->paystack_public_key = AppSetting::get('paystack_public_key', '');
         $this->paystack_secret_key = AppSetting::get('paystack_secret_key', '');
@@ -131,6 +133,7 @@ class Index extends Component
         AppSetting::set('kudisms_enabled', $this->kudisms_enabled ? '1' : '0');
         AppSetting::set('kudisms_token', $this->kudisms_token);
         AppSetting::set('kudisms_sender_id', $this->kudisms_sender_id ?: 'BasmelCare');
+        AppSetting::set('kudisms_gateway', $this->kudisms_gateway);
 
         $this->success('KudiSMS settings saved.');
     }

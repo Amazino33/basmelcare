@@ -49,7 +49,8 @@
                     <x-toggle label="Enable SMS Fallback" wire:model="kudisms_enabled" hint="Send via KudiSMS when WhatsApp fails" />
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <x-input label="KudiSMS API Token" wire:model="kudisms_token" type="password" placeholder="k4u3Ww..." />
-                        <x-input label="Sender ID" wire:model="kudisms_sender_id" placeholder="BasmelCare" hint="Max 11 characters" />
+                        <x-input label="Sender ID" wire:model="kudisms_sender_id" placeholder="BasmelCare" hint="Must be approved in your KudiSMS dashboard" />
+                        <x-input label="Gateway" wire:model="kudisms_gateway" type="number" hint="Check your KudiSMS dashboard for the correct gateway number" class="max-w-xs" />
                     </div>
                     <x-slot:actions>
                         <x-button label="Save SMS Settings" type="submit" class="btn-primary" />
