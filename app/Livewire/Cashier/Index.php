@@ -64,7 +64,7 @@ class Index extends Component
     public function attachCustomer(int $customerId): void
     {
         $sale = Sale::findOrFail($this->payingSaleId);
-        $sale->update(['custoer_id' => $customerId]);
+        $sale->update(['customer_id' => $customerId]);
 
         $customer = Customer::findOrFail($customerId);
         $this->apply_credit = $customer->credit_balance > 0;
@@ -82,7 +82,7 @@ class Index extends Component
 
     public function createAndAttachCustomer(): void
     {
-        $this->valide([
+        $this->validate([
             'newCustomerName'   => 'required|string|max:255',
             'newCustomerPhone'  => 'required|string|max:20',
             'newCustomerEmail'  => 'nullable|email|max:255',
