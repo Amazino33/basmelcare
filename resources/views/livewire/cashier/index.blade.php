@@ -394,8 +394,46 @@
                     </div>
                 @endif
 
-                {{-- Walk-in WhatsApp --}}
+                {{-- Attach / show customer --}}
                 @if(!$payingSale->customer_id)
+                    <div class="border border-base-300 rounded-lg p-3 mt-3">
+                        <p class="text-xs font-semibold mb-2 text-base-content/60">Attach Customer (optional)</p>
+                        <x-input 
+                            wire:model.live="customerSearch"
+                            placeholder="Search name or phone..."
+                            icon="o-magnifying-glass"
+                        />
+                        @if($customerSearch)
+                            @if(count($customers) > 0)
+                                <ul class="border border-base-300 rounded mt-1 divide-y divide-base-300 max-h-36 overflow-y-auto">
+                                    @foreach ($customers as $c)
+                                        <li>
+                                            <button type="button"
+                                                wire:click="attachCustomer({{ $c->id }})"
+                                                class="w-full text-left px-3 py-2 hover:bg-base-200 flex justify-between items-center text-sm">
+                                                <span class="font-medium">{{ $c->name }}</span>
+                                                <span class="text-xs text-base-content/50">{{ $c->phone }}</span>
+                                            </button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <div class="mt-2 text-xs text-base-content/60 flex items-center justify-between">
+                                    <span>No customer found.</span>
+                                    <button type="button" wire:click="openCreateCustomer" class="text-primary font-semibold">
+                                        + Create "{{ $customerSearch }}"
+                                    </button>
+                                </div>
+                            @endif
+                        @endif
+                        <x-button
+                            label="New Customer"
+                            wire:click="openCreateCustomer"
+                            class="btn-ghost btn-xs mt-2"
+                            icon="o-user-plus"
+                        />
+                    </div>
+
                     <x-input
                         wire:model="walkin_phone"
                         label="WhatsApp for receipt (optional)"
@@ -404,6 +442,14 @@
                         hint="Leave blank to skip"
                         class="mt-2"
                     />
+                @else
+                    <div class="flex items-center gap-3 border border-success/30 bg-success/5 rounded-lg px-3 py-2 mt-3">
+                        <x-icon name="o-user-circle" class="w-5 h-5 text-success shrink-0" />
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-success font-semibold">Customer Attached</p>
+                            <p class="text-sm font-bold truncate">{{ $payingSale->customer->name }}</p>
+                        </div>
+                    </div>
                 @endif
 
                 <x-slot:actions>
@@ -494,6 +540,34 @@
                 </div>
             @endif
         @endif
+    </x-modal>
+
+    <!-- Create Customer Modal (cashier quick-add) -->
+    <x-modal wire:model="createCustomerModal" title="New Customer" box-class="max-w-sm">
+        <x-form wire:submit="createAndAttachCustomer">
+            <x-input
+                wire:model="newCustomerName"
+                label="Full Name"
+                placeholder="Customer name"
+                required
+            />
+            <x-input
+                wire:model="newCustomerPhone"
+                label="Phone Number"
+                placeholder="08012345678"
+                required
+            />
+            <x-input
+                wire:model="newCustomerEmail"
+                label="Email (optional)"
+                placeholder="customer@email.com"
+                type="email"
+            />
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.createCustomerModal = false" />
+                <x-button label="Save & Attach" type="submit" class="btn-primary" icon="o-user-plus" />
+            </x-slot:actions>
+        </x-form>
     </x-modal>
 
     <!-- Online Order Payment Modal -->

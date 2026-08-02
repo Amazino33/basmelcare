@@ -10,6 +10,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Mary\Traits\Toast;
+use App\Models\Customer;
 
 class Index extends Component
 {
@@ -31,6 +32,13 @@ class Index extends Component
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
 
+    // Attach customer to walk-in sale
+    public bool $createCustomerModal    = false;
+    public string $newCustomerName     = '';
+    public string $newCustomerPhone     = '';
+    public string $newCustomerEmail     = '';
+    public string $customerSearch       = '';
+
     // Online order payment
     public ?int $payingOrderId = null;
     public bool $orderPayModal = false;
@@ -51,6 +59,43 @@ class Index extends Component
         $this->apply_credit = $sale?->customer_id && ($sale->customer->credit_balance ?? 0) > 0;
 
         $this->payModal = true;
+    }
+
+    public function attachCustomer(int $customerId): void
+    {
+        $sale = Sale::findOrFail($this->payingSaleId);
+        $sale->update(['custoer_id' => $customerId]);
+
+        $customer = Customer::findOrFail($customerId);
+        $this->apply_credit = $customer->credit_balance > 0;
+        $this->customerSearch = '';
+        $this->success($customer->name . ' attached to this sale.');
+    }
+
+    public function openCreateCustomer(): void
+    {
+        $this->newCustomerName      = $this->customerSearch;
+        $this->newCustomerPhone     = '';
+        $this->newCustomerEmail     = '';
+        $this->createCustomerModal  = true;
+    }
+
+    public function createAndAttachCustomer(): void
+    {
+        $this->valide([
+            'newCustomerName'   => 'required|string|max:255',
+            'newCustomerPhone'  => 'required|string|max:20',
+            'newCustomerEmail'  => 'nullable|email|max:255',
+        ]);
+
+        $customer = Customer::create([
+            'name'  => $this->newCustomerName,
+            'phone' => $this->newCustomerPhone,
+            'email' => $this->newCustomerEmail ?: null,
+        ]);
+
+        $this->createCustomerModal = false;
+        $this->attachCustomer($customer->id);
     }
 
     public function processPayment()
@@ -521,6 +566,14 @@ class Index extends Component
             $this->success('New invoice received!');
         }
         $this->lastPendingCount = $currentCount;
+
+        $customer = Customer::when($this->customerSearch,
+                fn($q) => $q->where('name', 'like', "%($this->customerSearch)%")
+                        ->orWhere('phone', 'like', "%($this->customerSearch)%")
+            )
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'phone']);
 
         return view('livewire.cashier.index', [
             'pendingInvoices'   => $pendingInvoices,
