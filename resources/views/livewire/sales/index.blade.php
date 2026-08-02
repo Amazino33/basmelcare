@@ -118,7 +118,7 @@
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                     <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-xs btn-ghost" tooltip="Invoice" external />
-                    @if($sale->status === 'completed' && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
+                    @if(in_array($sale->status, ['completed', 'paid']) && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
                         <x-button icon="o-arrow-uturn-left" wire:click="openReturn({{ $sale->id }})" class="btn-xs btn-ghost text-warning" tooltip="Return items" />
                     @endif
                 </div>

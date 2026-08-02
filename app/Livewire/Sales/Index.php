@@ -125,6 +125,11 @@ class Index extends Component
             return;
         }
 
+        if (!in_array($sale->status, ['completed', 'paid'])) {
+            $this->error('Returns can only be processed on paid or completed sales.');
+            return;
+        }
+
         $windowHours = (int) AppSetting::get('return_window_hours', 48);
         if ($sale->created_at->diffInHours(now()) > $windowHours) {
             $this->error("Returns are only allowed within {$windowHours} hours of the sale.");
