@@ -395,10 +395,11 @@
                 @endif
 
                 {{-- Attach / show customer --}}
+                <div wire:key="customer-attach-{{ $payingSale->customer_id ?? 'none' }}">
                 @if(!$payingSale->customer_id)
                     <div class="border border-base-300 rounded-lg p-3 mt-3">
                         <p class="text-xs font-semibold mb-2 text-base-content/60">Attach Customer (optional)</p>
-                        <x-input 
+                        <x-input
                             wire:model.live="customerSearch"
                             placeholder="Search name or phone..."
                             icon="o-magnifying-glass"
@@ -451,6 +452,7 @@
                         </div>
                     </div>
                 @endif
+                </div>
 
                 <x-slot:actions>
                     <x-button label="Cancel" @click="$wire.payModal = false" />
