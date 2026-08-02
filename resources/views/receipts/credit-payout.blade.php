@@ -79,5 +79,6 @@
 @if($copy === 1)<div class="cut-line">- - - - - - - - - - - - - - -</div>@endif
 @endfor
 
+    <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); };</script>
 </body>
 </html>

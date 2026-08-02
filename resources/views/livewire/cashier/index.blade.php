@@ -38,7 +38,8 @@
                     </div>
                     <div class="text-right ml-3 shrink-0 space-y-1">
                         <div class="font-bold text-sm">₦{{ number_format($invoice->total_amount, 2) }}</div>
-                        <a href="{{ route('receipt.show', $invoice->id) }}" target="_blank"
+                        <a href="{{ route('receipt.show', $invoice->id) }}"
+                            onclick="window.open(this.href); return false;"
                             class="btn btn-xs btn-outline btn-primary">
                             <x-icon name="o-printer" class="w-3 h-3" /> Receipt
                         </a>
@@ -240,7 +241,8 @@
                 <p class="text-sm text-base-content/60 mb-4">Print 2 copies — customer returns one to the sales person as proof of payment.</p>
 
                 <div class="flex gap-2 justify-center">
-                    <a href="{{ route('receipt.show', $lastPaidSaleId) }}" target="_blank"
+                    <a href="{{ route('receipt.show', $lastPaidSaleId) }}"
+                        onclick="window.open(this.href); return false;"
                         class="btn btn-primary gap-2">
                         <x-icon name="o-printer" class="w-4 h-4" />
                         Print Receipt (2 copies)
@@ -587,7 +589,8 @@
                 <p class="text-sm text-base-content/60 mb-4">Order is now completed. Print receipt and hand goods to customer.</p>
                 <div class="flex gap-2 justify-center">
                     @if($lastPaidOrderId)
-                        <a href="{{ route('order.receipt', $lastPaidOrderId) }}" target="_blank"
+                        <a href="{{ route('order.receipt', $lastPaidOrderId) }}"
+                           onclick="window.open(this.href); return false;"
                            class="btn btn-primary gap-2">
                             <x-icon name="o-printer" class="w-4 h-4" /> Print Receipt
                         </a>
