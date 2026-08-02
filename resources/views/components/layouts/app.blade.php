@@ -102,6 +102,7 @@
                 @if(in_array('admin', $roles))
                     <x-menu-item title="Branches" icon="o-building-storefront" link="{{ route('branches.index') }}" />
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />
+                    <x-menu-item title="Logs" icon="o-document-text" link="{{ route('logs.index') }}" />
                 @endif
 
                 <x-menu-separator />

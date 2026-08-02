@@ -87,6 +87,7 @@ Route::prefix('desk')->group(function () {
             Route::get('staff', App\Livewire\Staff\Index::class)->name('staff.index');
             Route::get('branches', App\Livewire\Branches\Index::class)->name('branches.index');
             Route::get('settings', App\Livewire\Settings\Index::class)->name('settings.index');
+            Route::get('logs', App\Livewire\Logs\Index::class)->name('logs.index');
         });
     });
 });

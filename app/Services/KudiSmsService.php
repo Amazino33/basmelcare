@@ -14,8 +14,13 @@ class KudiSmsService
         $token    = AppSetting::get('kudisms_token', '');
         $senderId = AppSetting::get('kudisms_sender_id', 'BasmelCare');
 
-        if (!$enabled || empty($token)) {
-            Log::info("[KudiSMS] Not configured. Would send to {$phone}");
+        if (!$enabled) {
+            Log::info("[KudiSMS] Disabled (kudisms_enabled is off). Would send to {$phone}");
+            return false;
+        }
+
+        if (empty($token)) {
+            Log::info("[KudiSMS] No token set (kudisms_token is empty). Would send to {$phone}");
             return false;
         }
 
@@ -27,22 +32,18 @@ class KudiSmsService
         }
 
         try {
-            $response = Http::post('https://my.kudisms.net/api/personalisedsms', [
-                'token'      => $token,
-                'senderID'   => $senderId,
-                'message'    => $message,
-                'csvHeaders' => ['phone_number'],
-                'recipients' => [['phone_number' => $number]],
+            $response = Http::asJson()->post('https://my.kudisms.net/api/autocomposesms', [
+                'token'   => $token,
+                'gateway' => 2,
+                'data'    => [[$senderId, $number, $message]],
             ]);
 
-            $body = $response->json();
-
-            if ($response->successful() && ($body['error_code'] ?? '') === '000') {
+            if ($response->successful()) {
                 Log::info("[KudiSMS] Sent to {$phone}");
                 return true;
             }
 
-            Log::warning("[KudiSMS] Failed for {$phone}: " . json_encode($body));
+            Log::warning("[KudiSMS] Failed for {$phone}: HTTP {$response->status()} — " . $response->body());
             return false;
         } catch (\Throwable $e) {
             Log::error("[KudiSMS] Exception for {$phone}: " . $e->getMessage());
