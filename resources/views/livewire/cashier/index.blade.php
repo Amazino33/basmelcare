@@ -352,7 +352,7 @@
                                             @if($alloc['remaining'] > 0.01)
                                                 <span class="text-error font-semibold">Still owes: ₦{{ number_format($alloc['remaining'], 2) }}</span>
                                             @else
-                                                <span class="text-success font-semibold">Fully cleared ✓</span>
+                                                <span class="text-success font-semibold">Fully cleared</span>
                                             @endif
                                         </div>
                                     </div>
@@ -386,11 +386,11 @@
                             </div>
                         @endif
 
-                        @if($breakdown['shortfall'] < 0.01 && $breakdown['excess'] >= -0.01)
+                        {{-- @if($breakdown['shortfall'] < 0.01 && $breakdown['excess'] >= -0.01)
                             <div class="text-center text-xs text-success font-semibold border-t border-base-300 pt-1.5 mt-1">
                                 ✓ Invoice fully covered
                             </div>
-                        @endif
+                        @endif --}}
                     </div>
                 @endif
 
@@ -484,7 +484,7 @@
 
                     <div class="alert alert-warning py-2 mt-3 text-xs">
                         <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
-                        Confirm only once the goods have been collected from the sales person.
+                        Confirm payment information.
                     </div>
 
                     <div class="flex gap-2 mt-3">
