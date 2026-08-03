@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 // Public pages
-Route::get('/', fn() => view('public.home'))->name('home');
+Route::get('/', fn() => redirect()->route('dashboard'))->name('home');
 Route::get('/shop', App\Livewire\Shop\Index::class)->name('shop.index');
 Route::get('/shop/{product}', App\Livewire\Shop\Show::class)->name('shop.show');
 Route::get('/cart', App\Livewire\Shop\Cart::class)->name('cart');

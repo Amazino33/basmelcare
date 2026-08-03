@@ -89,14 +89,30 @@
         </div>
     @endif
 
-    {{-- Search --}}
-    <x-input
-        icon="o-magnifying-glass"
-        placeholder="Search products..."
-        wire:model.live.debounce="search"
-        clearable
-        class="mb-4"
-    />
+    {{-- Filters + Search --}}
+    <div class="flex flex-col sm:flex-row gap-2 mb-4">
+        <div class="flex gap-1">
+            <button wire:click="$set('filter','all')"
+                @class(['btn btn-sm', 'btn-primary' => $filter === 'all', 'btn-ghost' => $filter !== 'all'])>
+                All <span class="badge badge-xs ml-1">{{ $totalProducts }}</span>
+            </button>
+            <button wire:click="$set('filter','pending')"
+                @class(['btn btn-sm', 'btn-warning' => $filter === 'pending', 'btn-ghost' => $filter !== 'pending'])>
+                Not Counted <span class="badge badge-xs ml-1">{{ $totalProducts - $countedProducts }}</span>
+            </button>
+            <button wire:click="$set('filter','discrepancy')"
+                @class(['btn btn-sm', 'btn-error' => $filter === 'discrepancy', 'btn-ghost' => $filter !== 'discrepancy'])>
+                Discrepancies <span class="badge badge-xs ml-1">{{ $discrepancies }}</span>
+            </button>
+        </div>
+        <x-input
+            icon="o-magnifying-glass"
+            placeholder="Search products..."
+            wire:model.live.debounce="search"
+            clearable
+            class="flex-1"
+        />
+    </div>
 
     {{-- Products table --}}
     <div class="overflow-x-auto rounded-lg border border-base-300">

@@ -18,6 +18,7 @@ class Show extends Component
     public StockTake $stockTake;
     public array $physicalQtys = [];
     public string $search = '';
+    public string $filter = 'all'; // all | pending | discrepancy
     public string $approvalNotes = '';
     public bool $rejectModal = false;
 
@@ -29,6 +30,16 @@ class Show extends Component
             ->pluck('physical_qty', 'product_id')
             ->map(fn($v) => $v !== null ? (string) $v : '')
             ->toArray();
+    }
+
+    public function updatedFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
     }
 
     public function updatedPhysicalQtys(string $productId): void
@@ -169,7 +180,10 @@ class Show extends Component
             ->when($this->search, fn($q) => $q->whereHas('product',
                 fn($p) => $p->where('name', 'like', "%{$this->search}%")
             ))
+            ->when($this->filter === 'pending',      fn($q) => $q->whereNull('physical_qty'))
+            ->when($this->filter === 'discrepancy',  fn($q) => $q->whereNotNull('physical_qty')->whereColumn('physical_qty', '!=', 'system_qty'))
             ->join('products', 'products.id', '=', 'stock_take_items.product_id')
+            ->orderByRaw($this->filter === 'pending' ? '1=1' : 'products.name')
             ->orderBy('products.name')
             ->select('stock_take_items.*')
             ->paginate(50);
