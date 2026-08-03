@@ -31,6 +31,8 @@ Route::prefix('desk')->group(function () {
         // Everyone can access
         Route::get('/', App\Livewire\Dashboard::class)->name('dashboard');
         Route::view('profile', 'profile')->name('profile');
+        Route::get('stock/take', App\Livewire\StockTake\Index::class)->name('stock-take.index');
+        Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');
 
         // POS & Online Orders — sales person (admin, pharmacist, branch_manager, sales)
         Route::middleware('role:admin,pharmacist,branch_manager,sales')->group(function () {
