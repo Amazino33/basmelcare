@@ -42,11 +42,9 @@ class Show extends Component
         $this->resetPage();
     }
 
-    public function updatedPhysicalQtys(string $productId): void
+    public function updatedPhysicalQtys(string $value, string $productId): void
     {
         if ($this->stockTake->status !== 'in_progress') return;
-
-        $value = $this->physicalQtys[$productId] ?? '';
 
         StockTakeItem::where('stock_take_id', $this->stockTake->id)
             ->where('product_id', (int) $productId)
