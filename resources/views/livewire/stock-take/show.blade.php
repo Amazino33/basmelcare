@@ -151,7 +151,7 @@
                             @if($stockTake->status === 'in_progress')
                                 <input
                                     type="number"
-                                    wire:model.blur="physicalQtys.{{ $item->product_id }}"
+                                    wire:model.live.debounce.600ms="physicalQtys.{{ $item->product_id }}"
                                     min="0"
                                     class="input input-bordered input-sm w-20 text-center font-mono"
                                     placeholder="—"
