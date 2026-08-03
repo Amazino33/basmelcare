@@ -54,6 +54,7 @@ Route::prefix('desk')->group(function () {
             Route::get('sales', App\Livewire\Sales\Index::class)->name('sales.index');
             Route::get('invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
             Route::get('receipt/{sale}', [App\Http\Controllers\InvoiceController::class, 'receipt'])->name('receipt.show');
+            Route::get('return/{saleReturn}/receipt', [App\Http\Controllers\InvoiceController::class, 'returnReceipt'])->name('return.receipt');
             Route::get('order-invoice/{order}', [App\Http\Controllers\InvoiceController::class, 'orderInvoice'])->name('order.invoice');
             Route::get('order-receipt/{order}', [App\Http\Controllers\InvoiceController::class, 'orderReceipt'])->name('order.receipt');
             Route::get('customers', App\Livewire\Customers\Index::class)->name('customers.index');

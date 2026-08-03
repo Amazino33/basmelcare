@@ -9,7 +9,9 @@ use App\Models\SaleItem;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
 use App\Models\StockMovement;
+use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -179,10 +181,11 @@ class Index extends Component
             return;
         }
 
-        $totalCredit = 0.0;
+        $totalCredit  = 0.0;
+        $saleReturnId = null;
 
         try {
-            DB::transaction(function () use ($sale, &$totalCredit) {
+            DB::transaction(function () use ($sale, &$totalCredit, &$saleReturnId) {
                 $saleReturn = SaleReturn::create([
                     'sale_id'      => $sale->id,
                     'processed_by' => auth()->id(),
@@ -235,11 +238,13 @@ class Index extends Component
                 if ($sale->customer_id && $totalCredit > 0) {
                     $sale->customer->increment('credit_balance', $totalCredit);
                 }
+
+                $saleReturnId = $saleReturn->getKey();
             });
         } catch (\RuntimeException $e) {
             $this->returnError = $e->getMessage();
             return;
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             $this->returnError = 'Return could not be processed. Please try again or contact support.';
             return;
         }
@@ -248,6 +253,23 @@ class Index extends Component
         $this->returnSaleId = null;
         $this->returnQtys   = [];
         $this->success('Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
+
+        $this->dispatch('open-return-receipt', url: route('return.receipt', $saleReturnId));
+
+        $phone = $sale->customer?->phone;
+        if ($phone && $totalCredit > 0) {
+            try {
+                $pharmacyName  = AppSetting::get('pharmacy_name', 'BasmelCare');
+                $newBalance    = $sale->customer->fresh()->credit_balance;
+                $message = "Hi {$sale->customer->name}, a return of \u{20A6}" . number_format($totalCredit, 2)
+                    . " has been credited to your {$pharmacyName} account."
+                    . " Your new credit balance is \u{20A6}" . number_format($newBalance, 2)
+                    . ". Ref: RT-" . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT) . ".";
+                app(WhatsAppService::class)->send($phone, $message);
+            } catch (\Throwable $e) {
+                Log::error('[WhatsApp Return] ' . $e->getMessage());
+            }
+        }
     }
 
     private function periodQuery($query)

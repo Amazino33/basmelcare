@@ -7,6 +7,7 @@ use App\Models\CreditPayout;
 use App\Models\DebtPayment;
 use App\Models\Order;
 use App\Models\Sale;
+use App\Models\SaleReturn;
 
 class InvoiceController extends Controller
 {
@@ -44,6 +45,16 @@ class InvoiceController extends Controller
         return view('receipts.credit-payout', array_merge(
             $this->pharmacySettings(),
             ['payout' => $creditPayout]
+        ));
+    }
+
+    public function returnReceipt(SaleReturn $saleReturn)
+    {
+        $saleReturn->load('items.product', 'sale.customer', 'processor');
+
+        return view('receipts.return-slip', array_merge(
+            $this->pharmacySettings(),
+            ['saleReturn' => $saleReturn]
         ));
     }
 
