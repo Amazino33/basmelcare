@@ -137,7 +137,7 @@
                         $counted = $phys !== '';
                         $diff    = $counted ? ((int) $phys) - $item->system_qty : null;
                     @endphp
-                    <tr @class([
+                    <tr wire:key="stock-item-{{ $item->product_id }}" @class([
                         'hover',
                         'bg-error/5'   => $diff !== null && $diff < 0,
                         'bg-warning/5' => $diff !== null && $diff > 0,
