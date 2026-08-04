@@ -23,6 +23,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .price { text-align: right; font-variant-numeric: tabular-nums; }
         tbody tr:nth-child(even) { background: #f5f5f5; }
         tbody tr { border-bottom: 1px solid #ddd; }
         tbody td { padding: 5px 6px; vertical-align: top; }
@@ -66,13 +67,15 @@
         <thead>
             <tr>
                 <th style="width:3%">#</th>
-                <th style="width:25%">Product Name</th>
-                <th style="width:12%">Category</th>
-                <th style="width:12%">Batch No.</th>
-                <th style="width:10%">Expiry</th>
-                <th style="width:8%; text-align:center">System Qty</th>
-                <th style="width:8%; text-align:center">Total</th>
-                <th style="width:10%; text-align:center">Physical Count</th>
+                <th style="width:20%">Product Name</th>
+                <th style="width:9%">Category</th>
+                <th style="width:8%; text-align:right">Selling Price</th>
+                <th style="width:10%">Batch No.</th>
+                <th style="width:7%">Expiry</th>
+                <th style="width:8%; text-align:right">Cost Price</th>
+                <th style="width:7%; text-align:center">Sys Qty</th>
+                <th style="width:7%; text-align:center">Total</th>
+                <th style="width:9%; text-align:center">Physical Count</th>
                 <th style="width:12%">Remarks</th>
             </tr>
         </thead>
@@ -90,10 +93,16 @@
                                 <td rowspan="{{ $product->batches->count() }}" style="font-size:10px; color:#555">
                                     {{ $product->category?->name ?? '—' }}
                                 </td>
+                                <td rowspan="{{ $product->batches->count() }}" class="price" style="vertical-align:middle">
+                                    ₦{{ number_format($product->selling_price, 2) }}
+                                </td>
                             @endif
                             <td class="batch-row">{{ $batch->batch_number ?? '—' }}</td>
                             <td class="batch-row">
                                 {{ $batch->expiry_date ? \Carbon\Carbon::parse($batch->expiry_date)->format('M Y') : '—' }}
+                            </td>
+                            <td class="batch-row price">
+                                {{ $batch->cost_price ? '₦' . number_format($batch->cost_price, 2) : '—' }}
                             </td>
                             <td class="batch-row" style="text-align:center">{{ $batch->quantity }}</td>
                             @if($batchIndex === 0)
@@ -114,8 +123,10 @@
                         <td>{{ $index + 1 }}</td>
                         <td style="font-weight:bold">{{ $product->name }}</td>
                         <td style="font-size:10px; color:#555">{{ $product->category?->name ?? '—' }}</td>
+                        <td class="price">₦{{ number_format($product->selling_price, 2) }}</td>
                         <td>—</td>
                         <td>—</td>
+                        <td class="price">—</td>
                         <td style="text-align:center">0</td>
                         <td style="text-align:center"><span class="total-qty out">0</span></td>
                         <td style="text-align:center"><span class="count-box"></span></td>
@@ -126,7 +137,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="9">
+                <td colspan="11">
                     <strong>Legend:</strong>
                     <span style="color:#cc0000">■ Out of stock</span> &nbsp;|&nbsp;
                     <span style="color:#996600">■ Low stock (at or below reorder level)</span>
