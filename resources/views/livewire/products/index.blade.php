@@ -70,7 +70,7 @@
                 </thead>
                 <tbody>
                     @foreach($products as $product)
-                        <tr class="hover:bg-base-100 border-b border-base-200">
+                        <tr wire:key="bulk-{{ $product->id }}" class="hover:bg-base-100 border-b border-base-200">
                             <td class="text-base-content/40 text-xs">{{ $product->id }}</td>
                             <td>
                                 <input
