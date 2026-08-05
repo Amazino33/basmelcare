@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'BasmelCare Pharmacy' }}</title>
     <meta name="description" content="{{ $description ?? 'Your trusted pharmacy for quality healthcare products, prescriptions, and wellness services.' }}">
+    @include('partials.head-icons')
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -21,7 +22,7 @@
             <div class="flex items-center justify-between h-14 md:h-16">
                 <!-- Logo -->
                 <a href="/" class="flex items-center gap-2">
-                    <img src="/images/logo.svg" class="h-10 w-auto" alt="BasmelCare Pharmacy">
+                    <img src="/logo.png" class="h-10 w-auto object-contain" alt="BasmelCare Pharmacy">
                 </a>
 
                 <!-- Desktop nav links -->
@@ -75,9 +76,7 @@
                 <!-- Brand -->
                 <div>
                     <div class="flex items-center gap-2 mb-3">
-                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <x-icon name="o-heart" class="w-5 h-5 text-primary-content" />
-                        </div>
+                        <img src="/logo.png" class="h-9 w-auto object-contain" alt="BasmelCare">
                         <span class="font-bold text-lg">BasmelCare</span>
                     </div>
                     <p class="text-sm opacity-70">Your trusted pharmacy for quality healthcare products, prescriptions, and wellness services.</p>
