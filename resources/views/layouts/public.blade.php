@@ -23,6 +23,7 @@
                 <!-- Logo -->
                 <a href="/" class="flex items-center gap-2">
                     <img src="/logo.png" class="h-10 w-auto object-contain" alt="BasmelCare Pharmacy">
+                    <span class="font-bold text-base leading-tight">BasmelCare <span class="text-primary">Pharmacy</span></span>
                 </a>
 
                 <!-- Desktop nav links -->
