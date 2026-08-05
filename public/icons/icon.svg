@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="225.28" fill="#fff"></rect>
-  <g transform="translate(433.152 522.24) rotate(-45)"><rect x="-194.56" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#422ad5"></rect></g>
-  <g transform="translate(590.848 522.24) rotate(45)"><rect x="0" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#2fae7a"></rect></g>
-  <text x="512" y="686.08" font-family="&#39;Space Grotesk&#39;,sans-serif" font-weight="700" font-size="148.48" fill="#422ad5" text-anchor="middle">BC</text>
-</svg>

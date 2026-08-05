@@ -28,7 +28,7 @@
         <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-100 lg:bg-inherit">
             <x-menu activate-by-route>
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-4 py-4 mb-1">
-                    <img src="/icons/icon.svg" class="h-10 w-10 rounded-xl shrink-0" alt="BasmelCare">
+                    <img src="/logo-1.png" class="h-10 w-10 rounded-xl shrink-0 object-contain" alt="BasmelCare">
                     <div class="leading-tight">
                         <div class="font-bold text-sm text-base-content">BasmelCare</div>
                         <div class="text-xs text-base-content/50">Pharmacy</div>
@@ -131,7 +131,7 @@
                 <label for="main-drawer" class="btn btn-ghost btn-sm">
                     <x-icon name="o-bars-3" class="w-6 h-6" />
                 </label>
-                <img src="/icons/icon.svg" class="h-8 w-8 rounded-lg" alt="BasmelCare">
+                <img src="/logo-1.png" class="h-8 w-8 rounded-lg object-contain" alt="BasmelCare">
                 <a href="{{ route('profile') }}" class="btn btn-ghost btn-sm btn-circle">
                     <x-icon name="o-user-circle" class="w-6 h-6" />
                 </a>
