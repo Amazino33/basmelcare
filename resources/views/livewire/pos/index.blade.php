@@ -75,20 +75,28 @@
 
     <!-- Mobile Cart Modal -->
     <dialog id="mobile-cart-modal" class="modal modal-bottom">
-        <div class="modal-box max-h-[85vh]">
-            <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
-            <h3 class="font-bold text-lg mb-4">Cart ({{ count($cart) }})</h3>
-            @include('livewire.pos._cart')
+        <div class="modal-box max-h-[90vh] flex flex-col p-0">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-base-200 shrink-0">
+                <h3 class="font-bold text-lg">Cart ({{ count($cart) }})</h3>
+                <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost">✕</button></form>
+            </div>
+            <div class="overflow-y-auto flex-1 px-4 py-3">
+                @include('livewire.pos._cart')
+            </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
     <!-- Mobile Invoices Modal -->
     <dialog id="mobile-invoices-modal" class="modal modal-bottom">
-        <div class="modal-box max-h-[85vh]">
-            <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
-            <h3 class="font-bold text-lg mb-4">My Invoices</h3>
-            @include('livewire.pos._invoices-mobile')
+        <div class="modal-box max-h-[90vh] flex flex-col p-0">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-base-200 shrink-0">
+                <h3 class="font-bold text-lg">My Invoices</h3>
+                <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost">✕</button></form>
+            </div>
+            <div class="overflow-y-auto flex-1 px-4 py-3">
+                @include('livewire.pos._invoices-mobile')
+            </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
