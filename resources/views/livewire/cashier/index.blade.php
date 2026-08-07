@@ -158,7 +158,7 @@
     @endif
 
     <!-- Payment Modal -->
-    <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : ($payReview ? 'Review & Confirm' : 'Process Payment') }}" box-class="max-w-lg relative overflow-hidden">
+    <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : ($payReview ? 'Review & Confirm' : 'Process Payment') }}" box-class="max-w-lg relative overflow-y-auto max-h-[90vh]">
         @if($paySuccess && $payingSale)
             <div class="text-center py-6">
                 <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
@@ -579,7 +579,7 @@
     </x-modal>
 
     <!-- Online Order Payment Modal -->
-    <x-modal wire:model="orderPayModal" title="{{ $orderPaySuccess ? 'Payment Collected' : ($orderPayReview ? 'Review & Confirm' : 'Collect Order Payment') }}" box-class="max-w-lg relative overflow-hidden">
+    <x-modal wire:model="orderPayModal" title="{{ $orderPaySuccess ? 'Payment Collected' : ($orderPayReview ? 'Review & Confirm' : 'Collect Order Payment') }}" box-class="max-w-lg relative overflow-y-auto max-h-[90vh]">
         @if($orderPaySuccess && $payingOrder)
             <div class="text-center py-6">
                 <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
