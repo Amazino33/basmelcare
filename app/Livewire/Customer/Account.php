@@ -31,7 +31,7 @@ class Account extends Component
         $medicalRecords = $customer->medicalRecords()->with('recorder')->latest()->get();
         $creditPayouts = $customer->creditPayouts()->latest()->get();
 
-        $totalSpent = $customer->sales()->where('status', 'completed')->sum('total_amount')
+        $totalSpent = $customer->sales()->whereIn('status', ['paid', 'completed'])->sum('total_amount')
             + $customer->orders()->where('payment_status', 'paid')->sum('total_amount');
         $totalDebt = $customer->totalDebt;
         $totalOrders = $customer->sales()->count() + $customer->orders()->count();

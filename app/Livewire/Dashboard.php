@@ -105,11 +105,11 @@ class Dashboard extends Component
 
     public function render()
     {
-        $todaySales = Sale::whereDate('created_at', today())->where('status', 'completed');
+        $todaySales = Sale::whereDate('created_at', today())->whereIn('status', ['paid', 'completed']);
         $totalSalesToday = $todaySales->sum('total_amount');
         $salesCountToday = $todaySales->count();
 
-        $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereDate('created_at', today())->where('status', 'completed'));
+        $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereDate('created_at', today())->whereIn('status', ['paid', 'completed']));
         $todayRevenue = (clone $todayItems)->sum('subtotal');
         $todayCost = 0;
         foreach ((clone $todayItems)->get() as $item) {
@@ -155,7 +155,7 @@ class Dashboard extends Component
         $potentialProfit = $potentialRevenue - $potentialCost;
 
         $recentSales = Sale::with('user', 'customer')
-            ->where('status', 'completed')
+            ->whereIn('status', ['paid', 'completed'])
             ->latest()
             ->limit(5)
             ->get();

@@ -315,12 +315,12 @@ class Index extends Component
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
 
-        $filteredSales = $this->periodQuery(clone $salesQuery)->where('status', 'completed');
+        $filteredSales = $this->periodQuery(clone $salesQuery)->whereIn('status', ['paid', 'completed']);
         $totalRevenue = $filteredSales->sum('total_amount');
         $totalTransactions = $filteredSales->count();
 
         $filteredItems = SaleItem::whereHas('sale', function ($q) use ($scopeFn) {
-            $this->periodQuery($q)->where('status', 'completed')->tap($scopeFn);
+            $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
         });
         $totalCost = 0;
         $totalItemsSold = 0;
@@ -332,7 +332,7 @@ class Index extends Component
         $avgSale = $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0;
 
         $paymentBreakdown = $this->periodQuery(
-            Sale::where('status', 'completed')->tap($scopeFn)
+            Sale::whereIn('status', ['paid', 'completed'])->tap($scopeFn)
             )->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
             ->groupBy('payment_method')
             ->get();

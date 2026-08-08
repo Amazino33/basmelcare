@@ -40,7 +40,7 @@ class Index extends Component
     {
         $sales = Sale::with('user', 'customer')
             ->whereBetween('created_at', [$this->dateFrom, $this->dateTo . ' 23:59:59'])
-            ->where('status', 'completed')
+            ->whereIn('status', ['paid', 'completed'])
             ->get();
 
         return $this->streamCsv('sales-report.csv', ['ID', 'Date', 'Customer', 'Cashier', 'Payment', 'Total'], $sales->map(fn($s) => [
@@ -51,7 +51,7 @@ class Index extends Component
     private function exportProfit(): StreamedResponse
     {
         $items = SaleItem::with('product', 'sale')
-            ->whereHas('sale', fn($q) => $q->whereBetween('created_at', [$this->dateFrom, $this->dateTo . ' 23:59:59'])->where('status', 'completed'))
+            ->whereHas('sale', fn($q) => $q->whereBetween('created_at', [$this->dateFrom, $this->dateTo . ' 23:59:59'])->whereIn('status', ['paid', 'completed']))
             ->get();
 
         return $this->streamCsv('profit-report.csv', ['Date', 'Product', 'Qty', 'Selling Price', 'Cost Price', 'Revenue', 'Cost', 'Profit'], $items->map(fn($i) => [
