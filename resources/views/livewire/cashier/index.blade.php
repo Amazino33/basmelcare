@@ -160,7 +160,7 @@
     <!-- Payment Modal -->
     <x-modal wire:model="payModal" title="{{ $paySuccess ? 'Payment Confirmed' : ($payReview ? 'Review & Confirm' : 'Process Payment') }}" box-class="max-w-lg relative overflow-y-auto max-h-[90vh]">
         @if($paySuccess && $payingSale)
-            <div class="text-center py-6">
+            <div class="text-center py-6" x-init="setTimeout(() => $wire.closePay(), 4000)">
                 <x-icon name="o-check-circle" class="w-16 h-16 text-success mx-auto mb-3" />
                 <div class="text-xl font-bold mb-1">Payment Received!</div>
                 <div class="text-base-content/60 text-sm mb-1">{{ $payingSale->invoice_number }}</div>
@@ -543,7 +543,11 @@
 
                     <div class="flex gap-2 mt-3">
                         <x-button label="Back" wire:click="$set('payReview', false)" class="btn-ghost flex-1" icon="o-arrow-left" />
-                        <x-button label="Confirm & Pay" wire:click="processPayment" class="btn-success flex-1" icon="o-check" />
+                        <button type="button" class="btn btn-success flex-1"
+                            x-on:click="async () => { const win = window.open('about:blank', '_blank'); const id = await $wire.call('processPayment'); id ? (win.location.href = '/desk/receipt/' + id) : win.close(); }">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                            Confirm &amp; Pay
+                        </button>
                     </div>
                 </div>
             @endif

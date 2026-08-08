@@ -243,6 +243,8 @@ class Index extends Component
         $this->reset(['customer_id', 'note']);
         session()->forget(['pos_cart', 'pos_customer_id']);
         $this->success('Invoice created. Print it for the customer.');
+
+        return $saleId;
     }
 
     public function confirmHandover($saleId)

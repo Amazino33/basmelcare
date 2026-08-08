@@ -119,5 +119,6 @@
             @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
         </div>
     </div>
+    <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); };</script>
 </body>
 </html>

@@ -264,6 +264,8 @@ class Index extends Component
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('[WhatsApp Receipt] ' . $e->getMessage());
         }
+
+        return $this->lastPaidSaleId;
     }
 
     private function buildReceiptMessage(Sale $sale): string
