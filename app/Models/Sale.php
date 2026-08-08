@@ -10,7 +10,7 @@ class Sale extends Model
     use BelongsToBranch;
 
     protected $fillable = [
-        'invoice_number', 'user_id', 'cashier_id', 'confirmed_by', 'customer_id',
+        'invoice_number', 'wifi_code', 'user_id', 'cashier_id', 'confirmed_by', 'customer_id',
         'total_amount', 'payment_method', 'payment_details',
         'status', 'paid_at', 'confirmed_at', 'note',
         'voucher_redeemed_at', 'voucher_revoked_at',
@@ -86,43 +86,29 @@ class Sale extends Model
             ->orderByDesc('invoice_number')
             ->value('invoice_number');
 
-        if ($last) {
-            // The sequential core sits immediately after the prefix. (int) stops
-            // at the first non-digit, so the random suffix below never interferes
-            // with reading back the last number.
-            $lastNum = (int) substr($last, strlen($prefix));
-            $next = $lastNum + 1;
-        } else {
-            $next = 1;
-        }
+        $lastNum = $last ? (int) substr($last, strlen($prefix)) : 0;
 
-        // Sequential core — stays gapless for accounting/audit.
-        $sequential = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
-
-        // Random suffix — the receipt doubles as a HiFastLink Wi-Fi access code,
-        // so it must not be guessable from a neighbouring invoice. The core above
-        // keeps the books sequential; this suffix carries the unpredictability.
-        do {
-            $candidate = $sequential . '-' . static::randomInvoiceSuffix();
-        } while (static::where('invoice_number', $candidate)->exists());
-
-        return $candidate;
+        return $prefix . str_pad($lastNum + 1, 4, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * A short, cryptographically-random suffix using an unambiguous alphabet
-     * (no 0/O/1/I/L) so it is easy to read off a printed receipt.
-     */
-    protected static function randomInvoiceSuffix(int $length = 6): string
+    /** Cryptographically-random 6-char Wi-Fi code, unique across all sales. */
+    public static function generateWifiCode(): string
+    {
+        do {
+            $code = static::randomCode();
+        } while (static::where('wifi_code', $code)->exists());
+
+        return $code;
+    }
+
+    private static function randomCode(int $length = 6): string
     {
         $alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         $maxIndex = strlen($alphabet) - 1;
-
-        $suffix = '';
+        $code = '';
         for ($i = 0; $i < $length; $i++) {
-            $suffix .= $alphabet[random_int(0, $maxIndex)];
+            $code .= $alphabet[random_int(0, $maxIndex)];
         }
-
-        return $suffix;
+        return $code;
     }
 }

@@ -114,7 +114,7 @@ class Index extends Component
 
         $sale->update(['voucher_revoked_at' => now()]);
 
-        $pushed = \App\Services\HifastlinkService::revoke($sale->invoice_number);
+        $pushed = \App\Services\HifastlinkService::revoke($sale->wifi_code ?? $sale->invoice_number);
 
         if ($pushed) {
             $this->success('Internet access revoked. The device can no longer reconnect.');

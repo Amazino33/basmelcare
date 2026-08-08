@@ -24,11 +24,12 @@ class VoucherRedeemController extends Controller
         // receipt never causes a false "not found".
         $invoiceNumber = strtoupper(trim($request->invoice_number));
 
-        // Accept either the full invoice number (INV-YYYYMMDD-NNNN-SUFFIX) or just
-        // the short suffix (last 6 chars). No dashes = suffix-only lookup.
-        $sale = str_contains($invoiceNumber, '-')
-            ? Sale::with('customer')->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])->first()
-            : Sale::with('customer')->whereRaw('UPPER(invoice_number) LIKE ?', ['%-' . $invoiceNumber])->first();
+        // New sales: look up by dedicated wifi_code column.
+        // Old sales: fall back to suffix embedded in invoice_number.
+        $sale = Sale::with('customer')->where('wifi_code', $invoiceNumber)->first()
+            ?? (str_contains($invoiceNumber, '-')
+                ? Sale::with('customer')->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])->first()
+                : Sale::with('customer')->whereRaw('UPPER(invoice_number) LIKE ?', ['%-' . $invoiceNumber])->first());
 
         if (! $sale) {
             return response()->json(['valid' => false, 'message' => 'Invoice not found.'], 404);
@@ -65,6 +66,7 @@ class VoucherRedeemController extends Controller
             'validity_hours' => $hours,
             'customer'       => $sale->customer?->name,
             'invoice_number' => $sale->invoice_number,
+            'wifi_code'      => $sale->wifi_code,
         ]);
     }
 }

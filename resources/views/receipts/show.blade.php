@@ -193,8 +193,8 @@
         <div class="line"></div>
         <div style="text-align:center;font-size:10px;padding:4px 0;">
             <div style="font-weight:bold;font-size:11px;">🎁 FREE INTERNET OFFER</div>
-            <div>Use invoice <strong>{{ $sale->invoice_number }}</strong></div>
-            <div>on HifastLink for 1 free day of internet!</div>
+            <div>Wi-Fi Code: <strong style="font-size:14px;letter-spacing:2px;">{{ $sale->wifi_code ?? substr($sale->invoice_number, -6) }}</strong></div>
+            <div style="margin-top:2px;">on HifastLink for 1 free day of internet!</div>
             <div style="margin-top:2px;color:#555;">Visit hifastlink.com &gt; Pharmacy Voucher</div>
         </div>
         @endif

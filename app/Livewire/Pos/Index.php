@@ -205,6 +205,7 @@ class Index extends Component
         $saleId = DB::transaction(function () {
             $sale = Sale::create([
                 'invoice_number' => Sale::generateInvoiceNumber(),
+                'wifi_code'      => Sale::generateWifiCode(),
                 'user_id' => auth()->id(),
                 'customer_id' => $this->customer_id,
                 'total_amount' => $this->cartTotal,
