@@ -192,10 +192,10 @@
         @if($hifastlinkEnabled && !$sale->voucher_redeemed_at)
         <div class="line"></div>
         <div style="text-align:center;font-size:10px;padding:4px 0;">
-            <div style="font-weight:bold;font-size:11px;">🎁 FREE INTERNET OFFER</div>
-            <div>Wi-Fi Code: <strong style="font-size:14px;letter-spacing:2px;">{{ $sale->wifi_code ?? substr($sale->invoice_number, -6) }}</strong></div>
-            <div style="margin-top:2px;">on HifastLink for 1 free day of internet!</div>
-            <div style="margin-top:2px;color:#555;">Visit hifastlink.com &gt; Pharmacy Voucher</div>
+            <div style="font-weight:bold;font-size:11px;">🎁 FREE INTERNET — 1 DAY</div>
+            <div style="margin-top:3px;">1. Connect to <strong>{{ $pharmacyName ?: 'BasmelCare' }} WiFi</strong></div>
+            <div style="margin-top:2px;">2. Enter this code when prompted:</div>
+            <div style="font-weight:bold;font-size:16px;letter-spacing:3px;margin-top:4px;">{{ $sale->wifi_code ?? substr($sale->invoice_number, -6) }}</div>
         </div>
         @endif
 
