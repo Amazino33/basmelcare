@@ -17,69 +17,83 @@
 
     <!-- Stats Row -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <x-stat
-            title="POS Sales Today"
-            value="₦{{ number_format($totalSalesToday, 2) }}"
-            description="{{ $salesCountToday }} transactions"
-            icon="o-banknotes"
-            color="text-primary"
-            class="text-sm"
-        />
+        <a href="{{ route('sales.index') }}" class="block">
+            <x-stat
+                title="POS Sales Today"
+                value="₦{{ number_format($totalSalesToday, 2) }}"
+                description="{{ $salesCountToday }} transactions"
+                icon="o-banknotes"
+                color="text-primary"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
-        <x-stat
-            title="Today's Profit"
-            value="₦{{ number_format($todayProfit, 2) }}"
-            description="Revenue - cost"
-            icon="o-arrow-trending-up"
-            color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
-            class="text-sm"
-        />
+        <a href="{{ route('reports.index') }}" class="block">
+            <x-stat
+                title="Today's Profit"
+                value="₦{{ number_format($todayProfit, 2) }}"
+                description="Revenue - cost"
+                icon="o-arrow-trending-up"
+                color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
         @endif
-        <x-stat
-            title="Products"
-            value="{{ $totalProducts }}"
-            description="{{ $totalStock }} in stock"
-            icon="o-cube"
-            color="text-info"
-            class="text-sm"
-        />
-        <x-stat
-            title="Out of Stock"
-            value="{{ $outOfStock }}"
-            description="Need restocking"
-            icon="o-exclamation-circle"
-            color="text-error"
-            class="text-sm"
-        />
+        <a href="{{ route('products.index') }}" class="block">
+            <x-stat
+                title="Products"
+                value="{{ $totalProducts }}"
+                description="{{ $totalStock }} in stock"
+                icon="o-cube"
+                color="text-info"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
+        <a href="{{ route('products.index', ['stockFilter' => 'out_of_stock']) }}" class="block">
+            <x-stat
+                title="Out of Stock"
+                value="{{ $outOfStock }}"
+                description="Need restocking"
+                icon="o-exclamation-circle"
+                color="text-error"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
     </div>
 
     <!-- Online Orders Stats (visible to roles that process online orders) -->
     @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-        <x-stat
-            title="Online Sales Today"
-            value="₦{{ number_format($todayOnlineRevenue, 2) }}"
-            description="{{ $todayOnlineCount }} orders completed"
-            icon="o-globe-alt"
-            color="text-secondary"
-            class="text-sm"
-        />
-        <x-stat
-            title="Pending Online"
-            value="{{ $pendingOnlineOrders }}"
-            description="Awaiting processing"
-            icon="o-clock"
-            color="{{ $pendingOnlineOrders > 0 ? 'text-warning' : 'text-base-content/40' }}"
-            class="text-sm"
-        />
-        <div class="col-span-2 lg:col-span-1 bg-base-100 rounded-lg p-4 shadow-sm flex items-center justify-between">
-            <div>
-                <div class="text-sm text-base-content/60">Combined Today</div>
-                <div class="text-xl font-bold text-primary">₦{{ number_format($totalSalesToday + $todayOnlineRevenue, 2) }}</div>
-                <div class="text-xs text-base-content/60">POS + Online</div>
+        <a href="{{ route('online-orders.index') }}" class="block">
+            <x-stat
+                title="Online Sales Today"
+                value="₦{{ number_format($todayOnlineRevenue, 2) }}"
+                description="{{ $todayOnlineCount }} orders completed"
+                icon="o-globe-alt"
+                color="text-secondary"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
+        <a href="{{ route('online-orders.index') }}" class="block">
+            <x-stat
+                title="Pending Online"
+                value="{{ $pendingOnlineOrders }}"
+                description="Awaiting processing"
+                icon="o-clock"
+                color="{{ $pendingOnlineOrders > 0 ? 'text-warning' : 'text-base-content/40' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+            />
+        </a>
+        <a href="{{ route('reports.index') }}" class="col-span-2 lg:col-span-1 block bg-base-100 rounded-lg p-4 shadow-sm hover:bg-base-200 transition-colors cursor-pointer">
+            <div class="flex items-center justify-between h-full">
+                <div>
+                    <div class="text-sm text-base-content/60">Combined Today</div>
+                    <div class="text-xl font-bold text-primary">₦{{ number_format($totalSalesToday + $todayOnlineRevenue, 2) }}</div>
+                    <div class="text-xs text-base-content/60">POS + Online</div>
+                </div>
+                <x-icon name="o-chart-bar" class="w-10 h-10 text-primary/20" />
             </div>
-            <x-icon name="o-chart-bar" class="w-10 h-10 text-primary/20" />
-        </div>
+        </a>
     </div>
 
     @if($pendingOnlineOrders > 0)
@@ -115,6 +129,9 @@
                 <div class="text-sm sm:text-xl font-bold text-success">₦{{ number_format($potentialProfit, 0) }}</div>
             </div>
         </div>
+        <div class="mt-2">
+            <x-button label="View Reports" link="{{ route('reports.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+        </div>
     </x-card>
     @endif
 
@@ -122,11 +139,13 @@
         <!-- Expiry Alerts -->
         <x-card title="Expiry Alerts" subtitle="Within 90 days">
             @if($expiredBatches > 0)
-                <x-alert title="{{ $expiredBatches }} expired!" icon="o-exclamation-triangle" class="alert-error mb-3" />
+                <a href="{{ route('expiry-alerts.index') }}" class="block">
+                    <x-alert title="{{ $expiredBatches }} expired!" icon="o-exclamation-triangle" class="alert-error mb-3 hover:opacity-80 transition-opacity" />
+                </a>
             @endif
 
             @forelse($expiringBatches as $batch)
-                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                <a href="{{ route('expiry-alerts.index') }}" class="flex justify-between items-center p-2 border-b border-base-200 last:border-0 hover:bg-base-200 transition-colors rounded">
                     <div class="min-w-0 flex-1">
                         <div class="font-semibold text-xs sm:text-sm truncate">{{ $batch->product->name }}</div>
                         <div class="text-xs text-base-content/60">{{ $batch->batch_number }} | Qty: {{ $batch->quantity }}</div>
@@ -140,22 +159,20 @@
                             'badge-info' => $days > 60,
                         ]) />
                     </div>
-                </div>
+                </a>
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">No products expiring soon.</div>
             @endforelse
 
-            @if($expiringBatches->count())
-                <div class="mt-2">
-                    <x-button label="View All" link="{{ route('expiry-alerts.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
-                </div>
-            @endif
+            <div class="mt-2">
+                <x-button label="View All" link="{{ route('expiry-alerts.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
         </x-card>
 
         <!-- Low Stock -->
         <x-card title="Low Stock" subtitle="Below reorder level">
             @forelse($lowStockProducts as $product)
-                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                <a href="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="flex justify-between items-center p-2 border-b border-base-200 last:border-0 hover:bg-base-200 transition-colors rounded">
                     <div class="min-w-0 flex-1">
                         <div class="font-semibold text-xs sm:text-sm truncate">{{ $product->name }}</div>
                         <div class="text-xs text-base-content/60">{{ $product->category?->name }}</div>
@@ -164,10 +181,13 @@
                         <div class="text-sm font-bold text-warning">{{ $product->batches->sum('quantity') }}</div>
                         <div class="text-xs text-base-content/60">/ {{ $product->reorder_level }}</div>
                     </div>
-                </div>
+                </a>
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">All stocked.</div>
             @endforelse
+            <div class="mt-2">
+                <x-button label="View Products" link="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
         </x-card>
 
         <!-- Recent Sales -->

@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -19,6 +20,9 @@ class Index extends Component
     use Toast, WithPagination, WithFileUploads;
 
     public string $search = '';
+
+    #[Url]
+    public string $stockFilter = '';
 
     // Product form
     public string $name = '';
@@ -434,6 +438,13 @@ class Index extends Component
         $products = Product::with('category', 'batches')
             ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")
                 ->orWhere('barcode', 'like', "%{$this->search}%"))
+            ->when($this->stockFilter === 'out_of_stock', fn($q) =>
+                $q->whereDoesntHave('batches', fn($bq) => $bq->where('quantity', '>', 0))
+            )
+            ->when($this->stockFilter === 'low_stock', fn($q) =>
+                $q->whereRaw('(SELECT COALESCE(SUM(quantity),0) FROM batches WHERE batches.product_id = products.id) > 0')
+                  ->whereRaw('(SELECT COALESCE(SUM(quantity),0) FROM batches WHERE batches.product_id = products.id) <= products.reorder_level')
+            )
             ->latest()
             ->paginate($this->bulkEditMode ? 50 : 15);
 
