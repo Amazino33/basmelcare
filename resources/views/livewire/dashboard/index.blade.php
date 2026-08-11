@@ -1,5 +1,21 @@
 <div>
-    <x-header title="Dashboard" subtitle="BasmelCare Pharmacy Overview" size="text-xl" />
+    <x-header title="Dashboard" subtitle="BasmelCare Pharmacy Overview" size="text-xl">
+        <x-slot:actions>
+            <div class="flex flex-wrap items-center gap-2">
+                <button wire:click="$set('dateFilter', 'today')"
+                    class="btn btn-sm {{ $dateFilter === 'today' ? 'btn-primary' : 'btn-ghost' }}">Today</button>
+                <button wire:click="$set('dateFilter', 'yesterday')"
+                    class="btn btn-sm {{ $dateFilter === 'yesterday' ? 'btn-primary' : 'btn-ghost' }}">Yesterday</button>
+                <button wire:click="$set('dateFilter', 'custom')"
+                    class="btn btn-sm {{ $dateFilter === 'custom' ? 'btn-primary' : 'btn-ghost' }}">Custom</button>
+                @if($dateFilter === 'custom')
+                    <input type="date" wire:model.live="dateFrom" class="input input-sm input-bordered w-36" />
+                    <span class="text-xs text-base-content/50">to</span>
+                    <input type="date" wire:model.live="dateTo" class="input input-sm input-bordered w-36" />
+                @endif
+            </div>
+        </x-slot:actions>
+    </x-header>
 
     <!-- Setup Progress Bar -->
     @if($setupProgress['percent'] < 100)
@@ -19,7 +35,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <a href="{{ route('sales.index') }}" class="block">
             <x-stat
-                title="POS Sales Today"
+                title="POS Sales · {{ $periodLabel }}"
                 value="₦{{ number_format($totalSalesToday, 2) }}"
                 description="{{ $salesCountToday }} transactions"
                 icon="o-banknotes"
@@ -30,7 +46,7 @@
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
         <a href="{{ route('reports.index') }}" class="block">
             <x-stat
-                title="Today's Profit"
+                title="Profit · {{ $periodLabel }}"
                 value="₦{{ number_format($todayProfit, 2) }}"
                 description="Revenue - cost"
                 icon="o-arrow-trending-up"
@@ -66,9 +82,9 @@
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <a href="{{ route('online-orders.index') }}" class="block">
             <x-stat
-                title="Online Sales Today"
+                title="Online Sales · {{ $periodLabel }}"
                 value="₦{{ number_format($todayOnlineRevenue, 2) }}"
-                description="{{ $todayOnlineCount }} orders completed"
+                description="{{ $todayOnlineCount }} orders"
                 icon="o-globe-alt"
                 color="text-secondary"
                 class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
@@ -87,7 +103,7 @@
         <a href="{{ route('reports.index') }}" class="col-span-2 lg:col-span-1 block bg-base-100 rounded-lg p-4 shadow-sm hover:bg-base-200 transition-colors cursor-pointer">
             <div class="flex items-center justify-between h-full">
                 <div>
-                    <div class="text-sm text-base-content/60">Combined Today</div>
+                    <div class="text-sm text-base-content/60">Combined · {{ $periodLabel }}</div>
                     <div class="text-xl font-bold text-primary">₦{{ number_format($totalSalesToday + $todayOnlineRevenue, 2) }}</div>
                     <div class="text-xs text-base-content/60">POS + Online</div>
                 </div>
@@ -191,7 +207,7 @@
         </x-card>
 
         <!-- Recent Sales -->
-        <x-card title="Recent POS Sales">
+        <x-card title="POS Sales · {{ $periodLabel }}">
             @forelse($recentSales as $sale)
                 <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
                     <div class="min-w-0 flex-1">
@@ -212,7 +228,7 @@
 
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
         <!-- Recent Online Orders -->
-        <x-card title="Recent Online Orders">
+        <x-card title="Online Orders · {{ $periodLabel }}">
             @forelse($recentOnlineOrders as $order)
                 <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
                     <div class="min-w-0 flex-1">

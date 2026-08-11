@@ -15,6 +15,10 @@ class Dashboard extends Component
     public bool $showWizard = false;
     public int $wizardStep = 1;
 
+    public string $dateFilter = 'today'; // today | yesterday | custom
+    public string $dateFrom = '';
+    public string $dateTo = '';
+
     // Step 1: Pharmacy Info
     public string $pharmacy_name = '';
     public string $pharmacy_phone = '';
@@ -28,6 +32,9 @@ class Dashboard extends Component
 
     public function mount()
     {
+        $this->dateFrom = today()->format('Y-m-d');
+        $this->dateTo   = today()->format('Y-m-d');
+
         $this->pharmacy_name = AppSetting::get('pharmacy_name', '');
         $this->pharmacy_phone = AppSetting::get('pharmacy_phone', '');
         $this->pharmacy_email = AppSetting::get('pharmacy_email', '');
@@ -35,6 +42,29 @@ class Dashboard extends Component
         $this->wawp_instance_id = AppSetting::get('wawp_instance_id', '');
         $this->wawp_access_token = AppSetting::get('wawp_access_token', '');
         $this->wawp_enabled = AppSetting::bool('wawp_enabled', false);
+    }
+
+    private function getDateRange(): array
+    {
+        return match ($this->dateFilter) {
+            'yesterday' => [now()->subDay()->startOfDay(), now()->subDay()->endOfDay()],
+            'custom'    => [
+                ($this->dateFrom ? \Carbon\Carbon::parse($this->dateFrom) : now())->startOfDay(),
+                ($this->dateTo   ? \Carbon\Carbon::parse($this->dateTo)   : now())->endOfDay(),
+            ],
+            default => [now()->startOfDay(), now()->endOfDay()],
+        };
+    }
+
+    private function getPeriodLabel(): string
+    {
+        return match ($this->dateFilter) {
+            'yesterday' => 'Yesterday',
+            'custom'    => $this->dateFrom === $this->dateTo
+                ? \Carbon\Carbon::parse($this->dateFrom)->format('M j, Y')
+                : \Carbon\Carbon::parse($this->dateFrom)->format('M j') . ' – ' . \Carbon\Carbon::parse($this->dateTo)->format('M j, Y'),
+            default => 'Today',
+        };
     }
 
     public function openWizard()
@@ -105,11 +135,14 @@ class Dashboard extends Component
 
     public function render()
     {
-        $todaySales = Sale::whereDate('created_at', today())->whereIn('status', ['paid', 'completed']);
+        [$from, $to] = $this->getDateRange();
+        $periodLabel  = $this->getPeriodLabel();
+
+        $todaySales = Sale::whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']);
         $totalSalesToday = $todaySales->sum('total_amount');
         $salesCountToday = $todaySales->count();
 
-        $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereDate('created_at', today())->whereIn('status', ['paid', 'completed']));
+        $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']));
         $todayRevenue = (clone $todayItems)->sum('subtotal');
         $todayCost = 0;
         foreach ((clone $todayItems)->get() as $item) {
@@ -156,20 +189,22 @@ class Dashboard extends Component
 
         $recentSales = Sale::with('user', 'customer')
             ->whereIn('status', ['paid', 'completed'])
+            ->whereBetween('created_at', [$from, $to])
             ->latest()
             ->limit(5)
             ->get();
 
-        $todayOnlineRevenue = Order::whereDate('created_at', today())
+        $todayOnlineRevenue = Order::whereBetween('created_at', [$from, $to])
             ->whereIn('status', ['completed', 'ready'])
             ->sum('total_amount');
-        $todayOnlineCount = Order::whereDate('created_at', today())
+        $todayOnlineCount = Order::whereBetween('created_at', [$from, $to])
             ->whereIn('status', ['completed', 'ready'])
             ->count();
         $pendingOnlineOrders = Order::whereNull('claimed_by')
             ->whereIn('status', ['pending', 'processing'])
             ->count();
         $recentOnlineOrders = Order::with('customer')
+            ->whereBetween('created_at', [$from, $to])
             ->latest()
             ->limit(5)
             ->get();
@@ -177,6 +212,7 @@ class Dashboard extends Component
         $setupProgress = $this->getSetupProgress();
 
         return view('livewire.dashboard.index', [
+            'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
             'salesCountToday' => $salesCountToday,
             'todayProfit' => $todayProfit,

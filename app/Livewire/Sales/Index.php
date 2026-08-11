@@ -23,6 +23,8 @@ class Index extends Component
 
     public string $search = '';
     public string $period = 'today';
+    public string $dateFrom = '';
+    public string $dateTo = '';
     public string $tab = 'pos';
     public bool $detailsDrawer = false;
     public ?int $viewSaleId = null;
@@ -275,10 +277,15 @@ class Index extends Component
     private function periodQuery($query)
     {
         return match ($this->period) {
-            'today' => $query->whereDate('created_at', today()),
-            'week' => $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]),
-            'month' => $query->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year),
-            'year' => $query->whereYear('created_at', now()->year),
+            'today'     => $query->whereDate('created_at', today()),
+            'yesterday' => $query->whereDate('created_at', today()->subDay()),
+            'week'      => $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]),
+            'month'     => $query->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year),
+            'year'      => $query->whereYear('created_at', now()->year),
+            'custom'    => $query->whereBetween('created_at', [
+                ($this->dateFrom ? \Carbon\Carbon::parse($this->dateFrom)->startOfDay() : now()->startOfDay()),
+                ($this->dateTo   ? \Carbon\Carbon::parse($this->dateTo)->endOfDay()     : now()->endOfDay()),
+            ]),
             default => $query,
         };
     }

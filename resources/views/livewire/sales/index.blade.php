@@ -5,13 +5,21 @@
     <div class="flex flex-col sm:flex-row gap-2 mb-4">
         <x-input icon="o-magnifying-glass" placeholder="Search..." wire:model.live.debounce="search" clearable class="flex-1" />
         <x-select wire:model.live="period" :options="[
-            ['id' => 'today', 'name' => 'Today'],
-            ['id' => 'week', 'name' => 'This Week'],
-            ['id' => 'month', 'name' => 'This Month'],
-            ['id' => 'year', 'name' => 'This Year'],
-            ['id' => 'all', 'name' => 'All Time'],
-        ]" option-value="id" option-label="name" class="sm:w-36" />
+            ['id' => 'today',     'name' => 'Today'],
+            ['id' => 'yesterday', 'name' => 'Yesterday'],
+            ['id' => 'week',      'name' => 'This Week'],
+            ['id' => 'month',     'name' => 'This Month'],
+            ['id' => 'year',      'name' => 'This Year'],
+            ['id' => 'all',       'name' => 'All Time'],
+            ['id' => 'custom',    'name' => 'Custom Range'],
+        ]" option-value="id" option-label="name" class="sm:w-40" />
     </div>
+    @if($period === 'custom')
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <x-input type="date" wire:model.live="dateFrom" label="From" class="w-40" />
+            <x-input type="date" wire:model.live="dateTo" label="To" class="w-40" />
+        </div>
+    @endif
 
     <!-- Tab Switcher -->
     <div role="tablist" class="tabs tabs-border mb-4">
