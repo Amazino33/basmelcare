@@ -183,18 +183,16 @@
                 <x-badge value="Paid – Awaiting Handover" class="badge-warning" />
             @endscope
 
-            @scope('actions', $sale, $elevated)
+            @scope('actions', $sale)
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="View details" />
-                    @if($elevated || $sale->user_id === auth()->id())
-                        <x-button
-                            label="Hand Over"
-                            icon="o-check"
-                            wire:click="completeHandover({{ $sale->id }})"
-                            wire:confirm="Mark this sale as handed over to the customer?"
-                            class="btn-xs btn-success"
-                        />
-                    @endif
+                    <x-button
+                        label="Hand Over"
+                        icon="o-check"
+                        wire:click="completeHandover({{ $sale->id }})"
+                        wire:confirm="Mark this sale as handed over to the customer?"
+                        class="btn-xs btn-success"
+                    />
                 </div>
             @endscope
         </x-table>
