@@ -48,6 +48,7 @@ class Index extends Component
     public string $batch_note = '';
     public ?int $batchProductId = null;
     public bool $batchModal = false;
+    public float $batchProductSellingPrice = 0;
 
     // View batches
     public ?int $viewBatchesProductId = null;
@@ -378,6 +379,7 @@ class Index extends Component
     {
         $this->reset(['batch_number', 'expiry_date', 'cost_price', 'quantity', 'batch_note']);
         $this->batchProductId = $productId;
+        $this->batchProductSellingPrice = (float) Product::find($productId)?->selling_price ?? 0;
         $this->batchModal = true;
     }
 
@@ -396,6 +398,11 @@ class Index extends Component
         ]);
 
         $expiry = Carbon::createFromFormat('Y-m', $this->expiry_date)->endOfMonth()->toDateString();
+
+        $product = Product::find($this->batchProductId);
+        if ($product && $this->cost_price > $product->selling_price) {
+            $this->warning("Batch cost price (₦{$this->cost_price}) exceeds the product's current selling price (₦{$product->selling_price}). You will sell at a loss.");
+        }
 
         $batch = Batch::create([
             'product_id'   => $this->batchProductId,

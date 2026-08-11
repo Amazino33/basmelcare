@@ -109,6 +109,9 @@
                                     data-bulk-sell
                                     class="input input-sm input-bordered w-full"
                                 />
+                                <div class="bulk-price-warn text-warning text-xs mt-0.5 items-center gap-1" style="display:none">
+                                    ⚠ Below cost
+                                </div>
                             </td>
                             <td>
                                 <input
@@ -198,11 +201,20 @@
             <x-input label="Product Name" wire:model="quick_name" placeholder="e.g. Paracetamol 500mg" />
             <x-select label="Category" wire:model="quick_category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" hint="Stays selected between entries" />
 
-            <div class="grid grid-cols-2 gap-4">
-                <x-input label="Cost Price" wire:model="quick_cost_price" prefix="₦" type="number" step="0.01" />
-                <x-input label="Selling Price" wire:model="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled from cost · type to override" />
-                <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
-                <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
+            <div x-data
+                 x-effect="$el.querySelector('.qa-price-warn').style.display =
+                     (parseFloat($wire.quick_selling_price) > 0 && parseFloat($wire.quick_cost_price) > 0 && parseFloat($wire.quick_selling_price) < parseFloat($wire.quick_cost_price))
+                     ? 'flex' : 'none'">
+                <div class="grid grid-cols-2 gap-4">
+                    <x-input label="Cost Price" wire:model.live="quick_cost_price" prefix="₦" type="number" step="0.01" />
+                    <x-input label="Selling Price" wire:model.live="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled from cost · type to override" />
+                    <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
+                    <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
+                </div>
+                <div class="qa-price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
+                    <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                    Selling price is below cost — you will sell at a loss.
+                </div>
             </div>
 
             <x-slot:actions>
@@ -260,14 +272,23 @@
                     step="0.01"
                     hint="Not saved — used to auto-calculate selling price"
                 />
-                <x-input
-                    label="Selling Price (Retail)"
-                    wire:model.live="selling_price"
-                    prefix="₦"
-                    type="number"
-                    step="0.01"
-                    hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
-                />
+                <div x-data
+                     x-effect="$el.querySelector('.price-warn').style.display =
+                         (parseFloat($wire.selling_price) > 0 && parseFloat($wire.cost_price_hint) > 0 && parseFloat($wire.selling_price) < parseFloat($wire.cost_price_hint))
+                         ? 'flex' : 'none'">
+                    <x-input
+                        label="Selling Price (Retail)"
+                        wire:model.live="selling_price"
+                        prefix="₦"
+                        type="number"
+                        step="0.01"
+                        hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
+                    />
+                    <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
+                        <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                        Selling price is below cost — you will sell at a loss.
+                    </div>
+                </div>
                 <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
                 <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
                 <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
@@ -394,7 +415,16 @@
         <x-form wire:submit="saveBatch">
             <x-input label="Batch Number" wire:model="batch_number" placeholder="Leave blank to auto-generate" hint="Optional" />
             <x-input label="Expiry Date" wire:model="expiry_date" type="month" />
-            <x-input label="Cost Price" wire:model="cost_price" prefix="₦" type="number" step="0.01" />
+            <div x-data
+                 x-effect="$el.querySelector('.batch-price-warn').style.display =
+                     (parseFloat($wire.cost_price) > 0 && $wire.batchProductSellingPrice > 0 && parseFloat($wire.cost_price) > $wire.batchProductSellingPrice)
+                     ? 'flex' : 'none'">
+                <x-input label="Cost Price" wire:model.live="cost_price" prefix="₦" type="number" step="0.01" />
+                <div class="batch-price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
+                    <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                    Batch cost exceeds selling price (₦{{ number_format($batchProductSellingPrice, 2) }}) — you will sell at a loss.
+                </div>
+            </div>
             <x-input label="Quantity" wire:model="quantity" type="number" />
             <x-textarea label="Note" wire:model="batch_note" placeholder="Optional" />
             <x-slot:actions>
@@ -466,13 +496,33 @@
     // Bulk Edit: auto-fill selling price from cost when markup toggle is ON
     document.addEventListener('input', function (e) {
         if (!e.target.dataset.bulkCost) return;
-        const toggle = document.getElementById('bulk-markup-toggle');
-        if (!toggle || !toggle.checked) return;
-        const cost = parseFloat(e.target.value) || 0;
-        if (cost <= 0) return;
         const row = e.target.closest('tr');
         const sellInput = row?.querySelector('[data-bulk-sell]');
-        if (sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
+        const toggle = document.getElementById('bulk-markup-toggle');
+        if (toggle?.checked) {
+            const cost = parseFloat(e.target.value) || 0;
+            if (cost > 0 && sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
+        }
+        // Update below-cost warning for this row
+        const warnEl = row?.querySelector('.bulk-price-warn');
+        if (warnEl && sellInput) {
+            const cost = parseFloat(e.target.value) || 0;
+            const sell = parseFloat(sellInput.value) || 0;
+            warnEl.style.display = (cost > 0 && sell > 0 && sell < cost) ? 'flex' : 'none';
+        }
+    });
+
+    // Bulk Edit: warn when selling price is edited below cost
+    document.addEventListener('input', function (e) {
+        if (!e.target.dataset.bulkSell) return;
+        const row = e.target.closest('tr');
+        const costInput = row?.querySelector('[data-bulk-cost]');
+        const warnEl = row?.querySelector('.bulk-price-warn');
+        if (warnEl && costInput) {
+            const cost = parseFloat(costInput.value) || 0;
+            const sell = parseFloat(e.target.value) || 0;
+            warnEl.style.display = (cost > 0 && sell > 0 && sell < cost) ? 'flex' : 'none';
+        }
     });
 
 
