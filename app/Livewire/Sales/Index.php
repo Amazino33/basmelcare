@@ -86,11 +86,6 @@ class Index extends Component
             return;
         }
 
-        if (!$this->isElevated() && $sale->user_id !== auth()->id()) {
-            $this->error('You can only complete handover for your own sales.');
-            return;
-        }
-
         $sale->update(['status' => 'completed']);
         $this->success('Handover completed — sale marked as given to customer.');
     }
@@ -296,14 +291,7 @@ class Index extends Component
         $isCashier  = $this->isCashier();
         $userId     = auth()->id();
 
-        // How to scope non-elevated users: sales person → user_id, cashier → cashier_id
-        $scopeFn = function ($q) use ($elevated, $isCashier, $userId) {
-            if (!$elevated) {
-                $isCashier
-                    ? $q->where('cashier_id', $userId)
-                    : $q->where('user_id', $userId);
-            }
-        };
+        $scopeFn = fn($q) => $q; // all staff see all sales
 
         // --- POS Sales ---
         $posHeaders = [
@@ -356,9 +344,9 @@ class Index extends Component
         $returnWindowHours = (int) AppSetting::get('return_window_hours', 48);
 
         // --- Pending Handover (paid but not yet handed to customer) ---
+        // All staff can see and complete handovers regardless of who made the sale
         $handoverQuery = Sale::with('user', 'customer')
             ->where('status', 'paid')
-            ->tap($scopeFn)
             ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));

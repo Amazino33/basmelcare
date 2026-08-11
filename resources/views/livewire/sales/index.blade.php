@@ -1,5 +1,5 @@
 <div x-data x-on:open-return-receipt.window="window.open($event.detail.url, '_blank')">
-    <x-header title="Sales History" subtitle="{{ $elevated ? 'All staff' : ($isCashier ? 'Payments you processed' : 'Your sales only') }}" size="text-xl" />
+    <x-header title="Sales History" subtitle="All staff" size="text-xl" />
 
     <!-- Filters -->
     <div class="flex flex-col sm:flex-row gap-2 mb-4">
