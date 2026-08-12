@@ -86,6 +86,11 @@ Route::prefix('desk')->group(function () {
             Route::get('reports', App\Livewire\Reports\Index::class)->name('reports.index');
         });
 
+        // Coupons (admin, branch_manager)
+        Route::middleware('role:admin,branch_manager')->group(function () {
+            Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
+        });
+
         // Admin only
         Route::middleware('role:admin')->group(function () {
             Route::get('staff', App\Livewire\Staff\Index::class)->name('staff.index');

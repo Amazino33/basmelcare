@@ -68,6 +68,10 @@
                     </x-menu-sub>
                 @endif
 
+                @if(in_array('admin', $roles) || in_array('branch_manager', $roles))
+                    <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
+                @endif
+
                 <x-menu-item title="Stock Take" icon="o-clipboard-document-check" link="{{ route('stock-take.index') }}" />
 
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))

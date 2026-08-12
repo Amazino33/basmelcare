@@ -103,6 +103,10 @@
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
                 @endif
 
+                @if(in_array('admin', $roles) || in_array('branch_manager', $roles))
+                    <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
+                @endif
+
                 @if(in_array('admin', $roles))
                     <x-menu-item title="Branches" icon="o-building-storefront" link="{{ route('branches.index') }}" />
                     <x-menu-item title="Settings" icon="o-cog-6-tooth" link="{{ route('settings.index') }}" />

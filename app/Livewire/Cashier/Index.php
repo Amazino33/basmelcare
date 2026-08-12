@@ -10,6 +10,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Mary\Traits\Toast;
+use App\Models\Coupon;
 use App\Models\Customer;
 
 class Index extends Component
@@ -31,6 +32,11 @@ class Index extends Component
     public bool $payReview = false;
     public bool $paySuccess = false;
     public ?int $lastPaidSaleId = null;
+
+    // Coupon
+    public string $couponCode = '';
+    public ?array $appliedCoupon = null;
+    public float $couponDiscount = 0;
 
     // Attach customer to walk-in sale
     public bool $createCustomerModal    = false;
@@ -58,7 +64,55 @@ class Index extends Component
         $sale = Sale::with('customer')->find($saleId);
         $this->apply_credit = $sale?->customer_id && ($sale->customer->credit_balance ?? 0) > 0;
 
+        $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
         $this->payModal = true;
+    }
+
+    public function applyCoupon(): void
+    {
+        $code = strtoupper(trim($this->couponCode));
+
+        if (!$code) {
+            $this->error('Enter a coupon code.');
+            return;
+        }
+
+        $sale = Sale::find($this->payingSaleId);
+
+        if (!$sale?->customer_id) {
+            $this->error('Coupons can only be applied to sales with a registered customer. Attach a customer first.');
+            return;
+        }
+
+        $coupon = Coupon::where('code', $code)->first();
+
+        if (!$coupon) {
+            $this->error('Invalid coupon code.');
+            return;
+        }
+
+        $error = $coupon->getValidationError();
+        if ($error) {
+            $this->error($error);
+            return;
+        }
+
+        $discount = $coupon->calculateDiscount((float) $sale->total_amount);
+
+        $this->appliedCoupon  = [
+            'id'       => $coupon->id,
+            'code'     => $coupon->code,
+            'type'     => $coupon->type,
+            'value'    => $coupon->value,
+            'discount' => $discount,
+        ];
+        $this->couponDiscount = $discount;
+        $this->success('Coupon applied! −₦' . number_format($discount, 2));
+    }
+
+    public function removeCoupon(): void
+    {
+        $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
     }
 
     public function detachCustomer(): void
@@ -121,11 +175,12 @@ class Index extends Component
         $transfer = (float) ($this->transfer_amount ?: 0);
         $totalCash = $cash + $card + $transfer;
 
+        $saleTotal = (float) $sale->total_amount - $this->couponDiscount;
+
         // Apply existing store credit if toggled
         $creditUsed = 0;
         if ($this->apply_credit && $sale->customer_id) {
             $available  = (float) ($sale->customer->credit_balance ?? 0);
-            $saleTotal  = (float) $sale->total_amount;
             $creditUsed = min($available, max(0, $saleTotal - $totalCash));
         }
 
@@ -135,8 +190,6 @@ class Index extends Component
             $this->error('Enter at least one payment amount.');
             return;
         }
-
-        $saleTotal = (float) $sale->total_amount;
         $shortfall = $saleTotal - $totalCollected;
 
         if ($shortfall > 0.01 && !$sale->customer_id) {
@@ -185,19 +238,24 @@ class Index extends Component
 
         // Build complete payment_details including the full outcome
         $paymentDetails = array_filter([
-            'cash'          => $cash > 0 ? $cash : null,
-            'card'          => $card > 0 ? $card : null,
-            'transfer'      => $transfer > 0 ? $transfer : null,
-            'credit'        => $creditUsed > 0 ? $creditUsed : null,
-            'debts_cleared' => !empty($debtsToClear)
+            'cash'            => $cash > 0 ? $cash : null,
+            'card'            => $card > 0 ? $card : null,
+            'transfer'        => $transfer > 0 ? $transfer : null,
+            'credit'          => $creditUsed > 0 ? $creditUsed : null,
+            'coupon_code'     => $this->appliedCoupon ? $this->appliedCoupon['code'] : null,
+            'coupon_discount' => $this->couponDiscount > 0 ? $this->couponDiscount : null,
+            'debts_cleared'   => !empty($debtsToClear)
                 ? array_map(fn($d) => ['invoice' => $d['invoice'], 'amount' => round($d['amount'], 2)], $debtsToClear)
                 : null,
-            'shortfall'     => $shortfall > 0.01 ? round($shortfall, 2) : null,
-            'change_given'  => $changeBack > 0.01 ? round($changeBack, 2) : null,
-            'stored_credit' => $storedCredit > 0.01 ? round($storedCredit, 2) : null,
+            'shortfall'       => $shortfall > 0.01 ? round($shortfall, 2) : null,
+            'change_given'    => $changeBack > 0.01 ? round($changeBack, 2) : null,
+            'stored_credit'   => $storedCredit > 0.01 ? round($storedCredit, 2) : null,
         ]);
 
-        DB::transaction(function () use ($sale, $saleTotal, $totalCollected, $creditUsed, $shortfall, $paymentMethod, $paymentDetails, $debtsToClear, $storedCredit) {
+        $appliedCouponSnapshot = $this->appliedCoupon;
+        $couponDiscountSnapshot = $this->couponDiscount;
+
+        DB::transaction(function () use ($sale, $saleTotal, $totalCollected, $creditUsed, $shortfall, $paymentMethod, $paymentDetails, $debtsToClear, $storedCredit, $appliedCouponSnapshot, $couponDiscountSnapshot) {
             if ($creditUsed > 0) {
                 $sale->customer->decrement('credit_balance', $creditUsed);
             }
@@ -208,7 +266,13 @@ class Index extends Component
                 'cashier_id'      => auth()->id(),
                 'status'          => 'paid',
                 'paid_at'         => now(),
+                'coupon_id'       => $appliedCouponSnapshot ? $appliedCouponSnapshot['id'] : null,
+                'coupon_discount' => $couponDiscountSnapshot,
             ]);
+
+            if ($appliedCouponSnapshot) {
+                Coupon::where('id', $appliedCouponSnapshot['id'])->increment('used_count');
+            }
 
             // Shortfall → debt
             if ($shortfall > 0.01 && $sale->customer_id) {
@@ -464,9 +528,10 @@ class Index extends Component
             $transfer = (float) ($this->transfer_amount ?: 0);
             $totalCash = $cash + $card + $transfer;
 
-            $creditBalance = (float) ($payingSale->customer?->credit_balance ?? 0);
-            $creditUsed    = 0;
-            $saleTotal     = (float) $payingSale->total_amount;
+            $creditBalance  = (float) ($payingSale->customer?->credit_balance ?? 0);
+            $creditUsed     = 0;
+            $originalTotal  = (float) $payingSale->total_amount;
+            $saleTotal      = $originalTotal - $this->couponDiscount;
 
             if ($this->apply_credit && $payingSale->customer_id && $creditBalance > 0) {
                 $creditUsed = min($creditBalance, max(0, $saleTotal - $totalCash));
@@ -513,6 +578,8 @@ class Index extends Component
                 $breakdown = [
                     'total_cash'      => $totalCash,
                     'credit_used'     => $creditUsed,
+                    'coupon_discount' => $this->couponDiscount,
+                    'original_total'  => $originalTotal,
                     'total_collected' => $totalCollected,
                     'sale_total'      => $saleTotal,
                     'excess'          => $excess,

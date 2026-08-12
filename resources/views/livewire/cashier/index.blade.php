@@ -272,6 +272,41 @@
                 </div>
             </div>
 
+            {{-- Coupon --}}
+            <div class="border border-base-300 rounded-lg p-3 mb-3">
+                @if($appliedCoupon)
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <x-icon name="o-tag" class="w-4 h-4 text-success shrink-0" />
+                            <div>
+                                <div class="font-mono font-bold text-success text-sm">{{ $appliedCoupon['code'] }}</div>
+                                <div class="text-xs text-base-content/60">
+                                    {{ $appliedCoupon['type'] === 'percent' ? $appliedCoupon['value'].'% off' : '₦'.number_format($appliedCoupon['value'], 2).' off' }}
+                                    &rarr; −₦{{ number_format($appliedCoupon['discount'], 2) }}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="removeCoupon" class="btn btn-ghost btn-xs text-error">Remove</button>
+                    </div>
+                @else
+                    <p class="text-xs font-semibold mb-1 text-base-content/60">Coupon Code (optional)</p>
+                    @if(!$payingSale->customer_id)
+                        <p class="text-xs text-warning mb-2">Attach a customer to use a coupon.</p>
+                    @endif
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            wire:model="couponCode"
+                            placeholder="Enter code..."
+                            class="input input-bordered input-sm flex-1 uppercase"
+                            :disabled="{{ $payingSale->customer_id ? 'false' : 'true' }}"
+                        />
+                        <x-button label="Apply" wire:click="applyCoupon" class="btn-outline btn-sm shrink-0" icon="o-tag"
+                            :disabled="!$payingSale->customer_id" />
+                    </div>
+                @endif
+            </div>
+
             {{-- Customer credit & debt notices --}}
             @if($payingSale->customer_id)
                 @php $creditBal = (float)($payingSale->customer->credit_balance ?? 0); @endphp
@@ -313,6 +348,16 @@
                 {{-- Live breakdown --}}
                 @if($breakdown)
                     <div class="bg-base-200 rounded-lg p-3 mt-3 text-sm space-y-1.5">
+                        @if($breakdown['coupon_discount'] > 0.01)
+                            <div class="flex justify-between text-base-content/60">
+                                <span>Invoice subtotal</span>
+                                <span>₦{{ number_format($breakdown['original_total'], 2) }}</span>
+                            </div>
+                            <div class="flex justify-between text-success">
+                                <span>Coupon ({{ $appliedCoupon['code'] }})</span>
+                                <span class="font-medium">−₦{{ number_format($breakdown['coupon_discount'], 2) }}</span>
+                            </div>
+                        @endif
                         @if($breakdown['credit_used'] > 0.01)
                             <div class="flex justify-between text-success">
                                 <span>Store credit applied</span>
@@ -324,7 +369,7 @@
                             <span class="font-bold">₦{{ number_format($breakdown['total_collected'], 2) }}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-base-content/60">Invoice total</span>
+                            <span class="text-base-content/60">{{ $breakdown['coupon_discount'] > 0.01 ? 'Payable total' : 'Invoice total' }}</span>
                             <span>₦{{ number_format($breakdown['sale_total'], 2) }}</span>
                         </div>
 
@@ -504,8 +549,18 @@
                         </div>
 
                         <div class="border-t border-base-300 pt-2 mt-2 space-y-1">
+                            @if($breakdown['coupon_discount'] > 0.01)
+                                <div class="flex justify-between text-base-content/60 text-sm">
+                                    <span>Subtotal</span>
+                                    <span>₦{{ number_format($breakdown['original_total'], 2) }}</span>
+                                </div>
+                                <div class="flex justify-between text-success text-sm">
+                                    <span>Coupon ({{ $appliedCoupon['code'] }})</span>
+                                    <span>−₦{{ number_format($breakdown['coupon_discount'], 2) }}</span>
+                                </div>
+                            @endif
                             <div class="flex justify-between font-bold text-base">
-                                <span>Invoice total</span>
+                                <span>{{ $breakdown['coupon_discount'] > 0.01 ? 'Payable total' : 'Invoice total' }}</span>
                                 <span>₦{{ number_format($breakdown['sale_total'], 2) }}</span>
                             </div>
                             @if($breakdown['shortfall'] > 0.01)
