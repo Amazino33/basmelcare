@@ -10,6 +10,11 @@ class Category extends Model
         'name', 'description',
     ];
 
+    public function getNameAttribute(string $value): string
+    {
+        return strtoupper($value);
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class);

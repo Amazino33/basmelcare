@@ -20,6 +20,11 @@ class Product extends Model
         'show_in_shop' => 'boolean',
     ];
 
+    public function getNameAttribute(string $value): string
+    {
+        return strtoupper($value);
+    }
+
     public function getPriceFor(?Customer $customer, int $qty = 1): float
     {
         if ($this->wholesale_price) {
