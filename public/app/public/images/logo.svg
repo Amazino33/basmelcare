@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="260" viewBox="0 0 980 260" font-family="'Space Grotesk', sans-serif">
+  <rect x="20" y="30" width="200" height="200" rx="44" fill="#fff" stroke="#eceaf7"></rect>
+  <g transform="translate(20,30) scale(0.1953)">
+  <g transform="translate(433.152 522.24) rotate(-45)"><rect x="-194.56" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#422ad5"></rect></g>
+  <g transform="translate(590.848 522.24) rotate(45)"><rect x="0" y="-102.4" width="194.56" height="204.8" rx="102.4" fill="#2fae7a"></rect></g>
+  <text x="512" y="686.08" font-family="'Space Grotesk',sans-serif" font-weight="700" font-size="148.48" fill="#422ad5" text-anchor="middle">BC</text>
+</g>
+  <text x="252" y="118" font-size="70" font-weight="700" letter-spacing="-2" fill="#16161e">Basmelcare</text>
+  <text x="252" y="196" font-size="70" font-weight="700" letter-spacing="-2" fill="#16161e">Pharmacy</text>
+</svg>

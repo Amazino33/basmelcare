@@ -1,0 +1,115 @@
+@if(count($cart))
+    <div class="space-y-2 max-h-60 lg:max-h-96 overflow-y-auto">
+        @foreach($cart as $key => $item)
+            <div class="flex items-center gap-2 p-2 rounded bg-base-200">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-xs truncate">{{ $item['name'] }}</div>
+                    <div class="text-xs text-base-content/60">
+                        ₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}
+                        @if($item['unit_price'] < $item['retail_price'])
+                            <span class="text-info">(w/s)</span>
+                        @endif
+                    </div>
+                </div>
+                <input type="number" wire:change="updateQty('{{ $key }}', $event.target.value)" value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}" class="input input-xs input-bordered w-14 text-center" />
+                <x-button icon="o-x-mark" wire:click="removeFromCart('{{ $key }}')" class="btn-xs btn-ghost text-error" />
+            </div>
+        @endforeach
+    </div>
+
+    <x-hr />
+
+    <div class="text-right text-lg font-bold text-primary mb-3">
+        ₦{{ number_format($cartTotal, 2) }}
+    </div>
+
+    {{-- Customer search (fully client-side filtering via Alpine.js) --}}
+    <div class="mt-2"
+        x-data="{
+            all: {{ $customers->toJson() }},
+            search: '',
+            open: false,
+            get results() {
+                if (!this.search) return [];
+                const q = this.search.toLowerCase();
+                return this.all.filter(c =>
+                    c.name.toLowerCase().includes(q) ||
+                    (c.phone && c.phone.includes(q))
+                ).slice(0, 15);
+            }
+        }"
+        @click.outside="open = false; search = ''">
+
+        <label class="label py-1"><span class="label-text text-sm font-semibold">Customer</span></label>
+
+        @if($selectedCustomer)
+            <div class="flex items-center gap-2 input input-bordered input-sm w-full pr-1">
+                <span class="flex-1 text-sm truncate">{{ $selectedCustomer->name }}
+                    @if($selectedCustomer->phone)
+                        <span class="text-base-content/50 text-xs ml-1">{{ $selectedCustomer->phone }}</span>
+                    @endif
+                </span>
+                <button wire:click="clearCustomer" class="btn btn-ghost btn-xs text-error shrink-0">✕</button>
+            </div>
+        @else
+            <div class="relative">
+                <input
+                    type="text"
+                    x-model="search"
+                    @focus="open = true"
+                    @input="open = true"
+                    placeholder="Search name or phone..."
+                    class="input input-bordered input-sm w-full"
+                    autocomplete="off"
+                />
+
+                <div x-show="open && (results.length > 0 || search.length > 0)"
+                    class="absolute z-200 w-full bg-base-100 border border-base-300 rounded-lg shadow-2xl mt-1 max-h-52 overflow-y-auto">
+                    <template x-for="c in results" :key="c.id">
+                        <button
+                            @mousedown.prevent="$wire.selectCustomer(c.id); open = false; search = ''"
+                            class="w-full text-left px-3 py-2 hover:bg-base-200 border-b border-base-200 last:border-0 transition-colors">
+                            <div class="font-semibold text-sm" x-text="c.name"></div>
+                            <div class="text-xs text-base-content/50" x-text="c.phone ?? ''"></div>
+                        </button>
+                    </template>
+
+                    <button
+                        @mousedown.prevent="$wire.openCreateCustomer(search); open = false"
+                        class="w-full text-left px-3 py-2 text-primary hover:bg-primary/10 flex items-center gap-2 text-sm font-semibold border-t border-base-300">
+                        <span>+</span>
+                        <span x-text="search ? 'Create \'' + search + '\'' : 'Create new customer'"></span>
+                    </button>
+                </div>
+            </div>
+        @endif
+    </div>
+    <x-textarea label="Note" wire:model="note" placeholder="Optional" class="mt-2" rows="2" />
+
+    <button type="button" class="btn btn-primary btn-block mt-3"
+        x-on:click="async () => { if (!confirm('Create this invoice?')) return; const win = window.open('about:blank', '_blank'); const result = await $wire.call('createInvoice'); result?.url ? (win.location.href = result.url) : win.close(); }">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+        Create Invoice
+    </button>
+    <button wire:click="clearCart" wire:confirm="Clear all items?" class="btn btn-ghost btn-xs text-error btn-block mt-1">
+        <x-icon name="o-trash" class="w-3 h-3" /> Clear Cart
+    </button>
+
+@else
+    @if($lastSale)
+        <div class="text-center py-4" x-init="setTimeout(() => $wire.set('lastSaleId', null), 4000)">
+            <x-icon name="o-check-circle" class="w-10 h-10 mx-auto mb-2 text-success" />
+            <p class="font-semibold text-sm mb-1">{{ $lastSale->invoice_number }}</p>
+            <p class="text-xs text-base-content/60 mb-3">Invoice created. Print for customer.</p>
+            <x-button label="Print Invoice" link="{{ route('invoice.show', $lastSale->id) }}" icon="o-printer" class="btn-sm btn-primary" external />
+            <x-button label="New Invoice" wire:click="$set('lastSaleId', null)" class="btn-sm btn-ghost mt-2" icon="o-plus" />
+        </div>
+    @else
+        <div class="text-center py-6 text-base-content/60">
+            <x-icon name="o-shopping-cart" class="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p class="text-sm">Cart is empty</p>
+        </div>
+    @endif
+@endif
+
+{{-- Create Customer Modal moved to pos/index.blade.php to avoid nesting inside mobile dialog --}}

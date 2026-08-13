@@ -48,7 +48,7 @@
                             <x-icon name="o-user-circle" class="w-5 h-5" /> Account
                         </a>
                     @else
-                        <a href="/customer/login" class="btn btn-primary btn-sm">Sign In</a>
+                        <a href="{{ route('customer.login') }}" class="btn btn-primary btn-sm">Sign In</a>
                     @endif
                 </div>
 
@@ -90,7 +90,7 @@
                         <li><a href="/shop" class="hover:opacity-100 transition-opacity">Shop Products</a></li>
                         <li><a href="#services" class="hover:opacity-100 transition-opacity">Our Services</a></li>
                         <li><a href="#contact" class="hover:opacity-100 transition-opacity">Contact Us</a></li>
-                        <li><a href="/customer/login" class="hover:opacity-100 transition-opacity">My Account</a></li>
+                        <li><a href="{{ route('customer.login') }}" class="hover:opacity-100 transition-opacity">My Account</a></li>
                     </ul>
                 </div>
 
@@ -136,7 +136,7 @@
                 </div>
                 <span class="mt-0.5">Cart</span>
             </a>
-            <a href="{{ auth('customer')->check() ? '/account' : '/customer/login' }}" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('account*') ? 'text-primary' : 'text-base-content/60' }}">
+            <a href="{{ auth('customer')->check() ? '/account' : route('customer.login') }}" class="flex-1 flex flex-col items-center py-2 text-xs {{ request()->is('account*') ? 'text-primary' : 'text-base-content/60' }}">
                 <x-icon name="o-user" class="w-5 h-5" />
                 <span class="mt-0.5">Account</span>
             </a>

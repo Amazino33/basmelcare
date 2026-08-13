@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Livewire\Customer;
+
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+
+#[Layout('layouts.public')]
+class Account extends Component
+{
+    public string $activeTab = 'overview';
+
+    public function logout()
+    {
+        Auth::guard('customer')->logout();
+        session()->invalidate();
+        session()->regenerateToken();
+        $this->redirect('/');
+    }
+
+    public function render()
+    {
+        $customer = Auth::guard('customer')->user();
+
+        $recentSales = $customer->sales()->with('saleItems.product')->latest()->limit(5)->get();
+        $allSales = $customer->sales()->with('saleItems.product')->latest()->get();
+        $onlineOrders = $customer->orders()->with('items.product')->latest()->get();
+        $debts = $customer->debts()->with('sale', 'payments')->latest()->get();
+        $appointments = $customer->appointments()->with('staff')->latest()->get();
+        $medicalRecords = $customer->medicalRecords()->with('recorder')->latest()->get();
+        $creditPayouts = $customer->creditPayouts()->latest()->get();
+
+        $totalSpent = $customer->sales()->whereIn('status', ['paid', 'completed'])->sum('total_amount')
+            + $customer->orders()->where('payment_status', 'paid')->sum('total_amount');
+        $totalDebt = $customer->totalDebt;
+        $totalOrders = $customer->sales()->count() + $customer->orders()->count();
+
+        return view('livewire.customer.account', [
+            'customer' => $customer,
+            'recentSales' => $recentSales,
+            'allSales' => $allSales,
+            'debts' => $debts,
+            'onlineOrders' => $onlineOrders,
+            'appointments' => $appointments,
+            'medicalRecords' => $medicalRecords,
+            'creditPayouts' => $creditPayouts,
+            'totalSpent' => $totalSpent,
+            'totalDebt' => $totalDebt,
+            'totalOrders' => $totalOrders,
+        ]);
+    }
+}

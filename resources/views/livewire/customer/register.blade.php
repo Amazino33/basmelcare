@@ -42,7 +42,7 @@
 
                     <div class="text-center text-sm text-base-content/60">
                         Already have an account?
-                        <a href="/customer/login" class="text-primary font-semibold hover:underline">Sign In</a>
+                        <a href="{{ route('customer.login') }}" class="text-primary font-semibold hover:underline">Sign In</a>
                     </div>
                 </form>
             </div>

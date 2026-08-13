@@ -260,7 +260,7 @@
                         <a href="/shop" class="btn btn-accent">
                             <x-icon name="o-shopping-bag" class="w-5 h-5" /> Shop Now
                         </a>
-                        <a href="/customer/login" class="btn btn-ghost border border-primary-content/30">
+                        <a href="{{ route('customer.login') }}" class="btn btn-ghost border border-primary-content/30">
                             Create Account
                         </a>
                     </div>
