@@ -16,6 +16,7 @@ class Index extends Component
     public string $dateFrom = '';
     public string $dateTo = '';
 
+    public bool $canManage = false;
     public bool $modal = false;
     public ?int $editId = null;
     public string $category = '';
@@ -28,16 +29,11 @@ class Index extends Component
         $this->dateFrom = today()->startOfMonth()->toDateString();
         $this->dateTo = today()->toDateString();
         $this->expense_date = today()->toDateString();
+        $this->canManage = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
     }
 
     public function updatedSearch(): void { $this->resetPage(); }
     public function updatedCategoryFilter(): void { $this->resetPage(); }
-
-    private function canManage(): bool
-    {
-        $roles = auth()->user()->role ?? [];
-        return (bool) array_intersect($roles, ['admin', 'branch_manager']);
-    }
 
     public function openCreate(): void
     {
@@ -48,7 +44,7 @@ class Index extends Component
 
     public function openEdit(int $id): void
     {
-        if (!$this->canManage()) return;
+        if (!$this->canManage) return;
         $expense = Expense::findOrFail($id);
         $this->editId = $id;
         $this->category = $expense->category;
@@ -87,7 +83,7 @@ class Index extends Component
 
     public function delete(int $id): void
     {
-        if (!$this->canManage()) return;
+        if (!$this->canManage) return;
         Expense::findOrFail($id)->delete();
         $this->success('Expense deleted.');
     }
@@ -123,7 +119,6 @@ class Index extends Component
             'totalFiltered' => $totalFiltered,
             'byCategory'    => $byCategory,
             'categories'    => Expense::categories(),
-            'canManage'     => $this->canManage(),
         ]);
     }
 }

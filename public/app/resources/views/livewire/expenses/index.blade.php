@@ -67,7 +67,7 @@
         @endscope
 
         @scope('actions', $expense)
-            @if($canManage ?? false)
+            @if($canManage)
                 <div class="flex gap-1">
                     <x-button icon="o-pencil" wire:click="openEdit({{ $expense->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                     <x-button icon="o-trash" wire:click="delete({{ $expense->id }})" wire:confirm="Delete this expense?" class="btn-xs btn-ghost text-error" tooltip="Delete" />
