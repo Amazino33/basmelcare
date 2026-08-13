@@ -25,11 +25,11 @@ Route::middleware('auth:customer')->group(function () {
     Route::get('/account', App\Livewire\Customer\Account::class)->name('customer.account');
 });
 
-// Staff desk — all routes under /desk
-Route::prefix('desk')->group(function () {
+// Staff desk
+Route::prefix(config('app.desk_prefix'))->group(function () {
     Route::middleware('auth')->group(function () {
         // Everyone can access
-        Route::get('/', App\Livewire\Dashboard::class)->name('dashboard');
+        Route::get('/dashboard', App\Livewire\Dashboard::class)->name('dashboard');
         Route::view('profile', 'profile')->name('profile');
         Route::get('stock/take', App\Livewire\StockTake\Index::class)->name('stock-take.index');
         Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');

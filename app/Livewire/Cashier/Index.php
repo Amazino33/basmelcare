@@ -329,7 +329,10 @@ class Index extends Component
             \Illuminate\Support\Facades\Log::error('[WhatsApp Receipt] ' . $e->getMessage());
         }
 
-        return $this->lastPaidSaleId;
+        return [
+            'id'  => $this->lastPaidSaleId,
+            'url' => route('receipt.show', $this->lastPaidSaleId),
+        ];
     }
 
     private function buildReceiptMessage(Sale $sale): string

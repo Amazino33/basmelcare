@@ -120,7 +120,8 @@
     @script
     <script>
         $wire.on('open-debt-receipt', ({ id }) => {
-            window.open(`/desk/debt-payment/${id}/receipt`, '_blank');
+            const url = "{{ route('debt-payment.receipt', ['debtPayment' => '__ID__']) }}".replace('__ID__', id);
+            window.open(url, '_blank');
         });
     </script>
     @endscript

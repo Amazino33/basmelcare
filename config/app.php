@@ -67,6 +67,8 @@ return [
 
     'timezone' => 'Africa/Lagos',
 
+    'desk_prefix' => env('DESK_PREFIX', 'desk'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

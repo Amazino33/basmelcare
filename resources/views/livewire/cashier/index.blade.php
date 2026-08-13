@@ -599,7 +599,7 @@
                     <div class="flex gap-2 mt-3">
                         <x-button label="Back" wire:click="$set('payReview', false)" class="btn-ghost flex-1" icon="o-arrow-left" />
                         <button type="button" class="btn btn-success flex-1"
-                            x-on:click="async () => { const win = window.open('about:blank', '_blank'); const id = await $wire.call('processPayment'); id ? (win.location.href = '/desk/receipt/' + id) : win.close(); }">
+                            x-on:click="async () => { const win = window.open('about:blank', '_blank'); const result = await $wire.call('processPayment'); result?.url ? (win.location.href = result.url) : win.close(); }">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                             Confirm &amp; Pay
                         </button>

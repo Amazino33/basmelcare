@@ -4,7 +4,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-Route::prefix('desk')->group(function () {
+Route::prefix(config('app.desk_prefix'))->group(function () {
     Route::middleware('guest')->group(function () {
         Volt::route('login', 'pages.auth.login')
             ->name('login');
