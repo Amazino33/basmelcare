@@ -103,6 +103,10 @@
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
                 @endif
 
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'cashier']))
+                    <x-menu-item title="Expenses" icon="o-banknotes" link="{{ route('expenses.index') }}" />
+                @endif
+
                 @if(in_array('admin', $roles) || in_array('branch_manager', $roles))
                     <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
                 @endif
