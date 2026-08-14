@@ -1,4 +1,58 @@
 <div>
+    @php $isPromoter = in_array('promoter', auth()->user()->role ?? []) && !array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']); @endphp
+
+    @if($isPromoter)
+    {{-- ── Promoter Dashboard ── --}}
+    <x-header title="Dashboard" subtitle="Your referral activity" size="text-xl" />
+
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        <x-stat
+            title="Registered Today"
+            value="{{ $myCustomersToday }}"
+            description="new customers"
+            icon="o-user-plus"
+            color="text-primary"
+        />
+        <x-stat
+            title="Total Earned"
+            value="₦{{ number_format($myTotalEarned, 2) }}"
+            description="all time"
+            icon="o-currency-dollar"
+            color="text-success"
+        />
+        <x-stat
+            title="Pending Payout"
+            value="₦{{ number_format($myPending, 2) }}"
+            description="awaiting payment"
+            icon="o-clock"
+            color="{{ $myPending > 0 ? 'text-warning' : 'text-base-content/40' }}"
+        />
+    </div>
+
+    <x-card title="Recently Registered Customers">
+        @forelse($myRecentCustomers as $commission)
+            <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                <div class="min-w-0 flex-1">
+                    <div class="font-semibold text-sm">{{ $commission->customer->name }}</div>
+                    <div class="text-xs text-base-content/60">{{ $commission->created_at->format('M d, Y · H:i') }}</div>
+                </div>
+                <span class="font-bold text-primary text-sm ml-4 shrink-0">
+                    ₦{{ number_format($commission->amount, 2) }}
+                </span>
+            </div>
+        @empty
+            <div class="text-center py-8 text-base-content/40 text-sm">
+                No customers registered yet — head to Customers to get started.
+            </div>
+        @endforelse
+        <div class="mt-3 flex gap-2">
+            <x-button label="Register Customer" link="{{ route('customers.index') }}" class="btn-sm btn-primary" icon="o-plus" />
+            <x-button label="My Commissions" link="{{ route('commissions.index') }}" class="btn-sm btn-ghost" icon="o-currency-dollar" />
+        </div>
+    </x-card>
+
+    @else
+    {{-- ── Standard Pharmacy Dashboard ── --}}
     <x-header title="Dashboard" subtitle="BasmelCare Pharmacy Overview" size="text-xl">
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
@@ -258,6 +312,9 @@
         </x-card>
         @endif
     </div>
+
+    @endif
+    {{-- end standard dashboard --}}
 
     <!-- Setup Wizard Modal -->
     <x-modal wire:model="showWizard" title="Setup Wizard" box-class="max-w-lg" persistent>

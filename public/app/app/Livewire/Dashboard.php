@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Batch;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use Livewire\Component;
@@ -211,6 +212,13 @@ class Dashboard extends Component
 
         $setupProgress = $this->getSetupProgress();
 
+        // Promoter commission snapshot
+        $userId            = auth()->id();
+        $myCustomersToday  = ReferralCommission::where('user_id', $userId)->whereDate('created_at', today())->count();
+        $myTotalEarned     = (float) ReferralCommission::where('user_id', $userId)->sum('amount');
+        $myPending         = $myTotalEarned - (float) ReferralCommission::where('user_id', $userId)->whereNotNull('paid_at')->sum('amount');
+        $myRecentCustomers = ReferralCommission::with('customer')->where('user_id', $userId)->latest()->limit(5)->get();
+
         return view('livewire.dashboard.index', [
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
@@ -230,7 +238,11 @@ class Dashboard extends Component
             'todayOnlineCount' => $todayOnlineCount,
             'pendingOnlineOrders' => $pendingOnlineOrders,
             'recentOnlineOrders' => $recentOnlineOrders,
-            'setupProgress' => $setupProgress,
+            'setupProgress'      => $setupProgress,
+            'myCustomersToday'   => $myCustomersToday,
+            'myTotalEarned'      => $myTotalEarned,
+            'myPending'          => $myPending,
+            'myRecentCustomers'  => $myRecentCustomers,
         ]);
     }
 }
