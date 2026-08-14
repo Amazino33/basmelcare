@@ -70,7 +70,9 @@
                     </x-menu-sub>
                 @endif
 
-                <x-menu-item title="Stock Take" icon="o-clipboard-document-check" link="{{ route('stock-take.index') }}" />
+                @if(array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+                    <x-menu-item title="Stock Take" icon="o-clipboard-document-check" link="{{ route('stock-take.index') }}" />
+                @endif
 
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Inventory" icon="o-archive-box">

@@ -10,13 +10,13 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         // Everyone can access
         Route::get('/dashboard', App\Livewire\Dashboard::class)->name('dashboard');
         Route::view('profile', 'profile')->name('profile');
-        Route::get('stock/take', App\Livewire\StockTake\Index::class)->name('stock-take.index');
-        Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');
 
-        // POS & Online Orders — sales person (admin, pharmacist, branch_manager, sales)
+        // Sales and above: POS, online orders, stock take
         Route::middleware('role:admin,pharmacist,branch_manager,sales')->group(function () {
             Route::get('pos', App\Livewire\Pos\Index::class)->name('pos.index');
             Route::get('online-orders', App\Livewire\OnlineOrders\Index::class)->name('online-orders.index');
+            Route::get('stock/take', App\Livewire\StockTake\Index::class)->name('stock-take.index');
+            Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');
         });
 
         // Cashier — processes payments and debt book (admin, pharmacist, branch_manager, cashier)
