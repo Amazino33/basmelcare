@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Customers;
 
+use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\MedicalRecord;
+use App\Models\ReferralCommission;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -45,28 +47,42 @@ class Index extends Component
     public function save()
     {
         $this->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:retail,wholesale',
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
+            'name'    => 'required|string|max:255',
+            'type'    => 'required|in:retail,wholesale',
+            'phone'   => 'nullable|string|max:20',
+            'email'   => 'nullable|email|max:255',
             'address' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'notes'   => 'nullable|string',
         ]);
 
-        Customer::updateOrCreate(
-            ['id' => $this->customerId],
-            [
-                'name' => $this->name,
-                'type' => $this->type,
-                'phone' => $this->phone,
-                'email' => $this->email,
-                'address' => $this->address,
-                'notes' => $this->notes,
-            ]
-        );
+        $data = [
+            'name'    => $this->name,
+            'type'    => $this->type,
+            'phone'   => $this->phone,
+            'email'   => $this->email,
+            'address' => $this->address,
+            'notes'   => $this->notes,
+        ];
+
+        if ($this->customerId) {
+            Customer::findOrFail($this->customerId)->update($data);
+        } else {
+            $customer = Customer::create(array_merge($data, [
+                'registered_by' => auth()->id(),
+            ]));
+
+            $user = auth()->user();
+            if (array_intersect($user->role ?? [], ReferralCommission::eligibleRoles())) {
+                ReferralCommission::create([
+                    'user_id'     => $user->id,
+                    'customer_id' => $customer->id,
+                    'amount'      => (float) AppSetting::get('commission_amount', 100),
+                ]);
+            }
+        }
 
         $this->modal = false;
-        $this->success($this->customerId ? 'Customer updated.' : 'Customer created.');
+        $this->success($this->customerId ? 'Customer updated.' : 'Customer added.');
         $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
     }
 
@@ -145,6 +161,7 @@ class Index extends Component
             ['key' => 'type', 'label' => 'Type'],
             ['key' => 'phone', 'label' => 'Phone'],
             ['key' => 'email', 'label' => 'Email'],
+            ['key' => 'registered_by_name', 'label' => 'Registered By'],
         ];
 
         $viewCustomer = $this->viewCustomerId
@@ -160,7 +177,9 @@ class Index extends Component
 
         return view('livewire.customers.index', [
             'headers' => $headers,
-            'customers' => Customer::when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))->latest()->paginate(20),
+            'customers' => Customer::with('registeredBy')
+                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+                ->latest()->paginate(20),
             'viewCustomer' => $viewCustomer,
         ]);
     }

@@ -41,6 +41,11 @@ class User extends Authenticatable
         return $this->hasMany(Sale::class);
     }
 
+    public function referralCommissions()
+    {
+        return $this->hasMany(ReferralCommission::class);
+    }
+
     public function hasRole(string $role): bool
     {
         return in_array($role, $this->role ?? []);

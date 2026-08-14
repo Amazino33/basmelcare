@@ -46,6 +46,9 @@ class Index extends Component
     public int  $return_window_hours    = 48;
     public bool $return_require_customer = true;
 
+    // Commissions
+    public float $commission_amount = 100;
+
     // Incentives / HifastLink
     public string $hifastlink_api_key = '';
     public string $hifastlink_url = '';
@@ -82,6 +85,7 @@ class Index extends Component
 
         $this->return_window_hours     = (int) AppSetting::get('return_window_hours', 48);
         $this->return_require_customer = AppSetting::bool('return_require_customer', true);
+        $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
 
         $this->hifastlink_api_key = AppSetting::get('hifastlink_api_key', '');
         $this->hifastlink_url = AppSetting::get('hifastlink_url', '');
@@ -92,10 +96,12 @@ class Index extends Component
     {
         $this->validate([
             'return_window_hours' => 'required|integer|min:1|max:168',
+            'commission_amount'   => 'required|numeric|min:0',
         ]);
 
         AppSetting::set('return_window_hours', $this->return_window_hours);
         AppSetting::set('return_require_customer', $this->return_require_customer ? '1' : '0');
+        AppSetting::set('commission_amount', $this->commission_amount);
 
         $this->success('Return settings saved.');
     }

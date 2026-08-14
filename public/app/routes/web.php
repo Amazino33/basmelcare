@@ -36,8 +36,17 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('return/{saleReturn}/receipt', [App\Http\Controllers\InvoiceController::class, 'returnReceipt'])->name('return.receipt');
             Route::get('order-invoice/{order}', [App\Http\Controllers\InvoiceController::class, 'orderInvoice'])->name('order.invoice');
             Route::get('order-receipt/{order}', [App\Http\Controllers\InvoiceController::class, 'orderReceipt'])->name('order.receipt');
+        });
+
+        // Customers & appointments: sales roles + promoters
+        Route::middleware('role:admin,pharmacist,branch_manager,sales,cashier,promoter')->group(function () {
             Route::get('customers', App\Livewire\Customers\Index::class)->name('customers.index');
             Route::get('appointments', App\Livewire\Appointments\Index::class)->name('appointments.index');
+        });
+
+        // Commissions: managers see all; commission-eligible staff see own
+        Route::middleware('role:admin,branch_manager,promoter,cashier,sales')->group(function () {
+            Route::get('commissions', App\Livewire\Commissions\Index::class)->name('commissions.index');
         });
 
         // Inventory & Catalog (admin, pharmacist, branch_manager, inventory_manager)

@@ -12,7 +12,7 @@ class Customer extends Authenticatable
 
     protected $fillable = [
         'name', 'type', 'phone', 'email', 'password', 'address', 'notes',
-        'otp', 'otp_expires_at', 'credit_balance',
+        'otp', 'otp_expires_at', 'credit_balance', 'registered_by',
     ];
 
     protected $hidden = ['password', 'remember_token', 'otp'];
@@ -57,6 +57,16 @@ class Customer extends Authenticatable
     public function creditPayouts()
     {
         return $this->hasMany(CreditPayout::class);
+    }
+
+    public function registeredBy()
+    {
+        return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    public function referralCommission()
+    {
+        return $this->hasOne(ReferralCommission::class);
     }
 
     public function getTotalDebtAttribute(): float

@@ -144,6 +144,15 @@
                         hint="Block returns on walk-in sales (no customer attached). Disable to allow walk-in returns without credit."
                         class="mt-4"
                     />
+                    <x-input
+                        label="Commission per Customer Registered (₦)"
+                        wire:model="commission_amount"
+                        type="number"
+                        step="1"
+                        min="0"
+                        hint="Amount earned by promoters, cashiers, and sales staff each time they register a new customer."
+                        class="max-w-xs mt-4"
+                    />
                     <x-slot:actions>
                         <x-button label="Save Return Settings" type="submit" class="btn-primary" />
                     </x-slot:actions>

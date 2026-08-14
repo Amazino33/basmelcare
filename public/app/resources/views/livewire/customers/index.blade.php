@@ -16,6 +16,12 @@
             ]) />
         @endscope
 
+        @scope('cell_registered_by_name', $customer)
+            <span class="text-sm {{ $customer->registeredBy ? '' : 'text-base-content/40' }}">
+                {{ $customer->registeredBy?->name ?? '—' }}
+            </span>
+        @endscope
+
         @scope('actions', $customer)
             <div class="flex gap-1">
                 <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
