@@ -6,9 +6,11 @@ use App\Models\AppSetting;
 use App\Models\Batch;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -135,42 +137,89 @@ class Dashboard extends Component
     }
 
     /**
-     * True when the user holds a role exclusively — no operational role
-     * alongside it that would entitle them to the full pharmacy dashboard.
+     * A specialised dashboard applies only when the user holds nothing but
+     * that role. Any additional role means they do wider work and get the
+     * full pharmacy dashboard instead.
      */
-    private function isOnly(string $role): bool
+    private function hasOnlyRole(string $role): bool
     {
-        $roles = auth()->user()->role ?? [];
+        $roles = array_unique(auth()->user()->role ?? []);
 
-        return in_array($role, $roles)
-            && !array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+        return $roles === [$role];
     }
 
     private function contentDashboard()
     {
         $total   = Product::count();
-        $missing = Product::whereNull('image')->orWhere('image', '')->count();
+        $missing = Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))->count();
         $done    = $total - $missing;
 
         return view('livewire.dashboard.index', [
-            'isContentOnly'  => true,
-            'isPromoterOnly' => false,
-            'contentTotal'   => $total,
-            'contentDone'    => $done,
-            'contentMissing' => $missing,
-            'contentPercent' => $total > 0 ? (int) round(($done / $total) * 100) : 0,
+            'isContentOnly'   => true,
+            'isPromoterOnly'  => false,
+            'isInventoryOnly' => false,
+            'contentTotal'    => $total,
+            'contentDone'     => $done,
+            'contentMissing'  => $missing,
+            'contentPercent'  => $total > 0 ? (int) round(($done / $total) * 100) : 0,
             'contentAddedToday' => Product::whereDate('updated_at', today())
                 ->whereNotNull('image')->where('image', '!=', '')->count(),
-            'contentQueue'   => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
+            'contentQueue'    => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
                 ->latest()->limit(8)->get(),
+        ]);
+    }
+
+    /**
+     * Stock-focused view: no revenue, no profit — only what the person
+     * responsible for inventory needs to act on.
+     */
+    private function inventoryDashboard()
+    {
+        // One query with a subquery sum, rather than loading every batch.
+        $products = Product::withSum('batches as stock', 'quantity')->get();
+
+        $outOfStock = $products->filter(fn($p) => (int) ($p->stock ?? 0) === 0);
+        $lowStock   = $products->filter(
+            fn($p) => (int) ($p->stock ?? 0) > 0 && (int) $p->stock <= (int) $p->reorder_level
+        );
+
+        $inStockBatches = Batch::where('quantity', '>', 0);
+
+        return view('livewire.dashboard.index', [
+            'isContentOnly'   => false,
+            'isPromoterOnly'  => false,
+            'isInventoryOnly' => true,
+
+            'invProducts'   => $products->count(),
+            'invStockUnits' => (int) Batch::sum('quantity'),
+            'invOutOfStock' => $outOfStock->count(),
+            'invLowStock'   => $lowStock->count(),
+
+            'invStockValue' => (float) (clone $inStockBatches)->sum(DB::raw('quantity * cost_price')),
+            'invExpired'    => (clone $inStockBatches)->where('expiry_date', '<', now())->count(),
+            'invExpiringSoon' => (clone $inStockBatches)
+                ->whereBetween('expiry_date', [now(), now()->addDays(90)])->count(),
+            'invAwaitingDelivery' => PurchaseOrder::whereIn('status', ['sent', 'partially_received'])->count(),
+
+            'invExpiringBatches' => Batch::with('product')
+                ->where('quantity', '>', 0)
+                ->whereBetween('expiry_date', [now(), now()->addDays(90)])
+                ->orderBy('expiry_date')
+                ->limit(6)
+                ->get(),
+            'invLowStockList' => $lowStock->sortBy('stock')->take(6)->values(),
         ]);
     }
 
     public function render()
     {
-        // Image uploaders get their own view and none of the sales queries below.
-        if ($this->isOnly('content')) {
+        // Specialised roles get their own view and none of the sales queries below.
+        if ($this->hasOnlyRole('content')) {
             return $this->contentDashboard();
+        }
+
+        if ($this->hasOnlyRole('inventory_manager')) {
+            return $this->inventoryDashboard();
         }
 
         [$from, $to] = $this->getDateRange();
@@ -257,8 +306,9 @@ class Dashboard extends Component
         $myRecentCustomers = ReferralCommission::with('customer')->where('user_id', $userId)->latest()->limit(5)->get();
 
         return view('livewire.dashboard.index', [
-            'isContentOnly'  => false,
-            'isPromoterOnly' => $this->isOnly('promoter'),
+            'isContentOnly'   => false,
+            'isInventoryOnly' => false,
+            'isPromoterOnly'  => $this->hasOnlyRole('promoter'),
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
             'salesCountToday' => $salesCountToday,

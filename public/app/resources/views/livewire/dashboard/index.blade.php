@@ -73,6 +73,102 @@
         </div>
     </x-card>
 
+    @elseif($isInventoryOnly)
+    {{-- ── Inventory Manager Dashboard ── --}}
+    <x-header title="Dashboard" subtitle="Stock overview" size="text-xl" />
+
+    @if($invExpired > 0)
+        <a href="{{ route('expiry-alerts.index') }}" class="block mb-4">
+            <x-alert title="{{ $invExpired }} batch(es) already expired — remove from shelves"
+                     icon="o-exclamation-triangle" class="alert-error hover:opacity-80 transition-opacity" />
+        </a>
+    @endif
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <a href="{{ route('products.index') }}" class="block">
+            <x-stat title="Products" value="{{ $invProducts }}"
+                description="{{ number_format($invStockUnits) }} units in stock"
+                icon="o-cube" color="text-info"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+        <a href="{{ route('products.index', ['stockFilter' => 'out_of_stock']) }}" class="block">
+            <x-stat title="Out of Stock" value="{{ $invOutOfStock }}"
+                description="need restocking"
+                icon="o-exclamation-circle"
+                color="{{ $invOutOfStock > 0 ? 'text-error' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+        <a href="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="block">
+            <x-stat title="Low Stock" value="{{ $invLowStock }}"
+                description="at or below reorder level"
+                icon="o-arrow-trending-down"
+                color="{{ $invLowStock > 0 ? 'text-warning' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+        <a href="{{ route('purchase-orders.index') }}" class="block">
+            <x-stat title="Awaiting Delivery" value="{{ $invAwaitingDelivery }}"
+                description="purchase orders open"
+                icon="o-truck" color="text-primary"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-5">
+        <a href="{{ route('expiry-alerts.index') }}" class="block">
+            <x-stat title="Expiring in 90 Days" value="{{ $invExpiringSoon }}"
+                description="batches to move or return"
+                icon="o-clock"
+                color="{{ $invExpiringSoon > 0 ? 'text-warning' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+        <a href="{{ route('inventory.index') }}" class="block">
+            <x-stat title="Stock Value" value="₦{{ number_format($invStockValue, 2) }}"
+                description="at cost price"
+                icon="o-banknotes" color="text-info"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <x-card title="Expiring Soon" subtitle="Within 90 days">
+            @forelse($invExpiringBatches as $batch)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm truncate">{{ $batch->product?->name ?? '—' }}</div>
+                        <div class="text-xs text-base-content/60">
+                            Batch {{ $batch->batch_number ?? '—' }} · {{ $batch->quantity }} units
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold shrink-0 ml-3 {{ $batch->expiry_date->diffInDays(now()) <= 30 ? 'text-error' : 'text-warning' }}">
+                        {{ $batch->expiry_date->format('d M Y') }}
+                    </span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">Nothing expiring in the next 90 days.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="All Expiry Alerts" link="{{ route('expiry-alerts.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+
+        <x-card title="Low Stock" subtitle="At or below reorder level">
+            @forelse($invLowStockList as $product)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm truncate">{{ $product->name }}</div>
+                        <div class="text-xs text-base-content/60">Reorder level {{ $product->reorder_level }}</div>
+                    </div>
+                    <span class="text-xs font-bold text-warning shrink-0 ml-3 tabular-nums">{{ (int) $product->stock }} left</span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">No products are running low.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="Create Purchase Order" link="{{ route('purchase-orders.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+    </div>
+
     @elseif($isPromoterOnly)
     {{-- ── Promoter Dashboard ── --}}
     <x-header title="Dashboard" subtitle="Your referral activity" size="text-xl" />
@@ -157,8 +253,11 @@
         </x-card>
     @endif
 
+    @php $seesRevenue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']); @endphp
+
     <!-- Stats Row -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        @if($seesRevenue)
         <a href="{{ route('sales.index') }}" class="block">
             <x-stat
                 title="POS Sales · {{ $periodLabel }}"
@@ -169,6 +268,7 @@
                 class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
             />
         </a>
+        @endif
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
         <a href="{{ route('reports.index') }}" class="block">
             <x-stat
@@ -332,6 +432,7 @@
             </div>
         </x-card>
 
+        @if($seesRevenue)
         <!-- Recent Sales -->
         <x-card title="POS Sales · {{ $periodLabel }}">
             @forelse($recentSales as $sale)
@@ -351,6 +452,7 @@
                 <x-button label="All Sales" link="{{ route('sales.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
             </div>
         </x-card>
+        @endif
 
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager', 'sales']))
         <!-- Recent Online Orders -->
