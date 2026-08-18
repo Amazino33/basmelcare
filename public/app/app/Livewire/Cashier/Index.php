@@ -240,10 +240,20 @@ class Index extends Component
             'newCustomerEmail'  => 'nullable|email|max:255',
         ]);
 
+        $phone = Customer::normalizePhone($this->newCustomerPhone);
+
+        if ($phone && $existing = Customer::where('phone', $phone)->first()) {
+            $this->createCustomerModal = false;
+            $this->attachCustomer($existing->id);
+            $this->warning("{$existing->name} is already registered on this number — attached that record instead.");
+            return;
+        }
+
         $customer = Customer::create([
-            'name'  => $this->newCustomerName,
-            'phone' => $this->newCustomerPhone,
-            'email' => $this->newCustomerEmail ?: null,
+            'name'          => $this->newCustomerName,
+            'phone'         => $phone,
+            'email'         => $this->newCustomerEmail ?: null,
+            'registered_by' => auth()->id(),
         ]);
 
         $this->createCustomerModal = false;

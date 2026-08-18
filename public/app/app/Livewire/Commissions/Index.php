@@ -47,6 +47,8 @@ class Index extends Component
 
     public function openDetail(int $userId): void
     {
+        if (!$this->isManager()) return;
+
         $this->viewUserId   = $userId;
         $this->detailDrawer = true;
     }

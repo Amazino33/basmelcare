@@ -25,8 +25,10 @@
         @scope('actions', $customer)
             <div class="flex gap-1">
                 <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
-                <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
-                <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
+                @unless($isPromoter)
+                    <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                    <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
+                @endunless
             </div>
         @endscope
     </x-table>
@@ -91,6 +93,12 @@
                 <div class="flex justify-between"><span class="text-base-content/60">Address:</span> <span>{{ $viewCustomer->address ?? '—' }}</span></div>
             </div>
 
+            @if($isPromoter)
+                <div class="flex items-start gap-2 p-3 bg-base-200 rounded-lg text-sm text-base-content/60">
+                    <x-icon name="o-lock-closed" class="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>Purchase history, medical records and account balances are not available to promoters.</span>
+                </div>
+            @else
             <!-- Quick Stats -->
             <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="bg-base-200 rounded p-2 text-center">
@@ -239,6 +247,7 @@
                         <span class="font-bold text-error">₦{{ number_format($debt->balance, 2) }}</span>
                     </div>
                 @endforeach
+            @endif
             @endif
         @endif
     </x-drawer>

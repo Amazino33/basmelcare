@@ -46,6 +46,18 @@ class Index extends Component
     public $mr_file = null;
     public bool $mrModal = false;
 
+    /**
+     * A "pure" promoter — someone whose only role is promoter. Staff who also
+     * hold an operational role keep their normal, unrestricted access.
+     */
+    private function isPromoter(): bool
+    {
+        $roles = auth()->user()->role ?? [];
+
+        return in_array('promoter', $roles)
+            && !array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+    }
+
     public function create()
     {
         $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
@@ -54,9 +66,15 @@ class Index extends Component
 
     public function save()
     {
-        $user = auth()->user();
-        $isPromoter = in_array('promoter', $user->role ?? [])
-            && !array_intersect($user->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+        $user       = auth()->user();
+        $isPromoter = $this->isPromoter();
+
+        // Promoters may only ever create; they cannot edit existing records.
+        if ($isPromoter && $this->customerId) {
+            $this->modal = false;
+            $this->error('Promoters cannot edit customer records.');
+            return;
+        }
 
         $this->validate([
             'name'    => 'required|string|max:255',
@@ -67,10 +85,30 @@ class Index extends Component
             'notes'   => 'nullable|string',
         ]);
 
+        $phone = Customer::normalizePhone($this->phone);
+
+        // Reject a number already on file, in any spelling.
+        if ($phone) {
+            $clash = Customer::where('phone', $phone)
+                ->when($this->customerId, fn($q) => $q->whereKeyNot($this->customerId))
+                ->first();
+
+            if ($clash) {
+                $this->addError('phone', 'This phone number is already registered to ' . $clash->name . '.');
+                return;
+            }
+        }
+
+        // A promoter must not verify against a phone they control themselves.
+        if ($isPromoter && $phone && $phone === Customer::normalizePhone($user->phone)) {
+            $this->addError('phone', 'You cannot register a customer using your own phone number.');
+            return;
+        }
+
         $data = [
             'name'    => $this->name,
             'type'    => $this->type,
-            'phone'   => $this->phone,
+            'phone'   => $phone,
             'email'   => $this->email,
             'address' => $this->address,
             'notes'   => $this->notes,
@@ -117,42 +155,94 @@ class Index extends Component
             return;
         }
 
-        $customer = Customer::find($this->pendingCommissionCustomerId);
+        // pendingCommissionCustomerId is a public property and therefore
+        // client-controlled — never trust it without re-checking ownership.
+        $customer = Customer::where('id', $this->pendingCommissionCustomerId)
+            ->where('registered_by', auth()->id())
+            ->first();
+
         if (!$customer) {
             $this->otpModal = false;
-            $this->error('Customer not found.');
+            $this->resetPendingOtp();
+            $this->error('Customer not found, or not registered by you.');
+            return;
+        }
+
+        if (ReferralCommission::where('customer_id', $customer->id)->exists()) {
+            $this->otpModal = false;
+            $this->resetPendingOtp();
+            $this->error('A commission has already been recorded for this customer.');
+            return;
+        }
+
+        if ($customer->otpAttemptsExhausted()) {
+            $this->otpError = 'Too many incorrect attempts. Tap Resend to get a new code.';
             return;
         }
 
         if (!$customer->verifyOtp(trim($this->otpCode))) {
-            $this->otpError = 'Incorrect or expired OTP. Try again or tap Resend.';
+            $remaining = max(0, Customer::OTP_MAX_ATTEMPTS - (int) $customer->fresh()->otp_attempts);
+            $this->otpError = $remaining > 0
+                ? "Incorrect or expired OTP. {$remaining} attempt(s) left."
+                : 'Too many incorrect attempts. Tap Resend to get a new code.';
             return;
         }
 
         $customer->clearOtp();
 
         $amount = (float) AppSetting::get('commission_amount', 100);
-        ReferralCommission::create([
-            'user_id'     => auth()->id(),
-            'customer_id' => $customer->id,
-            'amount'      => $amount,
-        ]);
+
+        try {
+            ReferralCommission::create([
+                'user_id'     => auth()->id(),
+                'customer_id' => $customer->id,
+                'amount'      => $amount,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Unique (user_id, customer_id) — a concurrent double-submit.
+            $this->otpModal = false;
+            $this->resetPendingOtp();
+            $this->error('A commission has already been recorded for this customer.');
+            return;
+        }
 
         $this->otpModal = false;
-        $this->pendingCommissionCustomerId = null;
-        $this->pendingPhone = '';
-        $this->otpCode  = '';
-        $this->otpError = '';
+        $this->resetPendingOtp();
 
         $symbol = AppSetting::get('currency_symbol', '₦');
         $this->success("Phone verified! {$symbol}" . number_format($amount, 2) . ' commission earned.');
     }
 
+    private function resetPendingOtp(): void
+    {
+        $this->pendingCommissionCustomerId = null;
+        $this->pendingPhone = '';
+        $this->otpCode  = '';
+        $this->otpError = '';
+    }
+
     public function resendOtp(): void
     {
-        $customer = Customer::find($this->pendingCommissionCustomerId);
+        $customer = Customer::where('id', $this->pendingCommissionCustomerId)
+            ->where('registered_by', auth()->id())
+            ->first();
+
         if (!$customer || !$customer->phone) {
-            $this->otpError = 'Cannot resend — customer or phone not found.';
+            $this->otpError = 'Cannot resend — customer not found, or not registered by you.';
+            return;
+        }
+
+        if (ReferralCommission::where('customer_id', $customer->id)->exists()) {
+            $this->otpModal = false;
+            $this->resetPendingOtp();
+            $this->error('A commission has already been recorded for this customer.');
+            return;
+        }
+
+        // Throttle so resend can't be used to burn SMS credit or spam a number.
+        if ($customer->otp_sent_at && $customer->otp_sent_at->diffInSeconds(now()) < 60) {
+            $wait = 60 - $customer->otp_sent_at->diffInSeconds(now());
+            $this->otpError = "Please wait {$wait}s before requesting another code.";
             return;
         }
 
@@ -169,14 +259,13 @@ class Index extends Component
 
     public function skipOtp(): void
     {
-        $customer = Customer::find($this->pendingCommissionCustomerId);
+        $customer = Customer::where('id', $this->pendingCommissionCustomerId)
+            ->where('registered_by', auth()->id())
+            ->first();
         $customer?->clearOtp();
 
         $this->otpModal = false;
-        $this->pendingCommissionCustomerId = null;
-        $this->pendingPhone = '';
-        $this->otpCode  = '';
-        $this->otpError = '';
+        $this->resetPendingOtp();
         $this->warning('Customer added without verification. No commission logged.');
     }
 
@@ -189,6 +278,11 @@ class Index extends Component
 
     public function edit($id)
     {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot edit customer records.');
+            return;
+        }
+
         $customer = Customer::findOrFail($id);
         $this->customerId = $customer->id;
         $this->name = $customer->name;
@@ -202,18 +296,35 @@ class Index extends Component
 
     public function delete($id)
     {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot delete customer records.');
+            return;
+        }
+
         Customer::findOrFail($id)->delete();
         $this->success('Customer deleted.');
     }
 
     public function viewProfile($id)
     {
+        // Promoters may only open profiles of customers they registered.
+        if ($this->isPromoter()
+            && !Customer::where('id', $id)->where('registered_by', auth()->id())->exists()) {
+            $this->error('You can only view customers you registered.');
+            return;
+        }
+
         $this->viewCustomerId = $id;
         $this->profileDrawer = true;
     }
 
     public function openMedicalRecord()
     {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot access medical records.');
+            return;
+        }
+
         $this->reset(['mr_title', 'mr_type', 'mr_details', 'mr_date', 'mr_note', 'mr_file']);
         $this->mr_date = now()->format('Y-m-d');
         $this->mrModal = true;
@@ -221,6 +332,11 @@ class Index extends Component
 
     public function saveMedicalRecord()
     {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot access medical records.');
+            return;
+        }
+
         $this->validate([
             'mr_title' => 'required|string|max:255',
             'mr_type' => 'required|string|max:100',
@@ -250,6 +366,11 @@ class Index extends Component
 
     public function deleteMedicalRecord($id)
     {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot access medical records.');
+            return;
+        }
+
         MedicalRecord::findOrFail($id)->delete();
         $this->success('Medical record deleted.');
     }
@@ -265,20 +386,34 @@ class Index extends Component
             ['key' => 'registered_by_name', 'label' => 'Registered By'],
         ];
 
-        $viewCustomer = $this->viewCustomerId
-            ? Customer::with([
-                'medicalRecords' => fn($q) => $q->latest(),
-                'medicalRecords.recorder',
-                'sales' => fn($q) => $q->latest()->limit(10),
-                'orders' => fn($q) => $q->with('items.product')->latest()->limit(10),
-                'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial']),
-                'appointments' => fn($q) => $q->with('staff')->latest()->limit(5),
-            ])->find($this->viewCustomerId)
-            : null;
+        $isPromoter = $this->isPromoter();
+
+        // Promoters see only the customers they registered, and none of the
+        // clinical or financial history attached to them.
+        $viewCustomer = null;
+
+        if ($this->viewCustomerId) {
+            $relations = $isPromoter
+                ? []
+                : [
+                    'medicalRecords' => fn($q) => $q->latest(),
+                    'medicalRecords.recorder',
+                    'sales' => fn($q) => $q->latest()->limit(10),
+                    'orders' => fn($q) => $q->with('items.product')->latest()->limit(10),
+                    'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial']),
+                    'appointments' => fn($q) => $q->with('staff')->latest()->limit(5),
+                ];
+
+            $viewCustomer = Customer::with($relations)
+                ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
+                ->find($this->viewCustomerId);
+        }
 
         return view('livewire.customers.index', [
             'headers' => $headers,
+            'isPromoter' => $isPromoter,
             'customers' => Customer::with('registeredBy')
+                ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
                 ->latest()->paginate(20),
             'viewCustomer' => $viewCustomer,
