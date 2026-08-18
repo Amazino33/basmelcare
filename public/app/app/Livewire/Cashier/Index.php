@@ -80,7 +80,7 @@ class Index extends Component
             return;
         }
 
-        $sale = Sale::find($this->payingSaleId);
+        $sale = Sale::with('customer', 'saleItems.product')->find($this->payingSaleId);
 
         if (!$sale?->customer_id) {
             $this->error('Coupons can only be applied to sales with a registered customer. Attach a customer first.');
@@ -94,13 +94,33 @@ class Index extends Component
             return;
         }
 
-        $error = $coupon->getValidationError();
+        $saleItems   = $sale->saleItems->map(fn($item) => [
+            'product_id'  => $item->product_id,
+            'category_id' => $item->product?->category_id,
+            'subtotal'    => (float) $item->subtotal,
+        ])->all();
+        $categoryIds = $sale->saleItems->pluck('product.category_id')->filter()->unique()->map(fn($v) => (int) $v)->all();
+        $productIds  = $sale->saleItems->pluck('product_id')->unique()->map(fn($v) => (int) $v)->all();
+        $itemCount   = (int) $sale->saleItems->sum('quantity');
+
+        $error = $coupon->getValidationError(
+            (float) $sale->total_amount,
+            $sale->customer,
+            $categoryIds,
+            $productIds,
+            $itemCount
+        );
         if ($error) {
             $this->error($error);
             return;
         }
 
-        $discount = $coupon->calculateDiscount((float) $sale->total_amount);
+        $discount = $coupon->calculateDiscount((float) $sale->total_amount, $saleItems);
+
+        if ($discount <= 0) {
+            $this->error('This coupon yields no discount for the items in this sale.');
+            return;
+        }
 
         $this->appliedCoupon  = [
             'id'       => $coupon->id,
