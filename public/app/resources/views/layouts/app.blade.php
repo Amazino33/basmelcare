@@ -52,6 +52,10 @@
                     </x-menu-sub>
                 @endif
 
+                @if(array_intersect($roles, ['admin', 'content']))
+                    <x-menu-item title="Product Images" icon="o-photo" link="{{ route('media.index') }}" />
+                @endif
+
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
                     @php $onlineOrderCount = \App\Models\Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count(); @endphp
                     <x-menu-sub title="Sales" icon="o-shopping-cart">

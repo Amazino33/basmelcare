@@ -84,6 +84,11 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
         });
 
+        // Content / image uploaders (admin, content)
+        Route::middleware('role:admin,content')->group(function () {
+            Route::get('product-images', App\Livewire\Media\Index::class)->name('media.index');
+        });
+
         // Admin only
         Route::middleware('role:admin')->group(function () {
             Route::get('staff', App\Livewire\Staff\Index::class)->name('staff.index');
