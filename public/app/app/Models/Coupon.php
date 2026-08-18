@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Coupon extends Model
 {
     protected $fillable = [
-        'code', 'type', 'value', 'max_uses', 'used_count', 'expires_at', 'is_active',
+        'code', 'type', 'value', 'max_discount', 'max_uses', 'used_count', 'expires_at', 'is_active',
     ];
 
     protected $casts = [
@@ -25,7 +25,11 @@ class Coupon extends Model
     public function calculateDiscount(float $cartTotal): float
     {
         if ($this->type === 'percent') {
-            return round($cartTotal * ($this->value / 100), 2);
+            $discount = round($cartTotal * ($this->value / 100), 2);
+            if ($this->max_discount !== null) {
+                $discount = min($discount, (float) $this->max_discount);
+            }
+            return $discount;
         }
 
         return min((float) $this->value, $cartTotal);

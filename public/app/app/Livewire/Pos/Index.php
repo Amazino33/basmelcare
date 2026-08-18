@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Pos;
 
+use App\Models\AppSetting;
 use App\Models\Batch;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
@@ -263,6 +265,15 @@ class Index extends Component
             'confirmed_by' => auth()->id(),
             'confirmed_at' => now(),
         ]);
+
+        // Commission for sales person per completed handover (customer sales only)
+        if ($sale->customer_id && in_array('sales', auth()->user()->role ?? [])) {
+            ReferralCommission::create([
+                'user_id'     => auth()->id(),
+                'customer_id' => $sale->customer_id,
+                'amount'      => (float) AppSetting::get('commission_amount', 100),
+            ]);
+        }
 
         $this->success('Goods handed over. Sale completed.');
     }

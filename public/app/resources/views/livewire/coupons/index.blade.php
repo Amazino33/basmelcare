@@ -34,6 +34,9 @@
                                 <td>
                                     @if($coupon->type === 'percent')
                                         {{ $coupon->value }}% off
+                                        @if($coupon->max_discount)
+                                            <span class="text-xs text-base-content/50">(max ₦{{ number_format($coupon->max_discount, 2) }})</span>
+                                        @endif
                                     @else
                                         ₦{{ number_format($coupon->value, 2) }} off
                                     @endif
@@ -107,12 +110,24 @@
                 :suffix="$type === 'percent' ? '%' : null"
             />
 
+            @if($type === 'percent')
+                <x-input
+                    label="Maximum Discount (₦)"
+                    wire:model="max_discount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    prefix="₦"
+                    hint="Cap the discount — e.g. 10% off but never more than ₦500. Leave blank for no cap."
+                />
+            @endif
+
             <x-input
                 label="Max Uses"
                 wire:model="max_uses"
                 type="number"
                 min="1"
-                hint="Leave blank for unlimited"
+                hint="Leave blank for unlimited redemptions"
             />
 
             <x-input

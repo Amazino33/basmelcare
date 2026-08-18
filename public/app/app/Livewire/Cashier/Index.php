@@ -2,16 +2,18 @@
 
 namespace App\Livewire\Cashier;
 
+use App\Models\AppSetting;
+use App\Models\Coupon;
+use App\Models\Customer;
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use App\Models\Order;
+use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Mary\Traits\Toast;
-use App\Models\Coupon;
-use App\Models\Customer;
 
 class Index extends Component
 {
@@ -37,6 +39,7 @@ class Index extends Component
     public string $couponCode = '';
     public ?array $appliedCoupon = null;
     public float $couponDiscount = 0;
+
 
     // Attach customer to walk-in sale
     public bool $createCustomerModal    = false;
@@ -327,6 +330,15 @@ class Index extends Component
             }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('[WhatsApp Receipt] ' . $e->getMessage());
+        }
+
+        // Commission for cashier per completed payment (customer sales only)
+        if ($sale->customer_id && in_array('cashier', auth()->user()->role ?? [])) {
+            ReferralCommission::create([
+                'user_id'     => auth()->id(),
+                'customer_id' => $sale->customer_id,
+                'amount'      => (float) AppSetting::get('commission_amount', 100),
+            ]);
         }
 
         return [

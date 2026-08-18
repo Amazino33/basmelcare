@@ -39,7 +39,8 @@
                 ['id' => 'retail', 'name' => 'Retail'],
                 ['id' => 'wholesale', 'name' => 'Wholesale'],
             ]" option-value="id" option-label="name" />
-            <x-input label="Phone" wire:model="phone" />
+            <x-input label="Phone" wire:model="phone"
+                :hint="in_array('promoter', auth()->user()->role ?? []) && !$customerId ? 'Required — OTP will be sent here to verify the customer' : ''" />
             <x-input label="Email" wire:model="email" type="email" />
             <x-textarea label="Address" wire:model="address" rows="2" />
             <x-textarea label="Notes" wire:model="notes" rows="2" />
@@ -48,6 +49,33 @@
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
+    </x-modal>
+
+    <!-- OTP Verification Modal (promoters only) -->
+    <x-modal wire:model="otpModal" title="Verify Customer Phone" box-class="max-w-sm" persistent>
+        <div class="space-y-4">
+            <div class="flex items-start gap-3 p-3 bg-info/10 rounded-lg">
+                <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-info shrink-0 mt-0.5" />
+                <p class="text-sm text-base-content/80">
+                    An OTP was sent to <span class="font-bold">{{ $pendingPhone }}</span>.
+                    Ask the customer for the code they received.
+                </p>
+            </div>
+            <div>
+                <x-input label="Enter OTP" wire:model="otpCode" placeholder="000000"
+                    maxlength="6" inputmode="numeric"
+                    hint="6-digit code from the customer's phone"
+                    wire:keydown.enter="confirmOtp" />
+                @if($otpError)
+                    <p class="text-error text-xs mt-1">{{ $otpError }}</p>
+                @endif
+            </div>
+        </div>
+        <x-slot:actions>
+            <x-button label="Skip (no commission)" wire:click="skipOtp" class="btn-ghost btn-sm text-base-content/40 mr-auto" />
+            <x-button label="Resend" wire:click="resendOtp" class="btn-outline btn-sm" />
+            <x-button label="Verify & Earn" wire:click="confirmOtp" class="btn-primary btn-sm" />
+        </x-slot:actions>
     </x-modal>
 
     <!-- Customer Profile Drawer -->

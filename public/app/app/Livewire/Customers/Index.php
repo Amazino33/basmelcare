@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\MedicalRecord;
 use App\Models\ReferralCommission;
+use App\Services\WhatsAppService;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -24,6 +25,13 @@ class Index extends Component
     public string $notes = '';
     public ?int $customerId = null;
     public bool $modal = false;
+
+    // OTP verification for promoter commissions
+    public bool $otpModal = false;
+    public string $otpCode = '';
+    public string $otpError = '';
+    public ?int $pendingCommissionCustomerId = null;
+    public string $pendingPhone = '';
 
     // Customer profile drawer
     public ?int $viewCustomerId = null;
@@ -46,10 +54,14 @@ class Index extends Component
 
     public function save()
     {
+        $user = auth()->user();
+        $isPromoter = in_array('promoter', $user->role ?? [])
+            && !array_intersect($user->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+
         $this->validate([
             'name'    => 'required|string|max:255',
             'type'    => 'required|in:retail,wholesale',
-            'phone'   => 'nullable|string|max:20',
+            'phone'   => ($isPromoter && !$this->customerId) ? 'required|string|max:20' : 'nullable|string|max:20',
             'email'   => 'nullable|email|max:255',
             'address' => 'nullable|string',
             'notes'   => 'nullable|string',
@@ -66,24 +78,113 @@ class Index extends Component
 
         if ($this->customerId) {
             Customer::findOrFail($this->customerId)->update($data);
-        } else {
-            $customer = Customer::create(array_merge($data, [
-                'registered_by' => auth()->id(),
-            ]));
+            $this->modal = false;
+            $this->success('Customer updated.');
+            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+            return;
+        }
 
-            $user = auth()->user();
-            if (array_intersect($user->role ?? [], ReferralCommission::eligibleRoles())) {
-                ReferralCommission::create([
-                    'user_id'     => $user->id,
-                    'customer_id' => $customer->id,
-                    'amount'      => (float) AppSetting::get('commission_amount', 100),
-                ]);
+        $customer = Customer::create(array_merge($data, ['registered_by' => auth()->id()]));
+
+        if ($isPromoter) {
+            $otp  = $customer->generateOtp();
+            $sent = $this->sendOtp($customer->phone, $otp);
+
+            $this->modal = false;
+            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+
+            if ($sent) {
+                $this->pendingCommissionCustomerId = $customer->id;
+                $this->pendingPhone  = $customer->phone;
+                $this->otpCode  = '';
+                $this->otpError = '';
+                $this->otpModal = true;
+            } else {
+                $this->warning('Customer added, but OTP could not be sent — check WhatsApp/SMS settings. No commission logged.');
             }
+            return;
         }
 
         $this->modal = false;
-        $this->success($this->customerId ? 'Customer updated.' : 'Customer added.');
+        $this->success('Customer added.');
         $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+    }
+
+    public function confirmOtp(): void
+    {
+        if (empty(trim($this->otpCode))) {
+            $this->otpError = 'Please enter the OTP.';
+            return;
+        }
+
+        $customer = Customer::find($this->pendingCommissionCustomerId);
+        if (!$customer) {
+            $this->otpModal = false;
+            $this->error('Customer not found.');
+            return;
+        }
+
+        if (!$customer->verifyOtp(trim($this->otpCode))) {
+            $this->otpError = 'Incorrect or expired OTP. Try again or tap Resend.';
+            return;
+        }
+
+        $customer->clearOtp();
+
+        $amount = (float) AppSetting::get('commission_amount', 100);
+        ReferralCommission::create([
+            'user_id'     => auth()->id(),
+            'customer_id' => $customer->id,
+            'amount'      => $amount,
+        ]);
+
+        $this->otpModal = false;
+        $this->pendingCommissionCustomerId = null;
+        $this->pendingPhone = '';
+        $this->otpCode  = '';
+        $this->otpError = '';
+
+        $symbol = AppSetting::get('currency_symbol', '₦');
+        $this->success("Phone verified! {$symbol}" . number_format($amount, 2) . ' commission earned.');
+    }
+
+    public function resendOtp(): void
+    {
+        $customer = Customer::find($this->pendingCommissionCustomerId);
+        if (!$customer || !$customer->phone) {
+            $this->otpError = 'Cannot resend — customer or phone not found.';
+            return;
+        }
+
+        $otp  = $customer->generateOtp();
+        $sent = $this->sendOtp($customer->phone, $otp);
+
+        if ($sent) {
+            $this->otpError = '';
+            $this->info('OTP resent.');
+        } else {
+            $this->otpError = 'Failed to resend — check WhatsApp/SMS settings.';
+        }
+    }
+
+    public function skipOtp(): void
+    {
+        $customer = Customer::find($this->pendingCommissionCustomerId);
+        $customer?->clearOtp();
+
+        $this->otpModal = false;
+        $this->pendingCommissionCustomerId = null;
+        $this->pendingPhone = '';
+        $this->otpCode  = '';
+        $this->otpError = '';
+        $this->warning('Customer added without verification. No commission logged.');
+    }
+
+    private function sendOtp(string $phone, string $otp): bool
+    {
+        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $message = "Your {$name} registration code is: *{$otp}*. Valid for 10 minutes.";
+        return app(WhatsAppService::class)->send($phone, $message);
     }
 
     public function edit($id)

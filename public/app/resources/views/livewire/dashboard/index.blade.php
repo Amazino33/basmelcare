@@ -71,8 +71,8 @@
         </x-slot:actions>
     </x-header>
 
-    <!-- Setup Progress Bar -->
-    @if($setupProgress['percent'] < 100)
+    <!-- Setup Progress Bar (admin/pharmacist/branch_manager only) -->
+    @if($setupProgress['percent'] < 100 && array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager']))
         <x-card class="mb-4 border-primary/30">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                 <div>

@@ -153,6 +153,7 @@
                         hint="Amount earned by promoters, cashiers, and sales staff each time they register a new customer."
                         class="max-w-xs mt-4"
                     />
+
                     <x-slot:actions>
                         <x-button label="Save Return Settings" type="submit" class="btn-primary" />
                     </x-slot:actions>

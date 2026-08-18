@@ -94,7 +94,7 @@
                     @if(in_array('admin', $roles))
                         <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
                     @endif
-                    @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
+                    @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier', 'promoter']))
                         <x-menu-item title="Customers" icon="o-users" link="{{ route('customers.index') }}" />
                         <x-menu-item title="Appointments" icon="o-calendar" link="{{ route('appointments.index') }}" />
                     @endif
