@@ -11,12 +11,13 @@ class Coupon extends Model
         'code', 'type', 'value', 'max_discount',
         'customer_type', 'min_order_amount', 'max_order_amount',
         'restricted_categories', 'restricted_products', 'min_item_count',
-        'max_uses', 'used_count', 'expires_at', 'is_active',
+        'max_uses', 'used_count', 'expires_at', 'is_active', 'auto_apply',
     ];
 
     protected $casts = [
         'expires_at'             => 'datetime',
         'is_active'              => 'boolean',
+        'auto_apply'             => 'boolean',
         'value'                  => 'float',
         'restricted_categories'  => 'array',
         'restricted_products'    => 'array',

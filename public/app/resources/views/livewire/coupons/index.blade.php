@@ -40,7 +40,12 @@
                                 if ($coupon->min_item_count) $rules[] = 'Min ' . $coupon->min_item_count . ' items';
                             @endphp
                             <tr class="hover">
-                                <td class="font-mono font-bold">{{ $coupon->code }}</td>
+                                <td class="font-mono font-bold">
+                                    {{ $coupon->code }}
+                                    @if($coupon->auto_apply)
+                                        <span class="badge badge-info badge-xs align-middle ml-1 font-sans font-normal">Auto</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($coupon->type === 'percent')
                                         {{ $coupon->value }}% off
@@ -139,6 +144,10 @@
             <x-input label="Max Uses" wire:model="max_uses" type="number" min="1" hint="Leave blank for unlimited" />
             <x-input label="Expiry Date" wire:model="expires_at" type="date" hint="Leave blank for no expiry" />
             <x-checkbox label="Active" wire:model="is_active" />
+            <x-checkbox
+                label="Apply automatically"
+                wire:model="auto_apply"
+                hint="Applies at the cashier without typing the code, whenever the sale qualifies. If several auto coupons qualify, the customer gets the biggest discount." />
 
             {{-- Restrictions --}}
             <div class="divider text-xs text-base-content/40 my-1">Optional Restrictions</div>

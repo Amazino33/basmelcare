@@ -23,6 +23,7 @@ class Index extends Component
     public string $max_uses     = '';
     public string $expires_at   = '';
     public bool   $is_active    = true;
+    public bool   $auto_apply   = false;
 
     // Restrictions — toggles
     public bool $enableCustomerType = false;
@@ -46,7 +47,7 @@ class Index extends Component
             'min_order_amount', 'max_order_amount', 'restricted_categories',
             'restricted_products', 'min_item_count',
             'enableCustomerType', 'enableOrderAmount', 'enableCategories',
-            'enableProducts', 'enableItemCount',
+            'enableProducts', 'enableItemCount', 'auto_apply',
         ]);
         $this->type          = 'fixed';
         $this->is_active     = true;
@@ -66,6 +67,7 @@ class Index extends Component
         $this->max_uses     = $coupon->max_uses !== null ? (string) $coupon->max_uses : '';
         $this->expires_at   = $coupon->expires_at?->format('Y-m-d') ?? '';
         $this->is_active    = $coupon->is_active;
+        $this->auto_apply   = (bool) $coupon->auto_apply;
 
         $this->customer_type        = $coupon->customer_type ?? 'all';
         $this->enableCustomerType   = $this->customer_type !== 'all';
@@ -92,6 +94,7 @@ class Index extends Component
             'max_uses'     => 'nullable|integer|min:1',
             'expires_at'   => 'nullable|date|after:today',
             'is_active'    => 'boolean',
+            'auto_apply'   => 'boolean',
             // Restrictions
             'customer_type'          => 'in:all,new,returning',
             'min_order_amount'       => 'nullable|numeric|min:0.01',

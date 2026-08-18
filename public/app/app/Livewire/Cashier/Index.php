@@ -68,6 +68,7 @@ class Index extends Component
         $this->apply_credit = $sale?->customer_id && ($sale->customer->credit_balance ?? 0) > 0;
 
         $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
+        $this->autoApplyCoupon();
         $this->payModal = true;
     }
 
@@ -94,42 +95,29 @@ class Index extends Component
             return;
         }
 
-        $saleItems   = $sale->saleItems->map(fn($item) => [
-            'product_id'  => $item->product_id,
-            'category_id' => $item->product?->category_id,
-            'subtotal'    => (float) $item->subtotal,
-        ])->all();
-        $categoryIds = $sale->saleItems->pluck('product.category_id')->filter()->unique()->map(fn($v) => (int) $v)->all();
-        $productIds  = $sale->saleItems->pluck('product_id')->unique()->map(fn($v) => (int) $v)->all();
-        $itemCount   = (int) $sale->saleItems->sum('quantity');
+        $ctx   = $this->couponContext($sale);
+        $total = (float) $sale->total_amount;
 
         $error = $coupon->getValidationError(
-            (float) $sale->total_amount,
+            $total,
             $sale->customer,
-            $categoryIds,
-            $productIds,
-            $itemCount
+            $ctx['categoryIds'],
+            $ctx['productIds'],
+            $ctx['itemCount']
         );
         if ($error) {
             $this->error($error);
             return;
         }
 
-        $discount = $coupon->calculateDiscount((float) $sale->total_amount, $saleItems);
+        $discount = $coupon->calculateDiscount($total, $ctx['items']);
 
         if ($discount <= 0) {
             $this->error('This coupon yields no discount for the items in this sale.');
             return;
         }
 
-        $this->appliedCoupon  = [
-            'id'       => $coupon->id,
-            'code'     => $coupon->code,
-            'type'     => $coupon->type,
-            'value'    => $coupon->value,
-            'discount' => $discount,
-        ];
-        $this->couponDiscount = $discount;
+        $this->setAppliedCoupon($coupon, $discount, false);
         $this->success('Coupon applied! −₦' . number_format($discount, 2));
     }
 
@@ -138,12 +126,89 @@ class Index extends Component
         $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
     }
 
+    /**
+     * Build the cart context every coupon rule is evaluated against.
+     */
+    private function couponContext(Sale $sale): array
+    {
+        return [
+            'items' => $sale->saleItems->map(fn($item) => [
+                'product_id'  => $item->product_id,
+                'category_id' => $item->product?->category_id,
+                'subtotal'    => (float) $item->subtotal,
+            ])->all(),
+            'categoryIds' => $sale->saleItems->pluck('product.category_id')->filter()->unique()->map(fn($v) => (int) $v)->all(),
+            'productIds'  => $sale->saleItems->pluck('product_id')->unique()->map(fn($v) => (int) $v)->all(),
+            'itemCount'   => (int) $sale->saleItems->sum('quantity'),
+        ];
+    }
+
+    private function setAppliedCoupon(Coupon $coupon, float $discount, bool $auto): void
+    {
+        $this->appliedCoupon = [
+            'id'       => $coupon->id,
+            'code'     => $coupon->code,
+            'type'     => $coupon->type,
+            'value'    => $coupon->value,
+            'discount' => $discount,
+            'auto'     => $auto,
+        ];
+        $this->couponDiscount = $discount;
+    }
+
+    /**
+     * Apply the best-value auto-apply coupon the sale qualifies for.
+     * Never overrides a coupon the cashier entered by hand.
+     */
+    private function autoApplyCoupon(): void
+    {
+        if ($this->appliedCoupon) {
+            return;
+        }
+
+        $sale = Sale::with('customer', 'saleItems.product')->find($this->payingSaleId);
+
+        if (!$sale?->customer_id) {
+            return;
+        }
+
+        $ctx   = $this->couponContext($sale);
+        $total = (float) $sale->total_amount;
+
+        $best = null;
+
+        foreach (Coupon::where('is_active', true)->where('auto_apply', true)->get() as $coupon) {
+            $invalid = $coupon->getValidationError(
+                $total,
+                $sale->customer,
+                $ctx['categoryIds'],
+                $ctx['productIds'],
+                $ctx['itemCount']
+            );
+            if ($invalid) {
+                continue;
+            }
+
+            $discount = $coupon->calculateDiscount($total, $ctx['items']);
+
+            if ($discount > 0 && (!$best || $discount > $best['discount'])) {
+                $best = ['coupon' => $coupon, 'discount' => $discount];
+            }
+        }
+
+        if ($best) {
+            $this->setAppliedCoupon($best['coupon'], $best['discount'], true);
+        }
+    }
+
     public function detachCustomer(): void
     {
         $sale = Sale::findOrFail($this->payingSaleId);
         $sale->update(['customer_id' => null]);
         $this->apply_credit = false;
         $this->customerSearch = '';
+        // Coupons require a registered customer, so any applied one is no longer valid.
+        $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
         $this->success('Customer removed from this sale.');
     }
 
@@ -155,6 +220,7 @@ class Index extends Component
         $customer = Customer::findOrFail($customerId);
         $this->apply_credit = $customer->credit_balance > 0;
         $this->customerSearch = '';
+        $this->autoApplyCoupon();
         $this->success($customer->name . ' attached to this sale.');
     }
 

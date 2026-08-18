@@ -279,7 +279,12 @@
                         <div class="flex items-center gap-2">
                             <x-icon name="o-tag" class="w-4 h-4 text-success shrink-0" />
                             <div>
-                                <div class="font-mono font-bold text-success text-sm">{{ $appliedCoupon['code'] }}</div>
+                                <div class="font-mono font-bold text-success text-sm">
+                                    {{ $appliedCoupon['code'] }}
+                                    @if($appliedCoupon['auto'] ?? false)
+                                        <span class="badge badge-info badge-xs align-middle ml-1 font-sans font-normal">Auto</span>
+                                    @endif
+                                </div>
                                 <div class="text-xs text-base-content/60">
                                     {{ $appliedCoupon['type'] === 'percent' ? $appliedCoupon['value'].'% off' : '₦'.number_format($appliedCoupon['value'], 2).' off' }}
                                     &rarr; −₦{{ number_format($appliedCoupon['discount'], 2) }}
