@@ -1,7 +1,79 @@
 <div>
-    @php $isPromoter = in_array('promoter', auth()->user()->role ?? []) && !array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']); @endphp
+    @if($isContentOnly)
+    {{-- ── Image Uploader Dashboard ── --}}
+    <x-header title="Dashboard" subtitle="Product image coverage" size="text-xl" />
 
-    @if($isPromoter)
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <x-stat
+            title="Still Missing"
+            value="{{ $contentMissing }}"
+            description="products need a photo"
+            icon="o-photo"
+            color="{{ $contentMissing > 0 ? 'text-warning' : 'text-success' }}"
+            class="text-sm h-full"
+        />
+        <x-stat
+            title="Done"
+            value="{{ $contentDone }}"
+            description="of {{ $contentTotal }} products"
+            icon="o-check-circle"
+            color="text-success"
+            class="text-sm h-full"
+        />
+        <x-stat
+            title="Coverage"
+            value="{{ $contentPercent }}%"
+            description="catalogue with images"
+            icon="o-chart-pie"
+            color="text-info"
+            class="text-sm h-full"
+        />
+        <x-stat
+            title="Updated Today"
+            value="{{ $contentAddedToday }}"
+            description="images touched"
+            icon="o-arrow-up-tray"
+            color="text-primary"
+            class="text-sm h-full"
+        />
+    </div>
+
+    <x-card class="mb-5">
+        <div class="flex justify-between items-end mb-2">
+            <span class="text-sm font-semibold">Catalogue coverage</span>
+            <span class="text-sm text-base-content/60 tabular-nums">{{ $contentDone }} / {{ $contentTotal }}</span>
+        </div>
+        <progress
+            class="progress {{ $contentPercent === 100 ? 'progress-success' : 'progress-primary' }} w-full"
+            value="{{ $contentPercent }}" max="100"></progress>
+    </x-card>
+
+    <x-card title="Next up — products without an image">
+        @forelse($contentQueue as $product)
+            <div class="flex items-center gap-3 p-2 border-b border-base-200 last:border-0">
+                <div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+                    <x-icon name="o-photo" class="w-4 h-4 text-base-content/30" />
+                </div>
+                <a href="https://www.google.com/search?q={{ urlencode($product->name) }}&tbm=isch"
+                   target="_blank" rel="noopener noreferrer"
+                   class="flex-1 min-w-0 text-sm font-medium text-primary hover:underline truncate">
+                    {{ $product->name }}
+                </a>
+            </div>
+        @empty
+            <div class="text-center py-8 text-base-content/50 text-sm">
+                <x-icon name="o-check-circle" class="w-10 h-10 mx-auto mb-2 text-success opacity-40" />
+                Every product has an image. Nothing left to do.
+            </div>
+        @endforelse
+
+        <div class="mt-3">
+            <x-button label="Go to Product Images" link="{{ route('media.index') }}"
+                      class="btn-sm btn-primary" icon="o-photo" />
+        </div>
+    </x-card>
+
+    @elseif($isPromoterOnly)
     {{-- ── Promoter Dashboard ── --}}
     <x-header title="Dashboard" subtitle="Your referral activity" size="text-xl" />
 
