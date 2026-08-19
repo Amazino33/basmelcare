@@ -107,7 +107,9 @@
                                     min="0"
                                     wire:model="bulkEdits.{{ $product->id }}.selling_price"
                                     data-bulk-sell
-                                    class="input input-sm input-bordered w-full"
+                                    @disabled(! $this->canSetPrices())
+                                    class="input input-sm input-bordered w-full disabled:opacity-60"
+                                    @if(! $this->canSetPrices()) title="Only an admin or branch manager can change prices" @endif
                                 />
                                 <div class="bulk-price-warn text-warning text-xs mt-0.5 items-center gap-1" style="display:none">
                                     ⚠ Below cost
@@ -162,9 +164,16 @@
             @endscope
 
             @scope('cell_selling_price', $product)
+                @if((float) $product->selling_price <= 0)
+                    <span class="badge badge-warning badge-sm gap-1">
+                        <x-icon name="o-exclamation-triangle" class="w-3 h-3" />
+                        Needs pricing
+                    </span>
+                @else
                 ₦{{ number_format($product->selling_price, 2) }}
-                @if($product->wholesale_price)
-                    <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
+                    @if($product->wholesale_price)
+                        <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
+                    @endif
                 @endif
             @endscope
 
@@ -207,7 +216,12 @@
                      ? 'flex' : 'none'">
                 <div class="grid grid-cols-2 gap-4">
                     <x-input label="Cost Price" wire:model.live="quick_cost_price" prefix="₦" type="number" step="0.01" />
-                    <x-input label="Selling Price" wire:model.live="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled from cost · type to override" />
+                    @if($this->canSetPrices())
+                        <x-input label="Selling Price" wire:model.live="quick_selling_price" prefix="₦" type="number" step="0.01" hint="Auto-filled from cost · type to override" />
+                    @else
+                        <x-input label="Selling Price" value="Set by manager" readonly
+                            hint="Saves unpriced — a manager will set it" class="opacity-60" />
+                    @endif
                     <x-input label="Quantity" wire:model="quick_quantity" type="number" min="1" />
                     <x-input label="Expiry Date" wire:model="quick_expiry_date" type="month" />
                 </div>
@@ -272,24 +286,42 @@
                     step="0.01"
                     hint="Not saved — used to auto-calculate selling price"
                 />
-                <div x-data
-                     x-effect="$el.querySelector('.price-warn').style.display =
-                         (parseFloat($wire.selling_price) > 0 && parseFloat($wire.cost_price_hint) > 0 && parseFloat($wire.selling_price) < parseFloat($wire.cost_price_hint))
-                         ? 'flex' : 'none'">
-                    <x-input
-                        label="Selling Price (Retail)"
-                        wire:model.live="selling_price"
-                        prefix="₦"
-                        type="number"
-                        step="0.01"
-                        hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
-                    />
-                    <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
-                        <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
-                        Selling price is below cost — you will sell at a loss.
+                @if($this->canSetPrices())
+                    <div x-data
+                         x-effect="$el.querySelector('.price-warn').style.display =
+                             (parseFloat($wire.selling_price) > 0 && parseFloat($wire.cost_price_hint) > 0 && parseFloat($wire.selling_price) < parseFloat($wire.cost_price_hint))
+                             ? 'flex' : 'none'">
+                        <x-input
+                            label="Selling Price (Retail)"
+                            wire:model.live="selling_price"
+                            prefix="₦"
+                            type="number"
+                            step="0.01"
+                            hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
+                        />
+                        <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
+                            <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                            Selling price is below cost — you will sell at a loss.
+                        </div>
                     </div>
-                </div>
-                <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
+                    <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
+                @else
+                    <div class="md:col-span-2">
+                        <div class="flex items-start gap-2 p-3 bg-base-200 rounded-lg">
+                            <x-icon name="o-lock-closed" class="w-4 h-4 shrink-0 mt-0.5 text-base-content/50" />
+                            <div class="text-sm">
+                                <p class="font-medium">Pricing is set by a manager</p>
+                                <p class="text-xs text-base-content/60 mt-0.5">
+                                    @if($productId)
+                                        Current price: <span class="font-semibold">₦{{ number_format((float) $selling_price, 2) }}</span>. Ask an admin or branch manager to change it.
+                                    @else
+                                        Save the product and stock now — an admin or branch manager will set the price.
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
                 <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
                 <div class="md:col-span-2">

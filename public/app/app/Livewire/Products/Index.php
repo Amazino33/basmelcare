@@ -19,6 +19,16 @@ class Index extends Component
 {
     use Toast, WithPagination, WithFileUploads;
 
+    /**
+     * Selling and wholesale price are commercial decisions, so they are limited
+     * to admin and branch_manager. Everyone else may still manage the product's
+     * details and stock — see the money-trail audit for who changes what.
+     */
+    public function canSetPrices(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
+    }
+
     public string $search = '';
 
     #[Url]
@@ -121,11 +131,16 @@ class Index extends Component
             $product = Product::with('batches')->find($productId);
             if (!$product) continue;
 
-            $product->update([
-                'name'          => strtoupper(trim($data['name'])),
-                'category_id'   => $data['category_id'] ?: $product->category_id,
-                'selling_price' => (float) $data['selling_price'],
-            ]);
+            $update = [
+                'name'        => strtoupper(trim($data['name'])),
+                'category_id' => $data['category_id'] ?: $product->category_id,
+            ];
+
+            if ($this->canSetPrices()) {
+                $update['selling_price'] = (float) $data['selling_price'];
+            }
+
+            $product->update($update);
 
             $newQty     = (int) ($data['qty'] ?? 0);
             $newCost    = (float) ($data['cost_price'] ?? 0);
@@ -249,7 +264,8 @@ class Index extends Component
         $product = Product::create([
             'name'          => $this->quick_name,
             'category_id'   => $this->quick_category_id,
-            'selling_price' => $this->quick_selling_price,
+            // Saves unpriced for a pricing role to set — stock still gets booked in.
+            'selling_price' => $this->canSetPrices() ? $this->quick_selling_price : 0,
             'reorder_level' => 0,
         ]);
 
@@ -298,7 +314,8 @@ class Index extends Component
             }],
             'sku' => 'nullable|string|max:100|unique:products,sku,' . $this->productId,
             'category_id' => 'required|exists:categories,id',
-            'selling_price' => 'required|numeric|min:0',
+            // Pricing roles must give a price; others cannot set one at all.
+            'selling_price' => $this->canSetPrices() ? 'required|numeric|min:0' : 'nullable',
             'wholesale_price' => 'nullable|numeric|min:0',
             'wholesale_min_qty' => 'nullable|integer|min:1',
             'reorder_level' => 'required|integer|min:0',
@@ -313,13 +330,20 @@ class Index extends Component
             'name' => $this->name,
             'sku' => $this->sku,
             'category_id' => $this->category_id,
-            'selling_price' => $this->selling_price,
-            'wholesale_price' => $this->wholesale_price ?: null,
             'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
             'reorder_level' => $this->reorder_level,
             'description' => $this->description,
             'barcode' => $this->barcode,
         ];
+
+        // Prices are a commercial decision. Non-pricing roles may add a product
+        // so a delivery isn't blocked, but it saves unpriced for admin to set.
+        if ($this->canSetPrices()) {
+            $data['selling_price']   = $this->selling_price;
+            $data['wholesale_price'] = $this->wholesale_price ?: null;
+        } elseif (!$this->productId) {
+            $data['selling_price'] = 0;
+        }
 
         if ($this->photo) {
             $data['image'] = $this->photo->store('products', 'public');
