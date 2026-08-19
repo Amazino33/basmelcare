@@ -23,9 +23,15 @@
         @endscope
 
         @scope('actions', $customer)
+            {{-- @scope does not inherit view variables — resolve the role here. --}}
+            @php
+                $actorRoles = auth()->user()->role ?? [];
+                $actorIsPromoter = in_array('promoter', $actorRoles)
+                    && ! array_intersect($actorRoles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+            @endphp
             <div class="flex gap-1">
                 <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
-                @unless($isPromoter)
+                @unless($actorIsPromoter)
                     <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                     <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
                 @endunless
