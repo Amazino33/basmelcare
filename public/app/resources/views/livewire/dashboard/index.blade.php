@@ -1,4 +1,16 @@
 <div>
+    @php
+        // MaryUI's x-stat is built for desktop: px-5 padding, a fixed w-9 icon and
+        // a whitespace-nowrap title. On a 360px phone that leaves ~66px for text,
+        // so titles clip and ₦ values overflow. Compact it below sm, full size above.
+        $stat = 'px-3 py-3 sm:px-5 sm:py-4'
+              . ' [&_svg]:w-7 [&_svg]:h-7 sm:[&_svg]:w-9 sm:[&_svg]:h-9'
+              . ' [&_.gap-3]:gap-2 sm:[&_.gap-3]:gap-3'
+              . ' [&_.font-black]:text-base sm:[&_.font-black]:text-xl'
+              . ' [&_.whitespace-nowrap]:whitespace-normal [&_.whitespace-nowrap]:leading-tight'
+              . ' [&_.stat-desc]:hidden sm:[&_.stat-desc]:block';
+    @endphp
+
     @if($panels)
     {{-- ── Focused-role dashboard: one panel per role held ── --}}
     @php $multi = count($panels) > 1; @endphp
@@ -18,7 +30,7 @@
             description="products need a photo"
             icon="o-photo"
             color="{{ $contentMissing > 0 ? 'text-warning' : 'text-success' }}"
-            class="text-sm h-full"
+            class="text-sm h-full {{ $stat }}"
         />
         <x-stat
             title="Done"
@@ -26,7 +38,7 @@
             description="of {{ $contentTotal }} products"
             icon="o-check-circle"
             color="text-success"
-            class="text-sm h-full"
+            class="text-sm h-full {{ $stat }}"
         />
         <x-stat
             title="Coverage"
@@ -34,7 +46,7 @@
             description="catalogue with images"
             icon="o-chart-pie"
             color="text-info"
-            class="text-sm h-full"
+            class="text-sm h-full {{ $stat }}"
         />
         <x-stat
             title="Updated Today"
@@ -42,7 +54,7 @@
             description="images touched"
             icon="o-arrow-up-tray"
             color="text-primary"
-            class="text-sm h-full"
+            class="text-sm h-full {{ $stat }}"
         />
     </div>
 
@@ -97,27 +109,27 @@
             <x-stat title="Products" value="{{ $invProducts }}"
                 description="{{ number_format($invStockUnits) }} units in stock"
                 icon="o-cube" color="text-info"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
         <a href="{{ route('products.index', ['stockFilter' => 'out_of_stock']) }}" class="block">
             <x-stat title="Out of Stock" value="{{ $invOutOfStock }}"
                 description="need restocking"
                 icon="o-exclamation-circle"
                 color="{{ $invOutOfStock > 0 ? 'text-error' : 'text-success' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
         <a href="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="block">
             <x-stat title="Low Stock" value="{{ $invLowStock }}"
                 description="at or below reorder level"
                 icon="o-arrow-trending-down"
                 color="{{ $invLowStock > 0 ? 'text-warning' : 'text-success' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
         <a href="{{ route('purchase-orders.index') }}" class="block">
             <x-stat title="Awaiting Delivery" value="{{ $invAwaitingDelivery }}"
                 description="purchase orders open"
                 icon="o-truck" color="text-primary"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
     </div>
 
@@ -127,13 +139,13 @@
                 description="batches to move or return"
                 icon="o-clock"
                 color="{{ $invExpiringSoon > 0 ? 'text-warning' : 'text-success' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
         <a href="{{ route('inventory.index') }}" class="block">
             <x-stat title="Stock Value" value="₦{{ number_format($invStockValue, 2) }}"
                 description="at cost price"
                 icon="o-banknotes" color="text-info"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full" />
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
         </a>
     </div>
 
@@ -207,13 +219,14 @@
         @endif
     </x-card>
 
-    <div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         <x-stat
             title="Codes Given"
             value="{{ $myProgress['issued'] }}"
             description="today"
             icon="o-ticket"
             color="text-primary"
+            class="h-full {{ $stat }}"
         />
         <x-stat
             title="Total Earned"
@@ -221,6 +234,7 @@
             description="all time"
             icon="o-currency-dollar"
             color="text-success"
+            class="h-full {{ $stat }}"
         />
         <x-stat
             title="Pending Payout"
@@ -228,6 +242,7 @@
             description="awaiting payment"
             icon="o-clock"
             color="{{ $myPending > 0 ? 'text-warning' : 'text-base-content/40' }}"
+            class="h-full col-span-2 sm:col-span-1 {{ $stat }}"
         />
     </div>
 
@@ -251,7 +266,7 @@
                 No one registered yet today — head to Customers to get started.
             </div>
         @endforelse
-        <div class="mt-3 flex gap-2">
+        <div class="mt-3 flex flex-wrap gap-2">
             <x-button label="Register Customer" link="{{ route('customers.index') }}" class="btn-sm btn-primary" icon="o-plus" />
             <x-button label="My Commissions" link="{{ route('commissions.index') }}" class="btn-sm btn-ghost" icon="o-currency-dollar" />
         </div>
@@ -304,7 +319,7 @@
                 description="{{ $salesCountToday }} transactions"
                 icon="o-banknotes"
                 color="text-primary"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         @endif
@@ -316,7 +331,7 @@
                 description="Revenue - cost"
                 icon="o-arrow-trending-up"
                 color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         @endif
@@ -327,7 +342,7 @@
                 description="{{ $totalStock }} in stock"
                 icon="o-cube"
                 color="text-info"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         <a href="{{ route('products.index', ['stockFilter' => 'out_of_stock']) }}" class="block">
@@ -337,7 +352,7 @@
                 description="Need restocking"
                 icon="o-exclamation-circle"
                 color="text-error"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
     </div>
@@ -352,7 +367,7 @@
                 description="{{ $todayOnlineCount }} orders"
                 icon="o-globe-alt"
                 color="text-secondary"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         <a href="{{ route('online-orders.index') }}" class="block">
@@ -362,7 +377,7 @@
                 description="Awaiting processing"
                 icon="o-clock"
                 color="{{ $pendingOnlineOrders > 0 ? 'text-warning' : 'text-base-content/40' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         <a href="{{ route('reports.index') }}" class="col-span-2 lg:col-span-1 block bg-base-100 rounded-lg p-4 shadow-sm hover:bg-base-200 transition-colors cursor-pointer">
