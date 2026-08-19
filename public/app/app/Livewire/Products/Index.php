@@ -132,7 +132,8 @@ class Index extends Component
             if (!$product) continue;
 
             $update = [
-                'name'        => strtoupper(trim($data['name'])),
+                // Casing is normalised by Product::setNameAttribute().
+                'name'        => $data['name'],
                 'category_id' => $data['category_id'] ?: $product->category_id,
             ];
 
