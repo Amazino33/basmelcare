@@ -2,10 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use RecordsAudit;
+
+    /** Prices drive revenue and margin, so changes must be attributable. */
+    protected array $audited = ['selling_price', 'wholesale_price', 'cost_price_hint'];
+
     protected $fillable = [
         'name', 'sku', 'category_id', 'selling_price', 'wholesale_price',
         'wholesale_min_qty', 'reorder_level', 'description', 'image', 'barcode',

@@ -2,15 +2,22 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 class AppSetting extends Model
 {
+    use RecordsAudit;
+
     protected $primaryKey = 'key';
     public $incrementing = false;
     protected $keyType = 'string';
 
     protected $fillable = ['key', 'value'];
+
+    /** Settings change rarely and all of them matter, so audit the value. */
+    protected array $audited = ['value'];
+    protected string $auditLabel = 'key';
 
     public static function get(string $key, mixed $default = null): mixed
     {

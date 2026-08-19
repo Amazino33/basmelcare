@@ -79,9 +79,10 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');
         });
 
-        // Coupons (admin, branch_manager)
+        // Coupons + money oversight (admin, branch_manager)
         Route::middleware('role:admin,branch_manager')->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
+            Route::get('money-trail', App\Livewire\AuditTrail\Index::class)->name('audit-trail.index');
         });
 
         // Content / image uploaders (admin, content)

@@ -121,6 +121,7 @@
 
                 @if(in_array('admin', $roles) || in_array('branch_manager', $roles))
                     <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
+                    <x-menu-item title="Money Trail" icon="o-shield-check" link="{{ route('audit-trail.index') }}" />
                 @endif
 
                 @if(in_array('admin', $roles))

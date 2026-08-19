@@ -2,11 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Coupon extends Model
 {
+    use RecordsAudit;
+
+    /** A coupon is a discount, so every field on it moves money. */
+    protected array $audited = [
+        'code', 'type', 'value', 'max_discount',
+        'max_uses', 'expires_at', 'is_active', 'auto_apply',
+    ];
+    protected string $auditLabel = 'code';
+
     protected $fillable = [
         'code', 'type', 'value', 'max_discount',
         'customer_type', 'min_order_amount', 'max_order_amount',
