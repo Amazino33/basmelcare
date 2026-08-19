@@ -136,28 +136,38 @@ class Dashboard extends Component
         ];
     }
 
-    /**
-     * A specialised dashboard applies only when the user holds nothing but
-     * that role. Any additional role means they do wider work and get the
-     * full pharmacy dashboard instead.
-     */
-    private function hasOnlyRole(string $role): bool
-    {
-        $roles = array_unique(auth()->user()->role ?? []);
+    /** Roles that entitle someone to the full pharmacy dashboard. */
+    private const OPERATIONAL = ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier'];
 
-        return $roles === [$role];
+    /** Focused roles, in the order their panels should stack. */
+    private const SPECIALIST = ['inventory_manager', 'promoter', 'content'];
+
+    private function roles(): array
+    {
+        return array_unique(auth()->user()->role ?? []);
     }
 
-    private function contentDashboard()
+    /**
+     * Panels to stack for someone who holds only focused roles. Anyone with an
+     * operational role does wider work and gets the full dashboard instead, so
+     * this returns nothing for them.
+     */
+    private function specialistPanels(): array
+    {
+        if (array_intersect($this->roles(), self::OPERATIONAL)) {
+            return [];
+        }
+
+        return array_values(array_intersect(self::SPECIALIST, $this->roles()));
+    }
+
+    private function contentData(): array
     {
         $total   = Product::count();
         $missing = Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))->count();
         $done    = $total - $missing;
 
-        return view('livewire.dashboard.index', [
-            'isContentOnly'   => true,
-            'isPromoterOnly'  => false,
-            'isInventoryOnly' => false,
+        return [
             'contentTotal'    => $total,
             'contentDone'     => $done,
             'contentMissing'  => $missing,
@@ -166,14 +176,30 @@ class Dashboard extends Component
                 ->whereNotNull('image')->where('image', '!=', '')->count(),
             'contentQueue'    => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
                 ->latest()->limit(8)->get(),
-        ]);
+        ];
+    }
+
+    private function promoterData(): array
+    {
+        $userId = auth()->id();
+
+        $earned = (float) ReferralCommission::where('user_id', $userId)->sum('amount');
+        $paid   = (float) ReferralCommission::where('user_id', $userId)->whereNotNull('paid_at')->sum('amount');
+
+        return [
+            'myCustomersToday'  => ReferralCommission::where('user_id', $userId)->whereDate('created_at', today())->count(),
+            'myTotalEarned'     => $earned,
+            'myPending'         => $earned - $paid,
+            'myRecentCustomers' => ReferralCommission::with('customer')
+                ->where('user_id', $userId)->latest()->limit(5)->get(),
+        ];
     }
 
     /**
      * Stock-focused view: no revenue, no profit — only what the person
      * responsible for inventory needs to act on.
      */
-    private function inventoryDashboard()
+    private function inventoryData(): array
     {
         // One query with a subquery sum, rather than loading every batch.
         $products = Product::withSum('batches as stock', 'quantity')->get();
@@ -185,11 +211,7 @@ class Dashboard extends Component
 
         $inStockBatches = Batch::where('quantity', '>', 0);
 
-        return view('livewire.dashboard.index', [
-            'isContentOnly'   => false,
-            'isPromoterOnly'  => false,
-            'isInventoryOnly' => true,
-
+        return [
             'invProducts'   => $products->count(),
             'invStockUnits' => (int) Batch::sum('quantity'),
             'invOutOfStock' => $outOfStock->count(),
@@ -208,18 +230,21 @@ class Dashboard extends Component
                 ->limit(6)
                 ->get(),
             'invLowStockList' => $lowStock->sortBy('stock')->take(6)->values(),
-        ]);
+        ];
     }
 
     public function render()
     {
-        // Specialised roles get their own view and none of the sales queries below.
-        if ($this->hasOnlyRole('content')) {
-            return $this->contentDashboard();
-        }
+        // Focused roles get their own stacked panels and none of the sales
+        // queries below. Someone holding two focused roles gets both panels.
+        if ($panels = $this->specialistPanels()) {
+            $data = ['panels' => $panels];
 
-        if ($this->hasOnlyRole('inventory_manager')) {
-            return $this->inventoryDashboard();
+            if (in_array('inventory_manager', $panels)) $data += $this->inventoryData();
+            if (in_array('promoter', $panels))          $data += $this->promoterData();
+            if (in_array('content', $panels))           $data += $this->contentData();
+
+            return view('livewire.dashboard.index', $data);
         }
 
         [$from, $to] = $this->getDateRange();
@@ -298,17 +323,8 @@ class Dashboard extends Component
 
         $setupProgress = $this->getSetupProgress();
 
-        // Promoter commission snapshot
-        $userId            = auth()->id();
-        $myCustomersToday  = ReferralCommission::where('user_id', $userId)->whereDate('created_at', today())->count();
-        $myTotalEarned     = (float) ReferralCommission::where('user_id', $userId)->sum('amount');
-        $myPending         = $myTotalEarned - (float) ReferralCommission::where('user_id', $userId)->whereNotNull('paid_at')->sum('amount');
-        $myRecentCustomers = ReferralCommission::with('customer')->where('user_id', $userId)->latest()->limit(5)->get();
-
         return view('livewire.dashboard.index', [
-            'isContentOnly'   => false,
-            'isInventoryOnly' => false,
-            'isPromoterOnly'  => $this->hasOnlyRole('promoter'),
+            'panels' => [],
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
             'salesCountToday' => $salesCountToday,
@@ -328,10 +344,6 @@ class Dashboard extends Component
             'pendingOnlineOrders' => $pendingOnlineOrders,
             'recentOnlineOrders' => $recentOnlineOrders,
             'setupProgress'      => $setupProgress,
-            'myCustomersToday'   => $myCustomersToday,
-            'myTotalEarned'      => $myTotalEarned,
-            'myPending'          => $myPending,
-            'myRecentCustomers'  => $myRecentCustomers,
         ]);
     }
 }

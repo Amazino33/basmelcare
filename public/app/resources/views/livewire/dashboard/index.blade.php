@@ -1,7 +1,15 @@
 <div>
-    @if($isContentOnly)
-    {{-- ── Image Uploader Dashboard ── --}}
-    <x-header title="Dashboard" subtitle="Product image coverage" size="text-xl" />
+    @if($panels)
+    {{-- ── Focused-role dashboard: one panel per role held ── --}}
+    @php $multi = count($panels) > 1; @endphp
+    <x-header title="Dashboard" size="text-xl" :subtitle="$multi ? 'Your work areas' : match($panels[0]) {
+        'inventory_manager' => 'Stock overview',
+        'promoter'          => 'Your referral activity',
+        'content'           => 'Product image coverage',
+    }" />
+
+    @if(in_array('content', $panels))
+    @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide">Product Images</div>@endif
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <x-stat
@@ -72,10 +80,10 @@
                       class="btn-sm btn-primary" icon="o-photo" />
         </div>
     </x-card>
+    @endif
 
-    @elseif($isInventoryOnly)
-    {{-- ── Inventory Manager Dashboard ── --}}
-    <x-header title="Dashboard" subtitle="Stock overview" size="text-xl" />
+    @if(in_array('inventory_manager', $panels))
+    @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide mt-6">Stock</div>@endif
 
     @if($invExpired > 0)
         <a href="{{ route('expiry-alerts.index') }}" class="block mb-4">
@@ -169,9 +177,10 @@
         </x-card>
     </div>
 
-    @elseif($isPromoterOnly)
-    {{-- ── Promoter Dashboard ── --}}
-    <x-header title="Dashboard" subtitle="Your referral activity" size="text-xl" />
+    @endif
+
+    @if(in_array('promoter', $panels))
+    @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide mt-6">Referrals</div>@endif
 
     <div class="grid grid-cols-3 gap-4 mb-6">
         <x-stat
@@ -218,6 +227,7 @@
             <x-button label="My Commissions" link="{{ route('commissions.index') }}" class="btn-sm btn-ghost" icon="o-currency-dollar" />
         </div>
     </x-card>
+    @endif
 
     @else
     {{-- ── Standard Pharmacy Dashboard ── --}}
