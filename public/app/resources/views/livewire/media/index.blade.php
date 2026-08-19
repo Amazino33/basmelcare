@@ -5,6 +5,20 @@
         </x-slot:middle>
     </x-header>
 
+    <div class="flex flex-wrap gap-2 mb-4">
+        @foreach([
+            'missing' => ['Needs Image', $missingCount],
+            'has'     => ['Has Image', $hasCount],
+            'all'     => ['All', $allCount],
+        ] as $key => [$label, $count])
+            <button type="button" wire:click="$set('filter', '{{ $key }}')"
+                class="btn btn-sm {{ $filter === $key ? 'btn-primary' : 'btn-ghost bg-base-200' }}">
+                {{ $label }}
+                <span class="badge badge-sm {{ $filter === $key ? 'badge-neutral' : 'badge-ghost' }}">{{ $count }}</span>
+            </button>
+        @endforeach
+    </div>
+
     <div class="space-y-2">
         @forelse($products as $product)
             <x-card class="!p-3">
@@ -71,9 +85,22 @@
         @empty
             <x-card>
                 <div class="text-center py-10 text-base-content/50">
-                    <x-icon name="o-photo" class="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p class="font-semibold">No products found</p>
-                    <p class="text-sm mt-1">Try a different search term.</p>
+                    @if($search)
+                        <x-icon name="o-magnifying-glass" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p class="font-semibold">Nothing matches "{{ $search }}"</p>
+                        <p class="text-sm mt-1">Try a different search term, or switch filter.</p>
+                    @elseif($filter === 'missing')
+                        <x-icon name="o-check-circle" class="w-12 h-12 mx-auto mb-3 text-success opacity-40" />
+                        <p class="font-semibold">Every product has an image</p>
+                        <p class="text-sm mt-1">Nothing left to upload — nice work.</p>
+                    @elseif($filter === 'has')
+                        <x-icon name="o-photo" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p class="font-semibold">No images uploaded yet</p>
+                        <p class="text-sm mt-1">Switch to "Needs Image" to get started.</p>
+                    @else
+                        <x-icon name="o-cube" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p class="font-semibold">No products in the catalogue</p>
+                    @endif
                 </div>
             </x-card>
         @endforelse
