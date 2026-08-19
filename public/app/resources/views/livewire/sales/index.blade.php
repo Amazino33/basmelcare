@@ -123,10 +123,12 @@
             @endscope
 
             @scope('actions', $sale, $returnWindowHours)
+                {{-- @scope does not inherit view variables — resolve the role here. --}}
+                @php $canRefund = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']); @endphp
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                     <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-xs btn-ghost" tooltip="Invoice" external />
-                    @if(in_array($sale->status, ['completed', 'paid']) && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
+                    @if($canRefund && in_array($sale->status, ['completed', 'paid']) && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
                         <x-button icon="o-arrow-uturn-left" wire:click="openReturn({{ $sale->id }})" class="btn-xs btn-ghost text-warning" tooltip="Return items" />
                     @endif
                 </div>
@@ -184,15 +186,18 @@
             @endscope
 
             @scope('actions', $sale)
+                @php $canHandOver = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']); @endphp
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="View details" />
-                    <x-button
-                        label="Hand Over"
-                        icon="o-check"
-                        wire:click="completeHandover({{ $sale->id }})"
-                        wire:confirm="Mark this sale as handed over to the customer?"
-                        class="btn-xs btn-success"
-                    />
+                    @if($canHandOver)
+                        <x-button
+                            label="Hand Over"
+                            icon="o-check"
+                            wire:click="completeHandover({{ $sale->id }})"
+                            wire:confirm="Mark this sale as handed over to the customer?"
+                            class="btn-xs btn-success"
+                        />
+                    @endif
                 </div>
             @endscope
         </x-table>
@@ -425,11 +430,13 @@
                         <div class="text-error">Revoked {{ $viewSale->voucher_revoked_at->diffForHumans() }}.</div>
                     @elseif($viewSale->wifiActive())
                         <div class="text-success">Active until {{ $viewSale->wifiExpiresAt()->format('D, d M Y h:i A') }}.</div>
-                        <x-button label="Revoke Wi-Fi access"
-                            wire:click="revokeWifi({{ $viewSale->id }})"
-                            wire:confirm="Revoke internet access for this receipt? The device will no longer be able to reconnect."
-                            class="btn-error btn-outline btn-block btn-sm" icon="o-no-symbol"
-                            spinner="revokeWifi" />
+                        @if($this->isElevated())
+                            <x-button label="Revoke Wi-Fi access"
+                                wire:click="revokeWifi({{ $viewSale->id }})"
+                                wire:confirm="Revoke internet access for this receipt? The device will no longer be able to reconnect."
+                                class="btn-error btn-outline btn-block btn-sm" icon="o-no-symbol"
+                                spinner="revokeWifi" />
+                        @endif
                     @else
                         <div class="text-base-content/60">Expired {{ $viewSale->wifiExpiresAt()?->diffForHumans() }}.</div>
                     @endif

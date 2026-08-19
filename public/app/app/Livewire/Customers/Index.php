@@ -67,6 +67,18 @@ class Index extends Component
             && !array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
     }
 
+    /** Medical records are clinical: only a pharmacist or admin may write them. */
+    public function canEditMedicalRecords(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist']);
+    }
+
+    /** Branch managers may read records for oversight, but not change them. */
+    public function canViewMedicalRecords(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager']);
+    }
+
     public function create()
     {
         $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
@@ -375,8 +387,8 @@ class Index extends Component
 
     public function openMedicalRecord()
     {
-        if ($this->isPromoter()) {
-            $this->error('Promoters cannot access medical records.');
+        if (! $this->canEditMedicalRecords()) {
+            $this->error('Only a pharmacist or admin can add medical records.');
             return;
         }
 
@@ -387,8 +399,8 @@ class Index extends Component
 
     public function saveMedicalRecord()
     {
-        if ($this->isPromoter()) {
-            $this->error('Promoters cannot access medical records.');
+        if (! $this->canEditMedicalRecords()) {
+            $this->error('Only a pharmacist or admin can add medical records.');
             return;
         }
 
@@ -421,8 +433,8 @@ class Index extends Component
 
     public function deleteMedicalRecord($id)
     {
-        if ($this->isPromoter()) {
-            $this->error('Promoters cannot access medical records.');
+        if (! $this->canEditMedicalRecords()) {
+            $this->error('Only a pharmacist or admin can delete medical records.');
             return;
         }
 
@@ -448,16 +460,22 @@ class Index extends Component
         $viewCustomer = null;
 
         if ($this->viewCustomerId) {
-            $relations = $isPromoter
-                ? []
-                : [
-                    'medicalRecords' => fn($q) => $q->latest(),
-                    'medicalRecords.recorder',
+            $relations = [];
+
+            if (! $isPromoter) {
+                $relations = [
                     'sales' => fn($q) => $q->latest()->limit(10),
                     'orders' => fn($q) => $q->with('items.product')->latest()->limit(10),
                     'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial']),
                     'appointments' => fn($q) => $q->with('staff')->latest()->limit(5),
                 ];
+
+                // Not merely hidden — never loaded for staff without clinical access.
+                if ($this->canViewMedicalRecords()) {
+                    $relations['medicalRecords'] = fn($q) => $q->latest();
+                    $relations[] = 'medicalRecords.recorder';
+                }
+            }
 
             $viewCustomer = Customer::with($relations)
                 ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
@@ -467,6 +485,8 @@ class Index extends Component
         return view('livewire.customers.index', [
             'headers' => $headers,
             'isPromoter' => $isPromoter,
+            'canViewRecords' => $this->canViewMedicalRecords(),
+            'canEditRecords' => $this->canEditMedicalRecords(),
             'customers' => Customer::with('registeredBy')
                 ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
                 ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))

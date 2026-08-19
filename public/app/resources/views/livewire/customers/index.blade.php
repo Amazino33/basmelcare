@@ -172,17 +172,22 @@
                     <div class="text-xs text-base-content/60">Debt</div>
                 </div>
                 <div class="bg-base-200 rounded p-2 text-center">
-                    <div class="text-lg font-bold">{{ $viewCustomer->medicalRecords->count() }}</div>
+                    <div class="text-lg font-bold">
+                        {{ $canViewRecords ? $viewCustomer->medicalRecords->count() : '—' }}
+                    </div>
                     <div class="text-xs text-base-content/60">Records</div>
                 </div>
             </div>
 
             <x-hr />
 
+            @if($canViewRecords)
             <!-- Medical Records -->
             <div class="flex justify-between items-center mb-3">
                 <div class="text-sm font-semibold text-base-content/60 uppercase">Medical Records</div>
-                <x-button label="Add Record" wire:click="openMedicalRecord" icon="o-plus" class="btn-xs btn-primary" />
+                @if($canEditRecords)
+                    <x-button label="Add Record" wire:click="openMedicalRecord" icon="o-plus" class="btn-xs btn-primary" />
+                @endif
             </div>
 
             @forelse($viewCustomer->medicalRecords as $record)
@@ -211,13 +216,16 @@
                             @if($record->file_path)
                                 <x-button icon="o-arrow-down-tray" link="{{ asset('storage/' . $record->file_path) }}" class="btn-xs btn-ghost" tooltip="Download" external />
                             @endif
-                            <x-button icon="o-trash" wire:click="deleteMedicalRecord({{ $record->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this record?" />
+                            @if($canEditRecords)
+                                <x-button icon="o-trash" wire:click="deleteMedicalRecord({{ $record->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this record?" />
+                            @endif
                         </div>
                     </div>
                 </div>
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">No medical records yet.</div>
             @endforelse
+            @endif
 
             <x-hr />
 

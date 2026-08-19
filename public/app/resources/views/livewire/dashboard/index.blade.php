@@ -15,10 +15,101 @@
     {{-- ── Focused-role dashboard: one panel per role held ── --}}
     @php $multi = count($panels) > 1; @endphp
     <x-header title="Dashboard" size="text-xl" :subtitle="$multi ? 'Your work areas' : match($panels[0]) {
+        'pharmacist'        => 'Patients and drug safety',
         'inventory_manager' => 'Stock overview',
         'promoter'          => 'Your referral activity',
         'content'           => 'Product image coverage',
     }" />
+
+    @if(in_array('pharmacist', $panels))
+    @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide">Clinical</div>@endif
+
+    @if($phExpired > 0)
+        <a href="{{ route('expiry-alerts.index') }}" class="block mb-4">
+            <x-alert title="{{ $phExpired }} batch(es) already expired — do not dispense"
+                     icon="o-exclamation-triangle" class="alert-error hover:opacity-80 transition-opacity" />
+        </a>
+    @endif
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <a href="{{ route('customers.index') }}" class="block">
+            <x-stat title="Patients Today" value="{{ $phNewPatients }}"
+                description="{{ number_format($phTotalPatients) }} on file"
+                icon="o-user-plus" color="text-primary"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
+        </a>
+        <a href="{{ route('appointments.index') }}" class="block">
+            <x-stat title="Appointments" value="{{ $phAppointments }}"
+                description="scheduled today"
+                icon="o-calendar" color="text-info"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
+        </a>
+        <a href="{{ route('expiry-alerts.index') }}" class="block">
+            <x-stat title="Expiring Soon" value="{{ $phExpiringSoon }}"
+                description="within 90 days"
+                icon="o-clock"
+                color="{{ $phExpiringSoon > 0 ? 'text-warning' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
+        </a>
+        <a href="{{ route('inventory.index') }}" class="block">
+            <x-stat title="Out of Stock" value="{{ $phOutOfStock }}"
+                description="cannot be dispensed"
+                icon="o-exclamation-circle"
+                color="{{ $phOutOfStock > 0 ? 'text-error' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}" />
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <x-card title="Today's Appointments">
+            @forelse($phTodayAppointments as $appt)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm truncate">{{ $appt->customer?->name ?? $appt->title }}</div>
+                        <div class="text-xs text-base-content/60">
+                            {{ $appt->scheduled_at->format('H:i') }}
+                            @if($appt->staff) · {{ $appt->staff->name }} @endif
+                        </div>
+                    </div>
+                    <span @class([
+                        'badge badge-sm shrink-0 ml-3',
+                        'badge-info'    => $appt->status === 'scheduled',
+                        'badge-primary' => $appt->status === 'confirmed',
+                        'badge-success' => $appt->status === 'completed',
+                        'badge-error'   => $appt->status === 'cancelled',
+                        'badge-warning' => $appt->status === 'no_show',
+                    ])>{{ ucfirst(str_replace('_', ' ', $appt->status)) }}</span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">No appointments today.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="All Appointments" link="{{ route('appointments.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+
+        <x-card title="Expiring Soon" subtitle="Check before dispensing">
+            @forelse($phExpiringList as $batch)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm truncate">{{ $batch->product?->name ?? '—' }}</div>
+                        <div class="text-xs text-base-content/60">
+                            Batch {{ $batch->batch_number ?? '—' }} · {{ $batch->quantity }} units
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold shrink-0 ml-3 {{ $batch->expiry_date->diffInDays(now()) <= 30 ? 'text-error' : 'text-warning' }}">
+                        {{ $batch->expiry_date->format('d M Y') }}
+                    </span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">Nothing expiring in the next 90 days.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="All Expiry Alerts" link="{{ route('expiry-alerts.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+    </div>
+    @endif
 
     @if(in_array('content', $panels))
     @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide">Product Images</div>@endif

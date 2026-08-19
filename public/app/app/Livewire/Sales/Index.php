@@ -63,12 +63,28 @@ class Index extends Component
         $this->detailsDrawer = true;
     }
 
-    private function isElevated(): bool
+    /**
+     * Refunds, Wi-Fi revocation and handover move money or entitlements, so they
+     * are limited to admin and branch_manager. Everyone else may view sales.
+     * (This check existed but was never applied to any action — it is now.)
+     */
+    public function isElevated(): bool
     {
         return (bool) array_intersect(
             auth()->user()->role ?? [],
-            ['admin', 'pharmacist', 'branch_manager']
+            ['admin', 'branch_manager']
         );
+    }
+
+    private function denyUnlessElevated(): bool
+    {
+        if ($this->isElevated()) {
+            return false;
+        }
+
+        $this->error('Only an admin or branch manager can do that.');
+
+        return true;
     }
 
     private function isCashier(): bool
@@ -79,6 +95,8 @@ class Index extends Component
 
     public function completeHandover(int $saleId): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::find($saleId);
 
         if (!$sale || $sale->status !== 'paid') {
@@ -97,6 +115,8 @@ class Index extends Component
      */
     public function revokeWifi($saleId): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::find($saleId);
 
         if (! $sale || ! $sale->voucher_redeemed_at) {
@@ -122,6 +142,8 @@ class Index extends Component
 
     public function openReturn(int $saleId): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::with('saleItems.product', 'saleItems.batch')->findOrFail($saleId);
 
         $requireCustomer = AppSetting::bool('return_require_customer', true);
@@ -159,6 +181,8 @@ class Index extends Component
 
     public function processReturn(): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
 
         $requireCustomer = AppSetting::bool('return_require_customer', true);

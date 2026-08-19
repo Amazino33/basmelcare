@@ -2,8 +2,11 @@
 
 namespace App\Livewire;
 
+use App\Models\Appointment;
 use App\Models\AppSetting;
 use App\Models\Batch;
+use App\Models\Customer;
+use App\Models\MedicalRecord;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\PromoterCode;
@@ -137,11 +140,14 @@ class Dashboard extends Component
         ];
     }
 
-    /** Roles that entitle someone to the full pharmacy dashboard. */
-    private const OPERATIONAL = ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier'];
+    /**
+     * Roles that entitle someone to the full pharmacy dashboard. Pharmacist is
+     * deliberately absent — it is a clinical role and sees no revenue or profit.
+     */
+    private const OPERATIONAL = ['admin', 'branch_manager', 'sales', 'cashier'];
 
     /** Focused roles, in the order their panels should stack. */
-    private const SPECIALIST = ['inventory_manager', 'promoter', 'content'];
+    private const SPECIALIST = ['pharmacist', 'inventory_manager', 'promoter', 'content'];
 
     private function roles(): array
     {
@@ -177,6 +183,41 @@ class Dashboard extends Component
                 ->whereNotNull('image')->where('image', '!=', '')->count(),
             'contentQueue'    => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
                 ->latest()->limit(8)->get(),
+        ];
+    }
+
+    /**
+     * Clinical view: patients and drug safety. No revenue, profit or stock value.
+     */
+    private function pharmacistData(): array
+    {
+        $expiring = Batch::with('product')
+            ->where('quantity', '>', 0)
+            ->whereBetween('expiry_date', [now(), now()->addDays(90)])
+            ->orderBy('expiry_date')
+            ->limit(6)
+            ->get();
+
+        return [
+            'phNewPatients'   => Customer::whereDate('created_at', today())->count(),
+            'phTotalPatients' => Customer::count(),
+            'phRecordsToday'  => MedicalRecord::whereDate('created_at', today())->count(),
+            'phAppointments'  => Appointment::whereDate('scheduled_at', today())
+                ->whereIn('status', ['scheduled', 'confirmed'])->count(),
+
+            'phExpired'       => Batch::where('quantity', '>', 0)
+                ->where('expiry_date', '<', now())->count(),
+            'phExpiringSoon'  => $expiring->count(),
+            'phExpiringList'  => $expiring,
+
+            'phOutOfStock'    => Product::withSum('batches as stock', 'quantity')->get()
+                ->filter(fn($p) => (int) ($p->stock ?? 0) === 0)->count(),
+
+            'phTodayAppointments' => Appointment::with('customer', 'staff')
+                ->whereDate('scheduled_at', today())
+                ->orderBy('scheduled_at')
+                ->limit(6)
+                ->get(),
         ];
     }
 
@@ -246,6 +287,7 @@ class Dashboard extends Component
         if ($panels = $this->specialistPanels()) {
             $data = ['panels' => $panels];
 
+            if (in_array('pharmacist', $panels))        $data += $this->pharmacistData();
             if (in_array('inventory_manager', $panels)) $data += $this->inventoryData();
             if (in_array('promoter', $panels))          $data += $this->promoterData();
             if (in_array('content', $panels))           $data += $this->contentData();

@@ -58,38 +58,45 @@
                     <x-menu-item title="Product Images" icon="o-photo" link="{{ route('media.index') }}" />
                 @endif
 
-                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']))
+                @if(array_intersect($roles,['admin', 'branch_manager', 'sales', 'cashier']))
                     @php $onlineOrderCount = \App\Models\Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count(); @endphp
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
-                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales']))
+                        @if(array_intersect($roles,['admin', 'branch_manager', 'sales']))
                             <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
                             <x-menu-item title="Online Orders" icon="o-globe-alt" link="{{ route('online-orders.index') }}" badge="{{ $onlineOrderCount ?: '' }}" badge-classes="badge-error badge-xs" />
                         @endif
-                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                        @if(array_intersect($roles,['admin', 'branch_manager', 'cashier']))
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
                         @endif
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
                         <x-menu-item title="Change Owed" icon="o-gift" link="{{ route('credits.index') }}" />
-                        @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'cashier']))
+                        @if(array_intersect($roles,['admin', 'branch_manager', 'cashier']))
                             <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
                         @endif
                     </x-menu-sub>
                 @endif
 
-                @if(array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales']))
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'sales']))
                     <x-menu-item title="Stock Take" icon="o-clipboard-document-check" link="{{ route('stock-take.index') }}" />
                 @endif
 
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Inventory" icon="o-archive-box">
+                        {{-- Visibility: what is in stock and what is expiring --}}
                         <x-menu-item title="Stock Levels" icon="o-archive-box" link="{{ route('inventory.index') }}" />
-                        <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
-                        <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
-                        <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
                         <x-menu-item title="Expiry Alerts" icon="o-exclamation-triangle" link="{{ route('expiry-alerts.index') }}" />
-                        <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
-                    </x-menu-sub>
 
+                        {{-- Operations: moving and adjusting stock is not clinical work --}}
+                        @if(array_intersect($roles,['admin', 'branch_manager', 'inventory_manager']))
+                            <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
+                            <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
+                            <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
+                            <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
+                        @endif
+                    </x-menu-sub>
+                @endif
+
+                @if(array_intersect($roles,['admin', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Procurement" icon="o-truck">
                         <x-menu-item title="Purchase Orders" icon="o-clipboard-document" link="{{ route('purchase-orders.index') }}" />
                         <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
@@ -106,7 +113,7 @@
                     @endif
                 </x-menu-sub>
 
-                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager']))
+                @if(array_intersect($roles,['admin', 'branch_manager']))
                     <x-menu-separator />
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
                 @endif
