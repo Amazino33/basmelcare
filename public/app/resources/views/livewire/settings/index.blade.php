@@ -145,12 +145,21 @@
                         class="mt-4"
                     />
                     <x-input
-                        label="Commission per Customer Registered (₦)"
+                        label="Commission per Customer (₦)"
                         wire:model="commission_amount"
                         type="number"
                         step="1"
                         min="0"
-                        hint="Amount earned by promoters, cashiers, and sales staff each time they register a new customer."
+                        hint="Promoters earn this when a customer they registered connects to the Wi-Fi. Cashiers and sales earn it on a completed sale."
+                        class="max-w-xs mt-4"
+                    />
+                    <x-input
+                        label="Default Daily Target (promoters)"
+                        wire:model="promoter_target_default"
+                        type="number"
+                        step="1"
+                        min="1"
+                        hint="Customers connected per day. Individual promoters can be given their own target on the Staff page."
                         class="max-w-xs mt-4"
                     />
 

@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Models\PromoterCode;
+use App\Models\ReferralCommission;
 use App\Models\Sale;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class VoucherRedeemController extends Controller
 {
@@ -31,8 +36,9 @@ class VoucherRedeemController extends Controller
                 ? Sale::with('customer')->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])->first()
                 : Sale::with('customer')->whereRaw('UPPER(invoice_number) LIKE ?', ['%-' . $invoiceNumber])->first());
 
+        // Not a receipt — it may be a promoter-issued Wi-Fi code.
         if (! $sale) {
-            return response()->json(['valid' => false, 'message' => 'Invoice not found.'], 404);
+            return $this->redeemPromoterCode($invoiceNumber);
         }
 
         if (! in_array($sale->status, ['paid', 'completed'])) {
@@ -67,6 +73,63 @@ class VoucherRedeemController extends Controller
             'customer'       => $sale->customer?->name,
             'invoice_number' => $sale->invoice_number,
             'wifi_code'      => $sale->wifi_code,
+        ]);
+    }
+
+    /**
+     * A code handed out by a promoter at registration. First redemption is what
+     * pays them — the customer actually getting online is the thing we reward.
+     */
+    private function redeemPromoterCode(string $code): JsonResponse
+    {
+        $promoterCode = PromoterCode::with('customer')->where('code', $code)->first();
+
+        if (! $promoterCode) {
+            return response()->json(['valid' => false, 'message' => 'Invoice not found.'], 404);
+        }
+
+        if ($error = $promoterCode->redemptionError()) {
+            return response()->json(['valid' => false, 'message' => $error], 422);
+        }
+
+        $hours = (int) AppSetting::get('voucher_validity_hours', 24);
+
+        // First redemption starts the clock and earns the promoter their commission.
+        if (! $promoterCode->redeemed_at) {
+            DB::transaction(function () use ($promoterCode) {
+                $promoterCode->update(['redeemed_at' => now()]);
+
+                try {
+                    ReferralCommission::create([
+                        'user_id'     => $promoterCode->user_id,
+                        'customer_id' => $promoterCode->customer_id,
+                        'amount'      => (float) AppSetting::get('commission_amount', 100),
+                    ]);
+                } catch (QueryException $e) {
+                    // Unique (user_id, customer_id): already paid for this customer,
+                    // e.g. manually credited earlier. Redemption still succeeds.
+                    Log::info('[PromoterCode] commission already recorded', [
+                        'code' => $promoterCode->code,
+                    ]);
+                }
+            });
+
+            $promoterCode->refresh();
+        }
+
+        $expiresAt = $promoterCode->expiresAt();
+
+        if (! $expiresAt || $expiresAt->isPast()) {
+            return response()->json(['valid' => false, 'message' => 'This code\'s free internet window has expired.'], 422);
+        }
+
+        return response()->json([
+            'valid'          => true,
+            'expires_at'     => $expiresAt->toDateTimeString(),
+            'validity_hours' => $hours,
+            'customer'       => $promoterCode->customer?->name,
+            'invoice_number' => null,
+            'wifi_code'      => $promoterCode->code,
         ]);
     }
 }

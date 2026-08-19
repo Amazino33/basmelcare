@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Batch;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\PromoterCode;
 use App\Models\PurchaseOrder;
 use App\Models\ReferralCommission;
 use App\Models\Sale;
@@ -181,17 +182,22 @@ class Dashboard extends Component
 
     private function promoterData(): array
     {
-        $userId = auth()->id();
+        $user   = auth()->user();
+        $userId = $user->id;
 
         $earned = (float) ReferralCommission::where('user_id', $userId)->sum('amount');
         $paid   = (float) ReferralCommission::where('user_id', $userId)->whereNotNull('paid_at')->sum('amount');
 
         return [
-            'myCustomersToday'  => ReferralCommission::where('user_id', $userId)->whereDate('created_at', today())->count(),
+            'myProgress'        => $user->promoterProgressOn(today()),
             'myTotalEarned'     => $earned,
             'myPending'         => $earned - $paid,
-            'myRecentCustomers' => ReferralCommission::with('customer')
-                ->where('user_id', $userId)->latest()->limit(5)->get(),
+            'myRecentCodes'     => PromoterCode::with('customer')
+                ->where('user_id', $userId)
+                ->whereDate('created_at', today())
+                ->latest()
+                ->limit(8)
+                ->get(),
         ];
     }
 

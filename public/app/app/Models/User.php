@@ -18,6 +18,7 @@ class User extends Authenticatable
         'name', 'email', 'password', 'phone', 'role', 'position',
         'employment_date', 'salary', 'address',
         'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id',
+        'referral_target',
     ];
 
     protected function casts(): array
@@ -44,6 +45,38 @@ class User extends Authenticatable
     public function referralCommissions()
     {
         return $this->hasMany(ReferralCommission::class);
+    }
+
+    public function promoterCodes()
+    {
+        return $this->hasMany(PromoterCode::class);
+    }
+
+    /** This promoter's own target, or the global default when unset. */
+    public function effectiveReferralTarget(): int
+    {
+        return (int) ($this->referral_target ?? AppSetting::get('promoter_target_default', 20));
+    }
+
+    /**
+     * Codes handed out and actually connected on a given day — the pair the
+     * promoter is judged on.
+     */
+    public function promoterProgressOn(\Carbon\Carbon|string $date): array
+    {
+        $day = $date instanceof \Carbon\Carbon ? $date : \Carbon\Carbon::parse($date);
+
+        $issued   = $this->promoterCodes()->whereDate('created_at', $day)->count();
+        $redeemed = $this->promoterCodes()->whereDate('created_at', $day)->whereNotNull('redeemed_at')->count();
+        $target   = $this->effectiveReferralTarget();
+
+        return [
+            'issued'   => $issued,
+            'redeemed' => $redeemed,
+            'target'   => $target,
+            'percent'  => $target > 0 ? min(100, (int) round(($redeemed / $target) * 100)) : 0,
+            'stalled'  => $issued - $redeemed,
+        ];
     }
 
     public function hasRole(string $role): bool

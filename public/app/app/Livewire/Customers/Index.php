@@ -5,6 +5,7 @@ namespace App\Livewire\Customers;
 use App\Models\AppSetting;
 use App\Models\Customer;
 use App\Models\MedicalRecord;
+use App\Models\PromoterCode;
 use App\Models\ReferralCommission;
 use App\Services\WhatsAppService;
 use Livewire\Component;
@@ -32,6 +33,14 @@ class Index extends Component
     public string $otpError = '';
     public ?int $pendingCommissionCustomerId = null;
     public string $pendingPhone = '';
+
+    // Wi-Fi code handover
+    public bool $codeModal = false;
+    public ?int $issuedCodeId = null;
+    public string $issuedCode = '';
+    public bool $codeSent = false;
+    public bool $codeRedeemed = false;
+    public float $earnedAmount = 0;
 
     // Customer profile drawer
     public ?int $viewCustomerId = null;
@@ -168,10 +177,10 @@ class Index extends Component
             return;
         }
 
-        if (ReferralCommission::where('customer_id', $customer->id)->exists()) {
+        if (PromoterCode::where('customer_id', $customer->id)->exists()) {
             $this->otpModal = false;
             $this->resetPendingOtp();
-            $this->error('A commission has already been recorded for this customer.');
+            $this->error('A Wi-Fi code has already been issued for this customer.');
             return;
         }
 
@@ -190,27 +199,73 @@ class Index extends Component
 
         $customer->clearOtp();
 
-        $amount = (float) AppSetting::get('commission_amount', 100);
-
+        // Phone proven real — issue the Wi-Fi code. Nothing is earned yet;
+        // commission is created when the customer actually connects.
         try {
-            ReferralCommission::create([
+            $code = PromoterCode::create([
+                'code'        => PromoterCode::generateCode(),
                 'user_id'     => auth()->id(),
                 'customer_id' => $customer->id,
-                'amount'      => $amount,
+                'valid_until' => today(),
             ]);
         } catch (\Illuminate\Database\QueryException $e) {
-            // Unique (user_id, customer_id) — a concurrent double-submit.
             $this->otpModal = false;
             $this->resetPendingOtp();
-            $this->error('A commission has already been recorded for this customer.');
+            $this->error('A Wi-Fi code has already been issued for this customer.');
             return;
         }
 
-        $this->otpModal = false;
-        $this->resetPendingOtp();
+        $this->issuedCodeId  = $code->id;
+        $this->issuedCode    = $code->code;
+        $this->codeRedeemed  = false;
+        $this->codeSent      = $this->sendCode($customer->phone, $code->code);
 
-        $symbol = AppSetting::get('currency_symbol', '₦');
-        $this->success("Phone verified! {$symbol}" . number_format($amount, 2) . ' commission earned.');
+        $this->otpModal  = false;
+        $this->codeModal = true;
+        $this->otpCode   = '';
+        $this->otpError  = '';
+    }
+
+    /**
+     * Polled by the code modal so the promoter sees the connection land while
+     * they are still with the customer. Stops once redeemed.
+     */
+    public function checkRedemption(): void
+    {
+        if ($this->codeRedeemed || ! $this->issuedCodeId) {
+            return;
+        }
+
+        $code = PromoterCode::find($this->issuedCodeId);
+
+        if ($code?->redeemed_at) {
+            $this->codeRedeemed = true;
+            $this->earnedAmount = (float) (ReferralCommission::where('user_id', auth()->id())
+                ->where('customer_id', $code->customer_id)
+                ->value('amount') ?? 0);
+        }
+    }
+
+    public function closeCodeModal(): void
+    {
+        $this->codeModal = false;
+        $this->issuedCodeId = null;
+        $this->issuedCode = '';
+        $this->codeRedeemed = false;
+        $this->earnedAmount = 0;
+        $this->resetPendingOtp();
+    }
+
+    private function sendCode(string $phone, string $code): bool
+    {
+        $name  = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $hours = (int) AppSetting::get('voucher_validity_hours', 24);
+
+        return app(WhatsAppService::class)->send(
+            $phone,
+            "Welcome to {$name}! Your free Wi-Fi code is: *{$code}*. "
+            . "Connect to the {$name} network and enter it to get {$hours} hours of internet."
+        );
     }
 
     private function resetPendingOtp(): void

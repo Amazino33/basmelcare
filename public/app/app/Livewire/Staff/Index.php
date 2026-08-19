@@ -27,6 +27,7 @@ class Index extends Component
     public string $emergency_contact_name = '';
     public string $emergency_contact_phone = '';
     public string $status = 'active';
+    public string $referral_target = '';
     public ?int $branch_id = null;
     public ?int $staffId = null;
     public bool $modal = false;
@@ -41,6 +42,7 @@ class Index extends Component
             'name', 'email', 'phone', 'password', 'role', 'position',
             'employment_date', 'salary', 'address',
             'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id', 'staffId',
+            'referral_target',
         ]);
         $this->modal = true;
     }
@@ -61,6 +63,7 @@ class Index extends Component
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:20',
             'status' => 'required|in:active,inactive,suspended',
+            'referral_target' => 'nullable|integer|min:1',
         ];
 
         if (!$this->staffId) {
@@ -84,6 +87,10 @@ class Index extends Component
             'emergency_contact_phone' => $this->emergency_contact_phone,
             'status' => $this->status,
             'branch_id' => $this->branch_id,
+            // Only promoters carry a target; clear it if the role is removed.
+            'referral_target' => (in_array('promoter', $this->role) && $this->referral_target !== '')
+                ? (int) $this->referral_target
+                : null,
         ];
 
         if ($this->password) {
@@ -102,6 +109,7 @@ class Index extends Component
             'name', 'email', 'phone', 'password', 'role', 'position',
             'employment_date', 'salary', 'address',
             'emergency_contact_name', 'emergency_contact_phone', 'status', 'branch_id', 'staffId',
+            'referral_target',
         ]);
     }
 
@@ -114,6 +122,7 @@ class Index extends Component
         $this->phone = $staff->phone ?? '';
         $this->password = '';
         $this->role = $staff->role;
+        $this->referral_target = $staff->referral_target !== null ? (string) $staff->referral_target : '';
         $this->position = $staff->position ?? '';
         $this->employment_date = $staff->employment_date?->format('Y-m-d') ?? '';
         $this->salary = $staff->salary ?? '';

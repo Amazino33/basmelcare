@@ -182,12 +182,37 @@
     @if(in_array('promoter', $panels))
     @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide mt-6">Referrals</div>@endif
 
+    {{-- Target progress: connected customers, which is what actually pays --}}
+    <x-card class="mb-4">
+        <div class="flex justify-between items-end mb-2">
+            <div>
+                <span class="text-sm font-semibold">Today's target</span>
+                <p class="text-xs text-base-content/60">Customers connected to Wi-Fi</p>
+            </div>
+            <div class="text-right">
+                <span class="text-2xl font-bold tabular-nums {{ $myProgress['redeemed'] >= $myProgress['target'] ? 'text-success' : 'text-primary' }}">
+                    {{ $myProgress['redeemed'] }}
+                </span>
+                <span class="text-sm text-base-content/50 tabular-nums">/ {{ $myProgress['target'] }}</span>
+            </div>
+        </div>
+        <progress class="progress {{ $myProgress['redeemed'] >= $myProgress['target'] ? 'progress-success' : 'progress-primary' }} w-full"
+                  value="{{ $myProgress['percent'] }}" max="100"></progress>
+
+        @if($myProgress['stalled'] > 0)
+            <p class="text-xs text-warning mt-2">
+                <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 inline align-text-bottom" />
+                {{ $myProgress['stalled'] }} customer(s) given a code but not yet connected — they don't count until they're online.
+            </p>
+        @endif
+    </x-card>
+
     <div class="grid grid-cols-3 gap-4 mb-6">
         <x-stat
-            title="Registered Today"
-            value="{{ $myCustomersToday }}"
-            description="new customers"
-            icon="o-user-plus"
+            title="Codes Given"
+            value="{{ $myProgress['issued'] }}"
+            description="today"
+            icon="o-ticket"
             color="text-primary"
         />
         <x-stat
@@ -206,20 +231,24 @@
         />
     </div>
 
-    <x-card title="Recently Registered Customers">
-        @forelse($myRecentCustomers as $commission)
+    <x-card title="Today's Customers">
+        @forelse($myRecentCodes as $code)
             <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
                 <div class="min-w-0 flex-1">
-                    <div class="font-semibold text-sm">{{ $commission->customer->name }}</div>
-                    <div class="text-xs text-base-content/60">{{ $commission->created_at->format('M d, Y · H:i') }}</div>
+                    <div class="font-semibold text-sm truncate">{{ $code->customer?->name ?? '—' }}</div>
+                    <div class="text-xs text-base-content/60">
+                        <span class="font-mono">{{ $code->code }}</span> · {{ $code->created_at->format('H:i') }}
+                    </div>
                 </div>
-                <span class="font-bold text-primary text-sm ml-4 shrink-0">
-                    ₦{{ number_format($commission->amount, 2) }}
-                </span>
+                @if($code->redeemed_at)
+                    <span class="badge badge-success badge-sm shrink-0 ml-3">Connected</span>
+                @else
+                    <span class="badge badge-ghost badge-sm shrink-0 ml-3">Not yet</span>
+                @endif
             </div>
         @empty
             <div class="text-center py-8 text-base-content/40 text-sm">
-                No customers registered yet — head to Customers to get started.
+                No one registered yet today — head to Customers to get started.
             </div>
         @endforelse
         <div class="mt-3 flex gap-2">

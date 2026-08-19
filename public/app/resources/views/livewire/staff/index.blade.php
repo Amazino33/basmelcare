@@ -63,7 +63,7 @@
                     <div class="flex flex-wrap gap-x-4 gap-y-2 mt-1">
                         @foreach(['admin' => 'Admin', 'pharmacist' => 'Pharmacist', 'branch_manager' => 'Branch Manager', 'sales' => 'Sales', 'cashier' => 'Cashier', 'inventory_manager' => 'Inventory Manager', 'promoter' => 'Promoter', 'content' => 'Content (Images)'] as $val => $label)
                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" wire:model="role" value="{{ $val }}" class="checkbox checkbox-primary checkbox-sm" />
+                                <input type="checkbox" wire:model.live="role" value="{{ $val }}" class="checkbox checkbox-primary checkbox-sm" />
                                 <span class="text-sm">{{ $label }}</span>
                             </label>
                         @endforeach
@@ -75,6 +75,11 @@
                 <x-input label="Position/Title" wire:model="position" placeholder="e.g. Senior Pharmacist" />
                 <x-input label="Employment Date" wire:model="employment_date" type="date" />
                 <x-input label="Salary" wire:model="salary" prefix="₦" type="number" step="0.01" />
+                @if(in_array('promoter', $role))
+                    <x-input label="Daily Target" wire:model="referral_target" type="number" min="1"
+                        placeholder="{{ \App\Models\AppSetting::get('promoter_target_default', 20) }}"
+                        hint="Customers connected per day. Blank uses the default." />
+                @endif
                 <x-select label="Status" wire:model="status" :options="[
                     ['id' => 'active', 'name' => 'Active'],
                     ['id' => 'inactive', 'name' => 'Inactive'],

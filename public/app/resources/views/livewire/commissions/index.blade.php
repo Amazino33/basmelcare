@@ -1,7 +1,15 @@
 <div>
     @if($isManager)
         {{-- ── Admin / Branch Manager view ── --}}
-        <x-header title="Commissions" subtitle="Referral earnings and payouts" />
+        <x-header title="Commissions" subtitle="Referral earnings and payouts">
+            <x-slot:actions>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-base-content/60 whitespace-nowrap">Activity for</span>
+                    <input type="date" wire:model.live="date"
+                           class="input input-bordered input-sm" max="{{ today()->format('Y-m-d') }}" />
+                </div>
+            </x-slot:actions>
+        </x-header>
 
         <div class="grid grid-cols-2 gap-4 mb-6">
             <x-stat title="Total Pending" value="₦{{ number_format($overallPending, 2) }}"
@@ -16,6 +24,7 @@
                     <tr>
                         <th>Staff</th>
                         <th>Role</th>
+                        <th class="text-center">Target<br><span class="font-normal text-xs text-base-content/50">{{ \Carbon\Carbon::parse($date)->format('d M') }}</span></th>
                         <th class="text-center">Customers</th>
                         <th class="text-right">Total Earned</th>
                         <th class="text-right">Paid</th>
@@ -41,6 +50,18 @@
                                     @endforeach
                                 </div>
                             </td>
+                            <td class="text-center">
+                                @if($item->progress)
+                                    <span class="font-semibold tabular-nums {{ $item->progress['redeemed'] >= $item->progress['target'] ? 'text-success' : '' }}">
+                                        {{ $item->progress['redeemed'] }}<span class="text-base-content/40">/{{ $item->progress['target'] }}</span>
+                                    </span>
+                                    @if($item->progress['stalled'] > 0)
+                                        <div class="text-xs text-warning">{{ $item->progress['stalled'] }} not connected</div>
+                                    @endif
+                                @else
+                                    <span class="text-base-content/30">—</span>
+                                @endif
+                            </td>
                             <td class="text-center">{{ $item->count }}</td>
                             <td class="text-right font-semibold">₦{{ number_format($item->total_earned, 2) }}</td>
                             <td class="text-right text-success">₦{{ number_format($item->total_paid, 2) }}</td>
@@ -60,7 +81,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-base-content/40 py-10">
+                            <td colspan="8" class="text-center text-base-content/40 py-10">
                                 No commission-eligible staff yet.
                             </td>
                         </tr>
@@ -68,6 +89,45 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Registered and given a code, but never connected --}}
+        @if($stalledCodes->isNotEmpty())
+            <x-card class="mt-6" title="Registered but never connected"
+                    subtitle="{{ \Carbon\Carbon::parse($date)->format('d M Y') }} — credit any that were not the promoter's fault">
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Promoter</th>
+                                <th>Code</th>
+                                <th>Issued</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($stalledCodes as $code)
+                                <tr class="hover">
+                                    <td class="font-semibold">{{ $code->customer?->name ?? '—' }}</td>
+                                    <td>{{ $code->promoter?->name ?? '—' }}</td>
+                                    <td class="font-mono text-xs">{{ $code->code }}</td>
+                                    <td class="text-xs text-base-content/60">{{ $code->created_at->format('H:i') }}</td>
+                                    <td class="text-right">
+                                        @if($code->already_paid)
+                                            <span class="badge badge-success badge-sm">Credited</span>
+                                        @else
+                                            <x-button label="Credit" wire:click="creditCode({{ $code->id }})"
+                                                wire:confirm="Pay {{ $code->promoter?->name }} for {{ $code->customer?->name }} even though they never connected?"
+                                                class="btn-xs btn-outline" icon="o-banknotes" />
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-card>
+        @endif
 
         {{-- Detail drawer: customers registered by a staff member --}}
         <x-drawer wire:model="detailDrawer" title="Customers registered by {{ $detailUser?->name }}" right class="w-96">

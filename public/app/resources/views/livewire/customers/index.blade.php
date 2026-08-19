@@ -74,9 +74,61 @@
             </div>
         </div>
         <x-slot:actions>
-            <x-button label="Skip (no commission)" wire:click="skipOtp" class="btn-ghost btn-sm text-base-content/40 mr-auto" />
+            <x-button label="Skip (no code)" wire:click="skipOtp" class="btn-ghost btn-sm text-base-content/40 mr-auto" />
             <x-button label="Resend" wire:click="resendOtp" class="btn-outline btn-sm" />
-            <x-button label="Verify & Earn" wire:click="confirmOtp" class="btn-primary btn-sm" />
+            <x-button label="Verify & Issue Code" wire:click="confirmOtp" class="btn-primary btn-sm" />
+        </x-slot:actions>
+    </x-modal>
+
+    <!-- Wi-Fi Code Handover (promoters) -->
+    <x-modal wire:model="codeModal" title="{{ $codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued' }}"
+             box-class="max-w-sm" persistent>
+        <div class="space-y-4" @if(!$codeRedeemed) wire:poll.3s="checkRedemption" @endif>
+
+            <div class="text-center py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide mb-1">Wi-Fi code</p>
+                <p class="text-3xl font-mono font-bold tracking-[0.2em] text-primary">{{ $issuedCode }}</p>
+            </div>
+
+            <div class="flex items-start gap-2 p-2 rounded-lg {{ $codeSent ? 'bg-success/10' : 'bg-warning/10' }}">
+                <x-icon name="{{ $codeSent ? 'o-check-circle' : 'o-exclamation-triangle' }}"
+                        class="w-4 h-4 shrink-0 mt-0.5 {{ $codeSent ? 'text-success' : 'text-warning' }}" />
+                <p class="text-xs text-base-content/80">
+                    @if($codeSent)
+                        Sent to <span class="font-semibold">{{ $pendingPhone }}</span>.
+                    @else
+                        Could not send by WhatsApp/SMS — read the code out to the customer.
+                    @endif
+                </p>
+            </div>
+
+            @if($codeRedeemed)
+                <div class="flex items-center gap-3 p-3 bg-success/10 rounded-lg">
+                    <x-icon name="o-check-badge" class="w-6 h-6 text-success shrink-0" />
+                    <div>
+                        <p class="text-sm font-bold text-success">Customer is online</p>
+                        <p class="text-xs text-base-content/70">
+                            ₦{{ number_format($earnedAmount, 2) }} commission earned.
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg">
+                    <span class="loading loading-spinner loading-sm text-primary shrink-0"></span>
+                    <div>
+                        <p class="text-sm font-semibold">Waiting for customer to connect…</p>
+                        <p class="text-xs text-base-content/60">
+                            Have them join the Wi-Fi and enter this code. You earn once they're online.
+                        </p>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        <x-slot:actions>
+            <x-button label="{{ $codeRedeemed ? 'Done' : 'Close' }}"
+                      wire:click="closeCodeModal"
+                      class="{{ $codeRedeemed ? 'btn-primary' : 'btn-ghost' }} btn-sm" />
         </x-slot:actions>
     </x-modal>
 
