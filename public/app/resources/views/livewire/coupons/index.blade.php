@@ -110,14 +110,20 @@
                 class="uppercase"
             />
 
-            <x-select
-                label="Discount Type"
-                wire:model.live="type"
-                :options="[['id'=>'fixed','name'=>'Fixed Amount (₦)'],['id'=>'percent','name'=>'Percentage (%)']]"
-                option-value="id"
-                option-label="name"
-            />
+            {{-- Switching type relabels the amount field server-side, so show it working --}}
+            <div class="relative" wire:target="type" wire:loading.class="opacity-60">
+                <x-select
+                    label="Discount Type"
+                    wire:model.live="type"
+                    :options="[['id'=>'fixed','name'=>'Fixed Amount (₦)'],['id'=>'percent','name'=>'Percentage (%)']]"
+                    option-value="id"
+                    option-label="name"
+                />
+                <span wire:loading wire:target="type"
+                      class="loading loading-spinner loading-xs absolute right-9 top-9 text-primary"></span>
+            </div>
 
+            <div wire:target="type" wire:loading.class="opacity-60">
             <x-input
                 label="{{ $type === 'percent' ? 'Percentage (1–100)' : 'Amount (₦)' }}"
                 wire:model="value"
@@ -140,6 +146,7 @@
                     hint="e.g. 10% off but never more than ₦500. Leave blank for no cap."
                 />
             @endif
+            </div>
 
             <x-input label="Max Uses" wire:model="max_uses" type="number" min="1" hint="Leave blank for unlimited" />
             <x-input label="Expiry Date" wire:model="expires_at" type="date" hint="Leave blank for no expiry" />
@@ -152,13 +159,16 @@
             {{-- Restrictions --}}
             <div class="divider text-xs text-base-content/40 my-1">Optional Restrictions</div>
 
+            {{-- Each toggle is Alpine-entangled: the panel opens instantly and the
+                 value syncs to Livewire on the next request, so no round trip. --}}
+
             {{-- Customer Type --}}
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" wire:model.live="enableCustomerType" class="checkbox checkbox-sm checkbox-primary" />
-                <span class="text-sm font-medium">Restrict by customer type</span>
-            </label>
-            @if($enableCustomerType)
-                <div class="pl-6">
+            <div x-data="{ on: @entangle('enableCustomerType') }">
+                <label class="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" x-model="on" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="text-sm font-medium">Restrict by customer type</span>
+                </label>
+                <div x-show="on" x-cloak x-collapse class="pl-6 mt-2">
                     <x-select
                         wire:model="customer_type"
                         :options="[
@@ -169,63 +179,73 @@
                         option-label="name"
                     />
                 </div>
-            @endif
+            </div>
 
             {{-- Order Amount --}}
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" wire:model.live="enableOrderAmount" class="checkbox checkbox-sm checkbox-primary" />
-                <span class="text-sm font-medium">Restrict by order amount</span>
-            </label>
-            @if($enableOrderAmount)
-                <div class="pl-6 grid grid-cols-2 gap-3">
+            <div x-data="{ on: @entangle('enableOrderAmount') }">
+                <label class="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" x-model="on" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="text-sm font-medium">Restrict by order amount</span>
+                </label>
+                <div x-show="on" x-cloak x-collapse class="pl-6 mt-2 grid grid-cols-2 gap-3">
                     <x-input label="Minimum (₦)" wire:model="min_order_amount" type="number" step="0.01" min="0.01" prefix="₦" hint="Leave blank for no minimum" />
                     <x-input label="Maximum (₦)" wire:model="max_order_amount" type="number" step="0.01" min="0.01" prefix="₦" hint="Leave blank for no maximum" />
                 </div>
-            @endif
+            </div>
 
             {{-- Category Restriction --}}
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" wire:model.live="enableCategories" class="checkbox checkbox-sm checkbox-primary" />
-                <span class="text-sm font-medium">Restrict to specific categories</span>
-            </label>
-            @if($enableCategories)
-                <div class="pl-6">
-                    <x-choices-offline
-                        label="Categories (discount applies only to items in these categories)"
+            <div x-data="{ on: @entangle('enableCategories') }">
+                <label class="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" x-model="on" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="text-sm font-medium">Restrict to specific categories</span>
+                </label>
+                <div x-show="on" x-cloak x-collapse class="pl-6 mt-2">
+                    <x-choices
+                        label="Categories"
+                        hint="Type to search. The discount applies only to items in the categories you pick."
                         wire:model="restricted_categories"
-                        :options="$categories"
+                        :options="$categoryOptions"
+                        search-function="searchCategories"
                         option-value="id"
                         option-label="name"
+                        debounce="300ms"
+                        min-chars="1"
+                        no-result-text="No category matches that name."
                         searchable
                     />
                 </div>
-            @endif
+            </div>
 
             {{-- Product Restriction --}}
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" wire:model.live="enableProducts" class="checkbox checkbox-sm checkbox-primary" />
-                <span class="text-sm font-medium">Restrict to specific products</span>
-            </label>
-            @if($enableProducts)
-                <div class="pl-6">
-                    <x-choices-offline
-                        label="Products (discount applies only to these products)"
+            <div x-data="{ on: @entangle('enableProducts') }">
+                <label class="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" x-model="on" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="text-sm font-medium">Restrict to specific products</span>
+                </label>
+                <div x-show="on" x-cloak x-collapse class="pl-6 mt-2">
+                    <x-choices
+                        label="Products"
+                        hint="Type to search. The discount applies only to the products you pick."
                         wire:model="restricted_products"
-                        :options="$products"
+                        :options="$productOptions"
+                        search-function="searchProducts"
                         option-value="id"
                         option-label="name"
+                        debounce="300ms"
+                        min-chars="1"
+                        no-result-text="No product matches that name."
                         searchable
                     />
                 </div>
-            @endif
+            </div>
 
             {{-- Min Item Count --}}
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" wire:model.live="enableItemCount" class="checkbox checkbox-sm checkbox-primary" />
-                <span class="text-sm font-medium">Require a minimum number of items</span>
-            </label>
-            @if($enableItemCount)
-                <div class="pl-6">
+            <div x-data="{ on: @entangle('enableItemCount') }">
+                <label class="flex items-center gap-2 cursor-pointer w-fit">
+                    <input type="checkbox" x-model="on" class="checkbox checkbox-sm checkbox-primary" />
+                    <span class="text-sm font-medium">Require a minimum number of items</span>
+                </label>
+                <div x-show="on" x-cloak x-collapse class="pl-6 mt-2">
                     <x-input
                         label="Minimum Items in Cart"
                         wire:model="min_item_count"
@@ -234,7 +254,7 @@
                         hint="Counts total quantity — 2 packs of the same product counts as 2."
                     />
                 </div>
-            @endif
+            </div>
 
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.couponModal = false" />

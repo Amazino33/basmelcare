@@ -5,6 +5,7 @@ namespace App\Livewire\Coupons;
 use App\Models\Category;
 use App\Models\Coupon;
 use App\Models\Product;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
@@ -40,6 +41,38 @@ class Index extends Component
     public array  $restricted_products   = [];
     public string $min_item_count    = '';
 
+    // Search results for the pickers — only ever a short list, never the
+    // whole catalogue, so the form stays fast as the catalogue grows.
+    public Collection $categoryOptions;
+    public Collection $productOptions;
+
+    public function mount(): void
+    {
+        $this->searchCategories();
+        $this->searchProducts();
+    }
+
+    public function searchCategories(string $value = ''): void
+    {
+        $this->categoryOptions = Category::query()
+            ->when($value, fn($q) => $q->where('name', 'like', "%{$value}%"))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name'])
+            // Keep already-selected entries present so their chips still render.
+            ->merge(Category::whereIn('id', $this->restricted_categories)->get(['id', 'name']));
+    }
+
+    public function searchProducts(string $value = ''): void
+    {
+        $this->productOptions = Product::query()
+            ->when($value, fn($q) => $q->where('name', 'like', "%{$value}%"))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name'])
+            ->merge(Product::whereIn('id', $this->restricted_products)->get(['id', 'name']));
+    }
+
     public function openCreate(): void
     {
         $this->reset([
@@ -52,6 +85,8 @@ class Index extends Component
         $this->type          = 'fixed';
         $this->is_active     = true;
         $this->customer_type = 'all';
+        $this->searchCategories();
+        $this->searchProducts();
         $this->couponModal   = true;
     }
 
@@ -80,6 +115,10 @@ class Index extends Component
         $this->enableProducts       = !empty($this->restricted_products);
         $this->min_item_count       = $coupon->min_item_count !== null ? (string) $coupon->min_item_count : '';
         $this->enableItemCount      = $coupon->min_item_count !== null;
+
+        // Seed the pickers so the saved selections show as chips.
+        $this->searchCategories();
+        $this->searchProducts();
 
         $this->couponModal = true;
     }
@@ -162,9 +201,7 @@ class Index extends Component
     public function render()
     {
         return view('livewire.coupons.index', [
-            'coupons'    => Coupon::latest()->get(),
-            'categories' => Category::orderBy('name')->get(['id', 'name']),
-            'products'   => Product::orderBy('name')->get(['id', 'name']),
+            'coupons' => Coupon::latest()->get(),
         ]);
     }
 }
