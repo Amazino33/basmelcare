@@ -39,8 +39,30 @@
         @endscope
     </x-table>
 
-    <!-- Create/Edit Modal -->
-    <x-modal wire:model="modal" title="{{ $customerId ? 'Edit Customer' : 'New Customer' }}">
+    {{--
+        ONE dialog for the whole promoter flow: details -> OTP -> Wi-Fi code.
+
+        These were three separate <x-modal>s. Each MaryUI modal carries
+        x-trap="open", so closing one and opening another in the same Livewire
+        response handed Alpine's focus trap over mid-tick — the next dialog
+        appeared but would not accept typing. A single dialog has a single trap.
+    --}}
+    @php
+        $flowStep = $codeModal ? 'code' : ($otpModal ? 'otp' : 'form');
+    @endphp
+
+    <x-modal
+        wire:model="modal"
+        :title="match($flowStep) {
+            'otp'   => 'Verify Customer Phone',
+            'code'  => $noSmartDevice ? 'No Smartphone' : ($codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued'),
+            default => $customerId ? 'Edit Customer' : 'New Customer',
+        }"
+        :box-class="$flowStep === 'form' ? null : 'max-w-sm'"
+        :persistent="$flowStep !== 'form'"
+    >
+
+    @if($flowStep === 'form')
         <x-form wire:submit="save">
             <x-input label="Name" wire:model="name" />
             <x-select label="Customer Type" wire:model="type" :options="[
@@ -57,10 +79,9 @@
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
-    </x-modal>
+    @endif
 
-    <!-- OTP Verification Modal (promoters only) -->
-    <x-modal wire:model="otpModal" title="Verify Customer Phone" box-class="max-w-sm" persistent>
+    @if($flowStep === 'otp')
         <div class="space-y-4">
             <div class="flex items-start gap-3 p-3 bg-info/10 rounded-lg">
                 <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-info shrink-0 mt-0.5" />
@@ -73,7 +94,8 @@
                 <x-input label="Enter OTP" wire:model="otpCode" placeholder="000000"
                     maxlength="6" inputmode="numeric"
                     hint="6-digit code from the customer's phone"
-                    wire:keydown.enter="confirmOtp" />
+                    wire:keydown.enter="confirmOtp"
+                    x-init="$nextTick(() => $el.querySelector('input')?.focus())" />
                 @if($otpError)
                     <p class="text-error text-xs mt-1">{{ $otpError }}</p>
                 @endif
@@ -81,15 +103,12 @@
         </div>
         <x-slot:actions>
             <x-button label="Skip (no code)" wire:click="skipOtp" class="btn-ghost btn-sm text-base-content/40 mr-auto" />
-            <x-button label="Resend" wire:click="resendOtp" class="btn-outline btn-sm" />
-            <x-button label="Verify & Issue Code" wire:click="confirmOtp" class="btn-primary btn-sm" />
+            <x-button label="Resend" wire:click="resendOtp" class="btn-outline btn-sm" spinner="resendOtp" />
+            <x-button label="Verify & Issue Code" wire:click="confirmOtp" class="btn-primary btn-sm" spinner="confirmOtp" />
         </x-slot:actions>
-    </x-modal>
+    @endif
 
-    <!-- Wi-Fi Code Handover (promoters) -->
-    <x-modal wire:model="codeModal"
-             title="{{ $noSmartDevice ? 'No Smartphone' : ($codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued') }}"
-             box-class="max-w-sm" persistent>
+    @if($flowStep === 'code')
         <div class="space-y-4" @if(!$codeRedeemed) wire:poll.3s="checkRedemption" @endif>
 
             @unless($noSmartDevice)
@@ -155,6 +174,8 @@
                       wire:click="closeCodeModal"
                       class="{{ $codeRedeemed ? 'btn-primary' : 'btn-ghost' }} btn-sm" />
         </x-slot:actions>
+    @endif
+
     </x-modal>
 
     <!-- Customer Profile Drawer -->

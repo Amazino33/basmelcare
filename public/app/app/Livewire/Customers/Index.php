@@ -154,8 +154,15 @@ class Index extends Component
             $this->otpChannel = $this->sendOtp($customer->phone, $otp);
             $sent = $this->otpChannel !== WhatsAppService::FAILED;
 
-            $this->modal = false;
+            // Deliberately leave $modal open: registration, OTP and code are
+            // steps INSIDE one dialog. Closing one modal and opening another in
+            // the same response hands Alpine's focus trap over mid-tick, which
+            // leaves the next dialog visible but unable to accept typing.
             $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+
+            if (! $sent) {
+                $this->modal = false;
+            }
 
             if ($sent) {
                 $this->pendingCommissionCustomerId = $customer->id;
@@ -189,6 +196,7 @@ class Index extends Component
 
         if (!$customer) {
             $this->otpModal = false;
+            $this->modal    = false;
             $this->resetPendingOtp();
             $this->error('Customer not found, or not registered by you.');
             return;
@@ -196,6 +204,7 @@ class Index extends Component
 
         if (PromoterCode::where('customer_id', $customer->id)->exists()) {
             $this->otpModal = false;
+            $this->modal    = false;
             $this->resetPendingOtp();
             $this->error('A Wi-Fi code has already been issued for this customer.');
             return;
@@ -234,6 +243,7 @@ class Index extends Component
             ]);
         } catch (\Illuminate\Database\QueryException $e) {
             $this->otpModal = false;
+            $this->modal    = false;
             $this->resetPendingOtp();
             $this->error('A Wi-Fi code has already been issued for this customer.');
             return;
@@ -321,6 +331,7 @@ class Index extends Component
     public function closeCodeModal(): void
     {
         $this->codeModal = false;
+        $this->modal     = false;   // closes the shared dialog
         $this->issuedCodeId = null;
         $this->issuedCode = '';
         $this->codeRedeemed = false;
@@ -394,6 +405,7 @@ class Index extends Component
 
         if (ReferralCommission::where('customer_id', $customer->id)->exists()) {
             $this->otpModal = false;
+            $this->modal    = false;
             $this->resetPendingOtp();
             $this->error('A commission has already been recorded for this customer.');
             return;
@@ -425,6 +437,7 @@ class Index extends Component
         $customer?->clearOtp();
 
         $this->otpModal = false;
+        $this->modal    = false;
         $this->resetPendingOtp();
         $this->warning('Customer added without verification. No commission logged.');
     }

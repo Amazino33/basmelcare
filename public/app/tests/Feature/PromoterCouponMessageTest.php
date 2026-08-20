@@ -34,6 +34,14 @@ class PromoterCouponMessageTest extends TestCase
         // Capture outgoing messages instead of sending them.
         $this->sent = [];
         $fake = Mockery::mock(WhatsAppService::class);
+
+        // Delivered over WhatsApp, i.e. the customer has a smartphone and the
+        // normal code-then-connect flow applies.
+        $fake->shouldReceive('deliver')->andReturnUsing(function ($phone, $message) {
+            $this->sent[] = $message;
+
+            return WhatsAppService::VIA_WHATSAPP;
+        });
         $fake->shouldReceive('send')->andReturnUsing(function ($phone, $message) {
             $this->sent[] = $message;
 
