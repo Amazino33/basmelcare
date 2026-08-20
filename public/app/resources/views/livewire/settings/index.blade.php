@@ -163,6 +163,57 @@
                         class="max-w-xs mt-4"
                     />
 
+                    <div class="mt-4 max-w-xl">
+                        <x-select
+                            label="Coupon to advertise to new customers"
+                            wire:model.live="promoter_coupon_code"
+                            :options="$advertisableCoupons"
+                            option-value="id"
+                            option-label="name"
+                            placeholder="Don't advertise a coupon"
+                            hint="Added to the Wi-Fi code message a promoter's customer receives."
+                        />
+
+                        @if($advertisableCoupons->isEmpty())
+                            <div class="flex items-start gap-2 p-3 mt-2 bg-warning/10 rounded-lg text-sm">
+                                <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+                                <span>
+                                    No coupon can be advertised right now. A coupon must be active, not
+                                    expired, still have uses left, and not apply automatically
+                                    &mdash; an auto-applying coupon needs no code.
+                                </span>
+                            </div>
+                        @endif
+
+                        @php
+                            $previewCoupon = $promoter_coupon_code
+                                ? \App\Models\Coupon::where('code', $promoter_coupon_code)->first()
+                                : null;
+                        @endphp
+
+                        @if($previewCoupon && $previewCoupon->isAdvertisable())
+                            <div class="mt-3">
+                                <p class="text-xs text-base-content/60 mb-1">The customer receives:</p>
+                                <div class="p-3 rounded-lg bg-base-200 text-sm leading-relaxed">
+                                    Welcome to {{ \App\Models\AppSetting::get('pharmacy_name', 'BasmelCare') }}!
+                                    Your free Wi-Fi code is: <span class="font-mono font-bold">7K4M2P</span>.
+                                    Connect to the {{ \App\Models\AppSetting::get('pharmacy_name', 'BasmelCare') }}
+                                    network and enter it to get {{ $voucher_validity_hours }} hours of internet.
+                                    <span class="text-primary font-medium">
+                                        Show this code at {{ \App\Models\AppSetting::get('pharmacy_name', 'BasmelCare') }}
+                                        for {{ $previewCoupon->offerSummary() }}:
+                                        <span class="font-mono font-bold">{{ $previewCoupon->code }}</span>.
+                                        {{ $previewCoupon->conditionsSummary() }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-base-content/50 mt-1">
+                                    Sent by WhatsApp where possible. If it falls back to SMS this is more
+                                    than one message, so it costs more to send.
+                                </p>
+                            </div>
+                        @endif
+                    </div>
+
                     <x-slot:actions>
                         <x-button label="Save Return Settings" type="submit" class="btn-primary" />
                     </x-slot:actions>

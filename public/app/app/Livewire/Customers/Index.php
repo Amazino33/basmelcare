@@ -3,6 +3,7 @@
 namespace App\Livewire\Customers;
 
 use App\Models\AppSetting;
+use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\MedicalRecord;
 use App\Models\PromoterCode;
@@ -273,11 +274,42 @@ class Index extends Component
         $name  = AppSetting::get('pharmacy_name', 'BasmelCare');
         $hours = (int) AppSetting::get('voucher_validity_hours', 24);
 
-        return app(WhatsAppService::class)->send(
-            $phone,
-            "Welcome to {$name}! Your free Wi-Fi code is: *{$code}*. "
-            . "Connect to the {$name} network and enter it to get {$hours} hours of internet."
-        );
+        $message = "Welcome to {$name}! Your free Wi-Fi code is: *{$code}*. "
+            . "Connect to the {$name} network and enter it to get {$hours} hours of internet.";
+
+        if ($offer = $this->couponMessage()) {
+            $message .= ' ' . $offer;
+        }
+
+        return app(WhatsAppService::class)->send($phone, $message);
+    }
+
+    /**
+     * The coupon line for the welcome message, or null.
+     *
+     * Returns nothing unless the chosen coupon can actually be redeemed today —
+     * texting an expired or used-up code sends customers to the counter for a
+     * discount they cannot get, and the promoter wears the complaint.
+     */
+    private function couponMessage(): ?string
+    {
+        $code = trim((string) AppSetting::get('promoter_coupon_code', ''));
+
+        if ($code === '') {
+            return null;
+        }
+
+        $coupon = Coupon::where('code', $code)->first();
+
+        if (! $coupon || ! $coupon->isAdvertisable()) {
+            return null;
+        }
+
+        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $line    = "Show this code at {$name} for {$coupon->offerSummary()}: *{$coupon->code}*.";
+        $conditions = $coupon->conditionsSummary();
+
+        return $conditions ? $line . ' ' . $conditions : $line;
     }
 
     private function resetPendingOtp(): void

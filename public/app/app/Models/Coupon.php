@@ -39,6 +39,73 @@ class Coupon extends Model
     }
 
     /**
+     * Can this coupon be advertised to a customer right now?
+     *
+     * Stricter than redeeming it: an auto-applying coupon needs no code, and a
+     * coupon that is expired or out of uses must never be texted to anybody.
+     */
+    public function isAdvertisable(): bool
+    {
+        return $this->is_active
+            && ! $this->auto_apply
+            && ! $this->expires_at?->isPast()
+            && ! ($this->max_uses !== null && $this->used_count >= $this->max_uses);
+    }
+
+    /** "10% off" / "₦500 off", including any cap. */
+    public function offerSummary(): string
+    {
+        if ($this->type === 'percent') {
+            $summary = rtrim(rtrim(number_format($this->value, 2, '.', ''), '0'), '.') . '% off';
+
+            return $this->max_discount
+                ? $summary . ' (up to ₦' . number_format($this->max_discount, 0) . ')'
+                : $summary;
+        }
+
+        return '₦' . number_format($this->value, 0) . ' off';
+    }
+
+    /**
+     * The conditions in plain language, for telling a customer up front rather
+     * than letting them discover them at the counter.
+     */
+    public function conditionsSummary(): string
+    {
+        $parts = [];
+
+        $parts[] = match ($this->customer_type ?? 'all') {
+            'new'       => 'first purchase only',
+            'returning' => 'returning customers only',
+            default     => null,
+        };
+
+        if ($this->min_order_amount) {
+            $parts[] = 'on orders over ₦' . number_format($this->min_order_amount, 0);
+        }
+
+        if ($this->max_order_amount) {
+            $parts[] = 'on orders up to ₦' . number_format($this->max_order_amount, 0);
+        }
+
+        if ($this->min_item_count) {
+            $parts[] = 'buy ' . $this->min_item_count . '+ items';
+        }
+
+        if (! empty($this->restricted_categories) || ! empty($this->restricted_products)) {
+            $parts[] = 'selected items only';
+        }
+
+        if ($this->expires_at) {
+            $parts[] = 'until ' . $this->expires_at->format('j M');
+        }
+
+        $parts = array_values(array_filter($parts));
+
+        return $parts ? ucfirst(implode(', ', $parts)) . '.' : '';
+    }
+
+    /**
      * Calculate the discount amount. When category or product restrictions are set,
      * the discount applies only to eligible line items (Option B / filter mode).
      * Pass $saleItems as an array of ['product_id', 'category_id', 'subtotal'] maps.

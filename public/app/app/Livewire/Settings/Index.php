@@ -49,6 +49,7 @@ class Index extends Component
     // Commissions
     public float $commission_amount = 100;
     public int $promoter_target_default = 20;
+    public string $promoter_coupon_code = '';
 
     // Incentives / HifastLink
     public string $hifastlink_api_key = '';
@@ -88,6 +89,7 @@ class Index extends Component
         $this->return_require_customer = AppSetting::bool('return_require_customer', true);
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
+        $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');
 
         $this->hifastlink_api_key = AppSetting::get('hifastlink_api_key', '');
         $this->hifastlink_url = AppSetting::get('hifastlink_url', '');
@@ -100,12 +102,14 @@ class Index extends Component
             'return_window_hours' => 'required|integer|min:1|max:168',
             'commission_amount'   => 'required|numeric|min:0',
             'promoter_target_default' => 'required|integer|min:1',
+            'promoter_coupon_code'    => 'nullable|string|exists:coupons,code',
         ]);
 
         AppSetting::set('return_window_hours', $this->return_window_hours);
         AppSetting::set('return_require_customer', $this->return_require_customer ? '1' : '0');
         AppSetting::set('commission_amount', $this->commission_amount);
         AppSetting::set('promoter_target_default', $this->promoter_target_default);
+        AppSetting::set('promoter_coupon_code', $this->promoter_coupon_code);
 
         $this->success('Return settings saved.');
     }
@@ -233,6 +237,15 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.settings.index');
+        return view('livewire.settings.index', [
+            // Only coupons a customer could actually redeem from a text message.
+            'advertisableCoupons' => \App\Models\Coupon::orderBy('code')->get()
+                ->filter(fn($c) => $c->isAdvertisable())
+                ->map(fn($c) => [
+                    'id'   => $c->code,
+                    'name' => $c->code . ' — ' . $c->offerSummary(),
+                ])
+                ->values(),
+        ]);
     }
 }
