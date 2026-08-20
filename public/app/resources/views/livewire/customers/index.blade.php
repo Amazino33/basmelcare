@@ -87,32 +87,51 @@
     </x-modal>
 
     <!-- Wi-Fi Code Handover (promoters) -->
-    <x-modal wire:model="codeModal" title="{{ $codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued' }}"
+    <x-modal wire:model="codeModal"
+             title="{{ $noSmartDevice ? 'No Smartphone' : ($codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued') }}"
              box-class="max-w-sm" persistent>
         <div class="space-y-4" @if(!$codeRedeemed) wire:poll.3s="checkRedemption" @endif>
 
-            <div class="text-center py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide mb-1">Wi-Fi code</p>
-                <p class="text-3xl font-mono font-bold tracking-[0.2em] text-primary">{{ $issuedCode }}</p>
-            </div>
+            @unless($noSmartDevice)
+                <div class="text-center py-2">
+                    <p class="text-xs text-base-content/60 uppercase tracking-wide mb-1">Wi-Fi code</p>
+                    <p class="text-3xl font-mono font-bold tracking-[0.2em] text-primary">{{ $issuedCode }}</p>
+                </div>
+            @endunless
 
-            <div class="flex items-start gap-2 p-2 rounded-lg {{ $codeSent ? 'bg-success/10' : 'bg-warning/10' }}">
-                <x-icon name="{{ $codeSent ? 'o-check-circle' : 'o-exclamation-triangle' }}"
-                        class="w-4 h-4 shrink-0 mt-0.5 {{ $codeSent ? 'text-success' : 'text-warning' }}" />
-                <p class="text-xs text-base-content/80">
-                    @if($codeSent)
-                        Sent to <span class="font-semibold">{{ $pendingPhone }}</span>.
-                    @else
-                        Could not send by WhatsApp/SMS — read the code out to the customer.
-                    @endif
-                </p>
-            </div>
+            @if($noSmartDevice)
+                <div class="flex items-start gap-3 p-3 bg-info/10 rounded-lg">
+                    <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-info shrink-0 mt-0.5" />
+                    <div>
+                        <p class="text-sm font-semibold">This phone can't use the Wi-Fi</p>
+                        <p class="text-xs text-base-content/70 mt-0.5">
+                            The message went by SMS, so there's no WhatsApp on
+                            <span class="font-semibold">{{ $pendingPhone }}</span>.
+                            No Wi-Fi code was issued — it would be no use to them.
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="flex items-start gap-2 p-2 rounded-lg {{ $codeSent ? 'bg-success/10' : 'bg-warning/10' }}">
+                    <x-icon name="{{ $codeSent ? 'o-check-circle' : 'o-exclamation-triangle' }}"
+                            class="w-4 h-4 shrink-0 mt-0.5 {{ $codeSent ? 'text-success' : 'text-warning' }}" />
+                    <p class="text-xs text-base-content/80">
+                        @if($codeSent)
+                            Sent to <span class="font-semibold">{{ $pendingPhone }}</span>.
+                        @else
+                            Could not send by WhatsApp/SMS — read the code out to the customer.
+                        @endif
+                    </p>
+                </div>
+            @endif
 
             @if($codeRedeemed)
                 <div class="flex items-center gap-3 p-3 bg-success/10 rounded-lg">
                     <x-icon name="o-check-badge" class="w-6 h-6 text-success shrink-0" />
                     <div>
-                        <p class="text-sm font-bold text-success">Customer is online</p>
+                        <p class="text-sm font-bold text-success">
+                            {{ $noSmartDevice ? 'Counted — no connection needed' : 'Customer is online' }}
+                        </p>
                         <p class="text-xs text-base-content/70">
                             ₦{{ number_format($earnedAmount, 2) }} commission earned.
                         </p>

@@ -41,6 +41,8 @@ class Index extends Component
     public string $issuedCode = '';
     public bool $codeSent = false;
     public bool $codeRedeemed = false;
+    public bool $noSmartDevice = false;
+    public string $otpChannel = '';
     public float $earnedAmount = 0;
 
     // Customer profile drawer
@@ -148,7 +150,9 @@ class Index extends Component
 
         if ($isPromoter) {
             $otp  = $customer->generateOtp();
-            $sent = $this->sendOtp($customer->phone, $otp);
+            // How the OTP reached them tells us whether they can use Wi-Fi at all.
+            $this->otpChannel = $this->sendOtp($customer->phone, $otp);
+            $sent = $this->otpChannel !== WhatsAppService::FAILED;
 
             $this->modal = false;
             $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
@@ -212,14 +216,21 @@ class Index extends Component
 
         $customer->clearOtp();
 
-        // Phone proven real — issue the Wi-Fi code. Nothing is earned yet;
-        // commission is created when the customer actually connects.
+        // Reached only by SMS while WhatsApp was working: the number has no
+        // WhatsApp, so no device that can use the Wi-Fi. A degraded fallback
+        // (WhatsApp down or unconfigured) tells us nothing, so it is NOT
+        // treated this way — those customers still get a code as normal.
+        $noSmartDevice = $this->otpChannel === WhatsAppService::VIA_SMS;
+
         try {
             $code = PromoterCode::create([
-                'code'        => PromoterCode::generateCode(),
-                'user_id'     => auth()->id(),
-                'customer_id' => $customer->id,
-                'valid_until' => today(),
+                'code'          => PromoterCode::generateCode(),
+                'user_id'       => auth()->id(),
+                'customer_id'   => $customer->id,
+                'delivered_via' => $this->otpChannel,
+                'valid_until'   => today(),
+                // Never usable, so don't leave a live code lying around.
+                'revoked_at'    => $noSmartDevice ? now() : null,
             ]);
         } catch (\Illuminate\Database\QueryException $e) {
             $this->otpModal = false;
@@ -230,13 +241,61 @@ class Index extends Component
 
         $this->issuedCodeId  = $code->id;
         $this->issuedCode    = $code->code;
+        $this->noSmartDevice = $noSmartDevice;
         $this->codeRedeemed  = false;
-        $this->codeSent      = $this->sendCode($customer->phone, $code->code);
+
+        if ($noSmartDevice) {
+            // They can never connect, so the promoter is paid now rather than
+            // being penalised for the customer's handset.
+            $this->earnedAmount = $this->recordCommission($customer);
+            $this->codeRedeemed = true;
+            $this->codeSent     = $this->sendNoDeviceMessage($customer->phone);
+        } else {
+            $this->codeSent = $this->sendCode($customer->phone, $code->code);
+        }
 
         $this->otpModal  = false;
         $this->codeModal = true;
         $this->otpCode   = '';
         $this->otpError  = '';
+    }
+
+    /** Records the promoter's commission for this customer, returning the amount. */
+    private function recordCommission(Customer $customer): float
+    {
+        $amount = (float) AppSetting::get('commission_amount', 100);
+
+        try {
+            ReferralCommission::create([
+                'user_id'     => auth()->id(),
+                'customer_id' => $customer->id,
+                'amount'      => $amount,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Unique (user_id, customer_id) — already paid for this customer.
+            return (float) ReferralCommission::where('user_id', auth()->id())
+                ->where('customer_id', $customer->id)->value('amount');
+        }
+
+        return $amount;
+    }
+
+    /**
+     * A feature-phone customer gets no Wi-Fi code — it would be useless to them
+     * — but the coupon still works at the counter, so that is worth sending.
+     */
+    private function sendNoDeviceMessage(string $phone): bool
+    {
+        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $message = "Welcome to {$name}!";
+
+        if ($offer = $this->couponMessage()) {
+            $message .= ' ' . $offer;
+        } else {
+            $message .= ' Thank you for registering with us.';
+        }
+
+        return app(WhatsAppService::class)->send($phone, $message);
     }
 
     /**
@@ -265,6 +324,8 @@ class Index extends Component
         $this->issuedCodeId = null;
         $this->issuedCode = '';
         $this->codeRedeemed = false;
+        $this->noSmartDevice = false;
+        $this->otpChannel = '';
         $this->earnedAmount = 0;
         $this->resetPendingOtp();
     }
@@ -368,11 +429,13 @@ class Index extends Component
         $this->warning('Customer added without verification. No commission logged.');
     }
 
-    private function sendOtp(string $phone, string $otp): bool
+    /** @return string one of the WhatsAppService VIA_* / FAILED constants */
+    private function sendOtp(string $phone, string $otp): string
     {
         $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
         $message = "Your {$name} registration code is: *{$otp}*. Valid for 10 minutes.";
-        return app(WhatsAppService::class)->send($phone, $message);
+
+        return app(WhatsAppService::class)->deliver($phone, $message);
     }
 
     public function edit($id)

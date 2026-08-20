@@ -66,16 +66,26 @@ class User extends Authenticatable
     {
         $day = $date instanceof \Carbon\Carbon ? $date : \Carbon\Carbon::parse($date);
 
-        $issued   = $this->promoterCodes()->whereDate('created_at', $day)->count();
-        $redeemed = $this->promoterCodes()->whereDate('created_at', $day)->whereNotNull('redeemed_at')->count();
+        $issued = $this->promoterCodes()->whereDate('created_at', $day)->count();
+
+        // A customer with no smart device can never connect, but the promoter
+        // is paid for them — so they count towards the target just the same.
+        $connected = $this->promoterCodes()->whereDate('created_at', $day)
+            ->whereNotNull('redeemed_at')->count();
+        $noDevice  = $this->promoterCodes()->whereDate('created_at', $day)
+            ->where('delivered_via', \App\Services\WhatsAppService::VIA_SMS)->count();
+
+        $credited = $connected + $noDevice;
         $target   = $this->effectiveReferralTarget();
 
         return [
-            'issued'   => $issued,
-            'redeemed' => $redeemed,
-            'target'   => $target,
-            'percent'  => $target > 0 ? min(100, (int) round(($redeemed / $target) * 100)) : 0,
-            'stalled'  => $issued - $redeemed,
+            'issued'    => $issued,
+            'redeemed'  => $credited,
+            'connected' => $connected,
+            'noDevice'  => $noDevice,
+            'target'    => $target,
+            'percent'   => $target > 0 ? min(100, (int) round(($credited / $target) * 100)) : 0,
+            'stalled'   => max(0, $issued - $credited),
         ];
     }
 

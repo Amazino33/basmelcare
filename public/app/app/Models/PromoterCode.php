@@ -8,8 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PromoterCode extends Model
 {
     protected $fillable = [
-        'code', 'user_id', 'customer_id', 'valid_until', 'redeemed_at', 'revoked_at',
+        'code', 'user_id', 'customer_id', 'delivered_via',
+        'valid_until', 'redeemed_at', 'revoked_at',
     ];
+
+    /** Reached only by SMS, so the customer has no device that can use Wi-Fi. */
+    public function isSmsOnly(): bool
+    {
+        return $this->delivered_via === \App\Services\WhatsAppService::VIA_SMS;
+    }
 
     protected $casts = [
         'valid_until' => 'date',
