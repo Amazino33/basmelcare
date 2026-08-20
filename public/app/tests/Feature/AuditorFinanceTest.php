@@ -170,7 +170,7 @@ class AuditorFinanceTest extends TestCase
         // The client asked to see the actual sales, not just a total.
         $html = $this->actingAs($this->auditor())->get($this->url('finance'))->getContent();
 
-        $this->assertStringContainsString('Every sale in this period', $html);
+        $this->assertStringContainsString('Every invoice in this period', $html);
         $this->assertStringContainsString('Cost', $html);
         $this->assertStringContainsString('Margin', $html);
     }

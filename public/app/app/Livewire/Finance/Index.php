@@ -162,6 +162,13 @@ class Index extends Component
             'netCash'        => $collected - $paidOut,
 
             'saleCount'    => $this->settledSales($from, $to)->count(),
+
+            // Shown so the auditor can account for every invoice number. A gap
+            // in the sequence with no visible reason is what fraud looks like.
+            'cancelledCount' => Sale::where('status', 'cancelled')
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'pendingCount'   => Sale::where('status', 'pending')
+                ->whereBetween('created_at', [$from, $to])->count(),
         ];
     }
 
@@ -169,13 +176,17 @@ class Index extends Component
     {
         [$from, $to] = $this->range();
 
-        // Individual sales with their margin — the client asked to see the
-        // actual transactions, not just a total handed over by the cashier.
+        // EVERY sale, whatever its status — cancelled and pending invoices are
+        // listed too, so the invoice sequence has no unexplained gaps. Only
+        // settled sales feed the figures above; the rest contribute nothing.
+        //
+        // Ordered by invoice number so the sequence reads straight down and a
+        // missing one is obvious.
         $sales = Sale::with('customer', 'user')
-            ->whereIn('status', ['paid', 'completed'])
             ->whereBetween('created_at', [$from, $to])
             ->withSum('saleItems as cogs', DB::raw('cost_price * quantity'))
-            ->latest()
+            ->orderByDesc('created_at')
+            ->orderByDesc('invoice_number')
             ->paginate(25);
 
         return view('livewire.finance.index', [

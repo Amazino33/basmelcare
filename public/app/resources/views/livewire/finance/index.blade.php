@@ -156,13 +156,28 @@
     </div>
 
     {{-- Every sale behind the numbers --}}
-    <x-card title="Every sale in this period" subtitle="The figures above come from these">
+    <x-card title="Every invoice in this period"
+            subtitle="Cancelled and unpaid invoices are listed too, so no number is unaccounted for">
+
+        @if($f['cancelledCount'] > 0 || $f['pendingCount'] > 0)
+            <div class="flex flex-wrap gap-2 mb-3 text-xs">
+                @if($f['cancelledCount'] > 0)
+                    <span class="badge badge-error badge-sm">{{ $f['cancelledCount'] }} cancelled</span>
+                @endif
+                @if($f['pendingCount'] > 0)
+                    <span class="badge badge-warning badge-sm">{{ $f['pendingCount'] }} unpaid</span>
+                @endif
+                <span class="text-base-content/50">— shown for completeness, counted as ₦0</span>
+            </div>
+        @endif
+
         <div class="overflow-x-auto">
             <table class="table table-sm">
                 <thead>
                     <tr>
                         <th>Invoice</th>
                         <th>Date</th>
+                        <th>Status</th>
                         <th>Customer</th>
                         <th>Sold by</th>
                         <th class="text-right">Sold for</th>
@@ -174,28 +189,50 @@
                 <tbody>
                     @forelse($sales as $sale)
                         @php
-                            $net    = (float) $sale->total_amount - (float) ($sale->coupon_discount ?? 0);
-                            $cost   = (float) ($sale->cogs ?? 0);
-                            $profit = $net - $cost;
+                            $settled = in_array($sale->status, ['paid', 'completed']);
+                            $net     = $settled ? (float) $sale->total_amount - (float) ($sale->coupon_discount ?? 0) : 0.0;
+                            $cost    = $settled ? (float) ($sale->cogs ?? 0) : 0.0;
+                            $profit  = $net - $cost;
                         @endphp
-                        <tr class="hover">
+                        <tr class="hover {{ $settled ? '' : 'opacity-60' }}">
                             <td class="font-mono text-xs">{{ $sale->invoice_number ?? '#' . $sale->id }}</td>
                             <td class="text-xs whitespace-nowrap">{{ $sale->created_at->format('d M H:i') }}</td>
+                            <td>
+                                <span @class([
+                                    'badge badge-sm',
+                                    'badge-success' => $sale->status === 'completed',
+                                    'badge-info'    => $sale->status === 'paid',
+                                    'badge-warning' => $sale->status === 'pending',
+                                    'badge-error'   => $sale->status === 'cancelled',
+                                    'badge-ghost'   => ! in_array($sale->status, ['completed','paid','pending','cancelled']),
+                                ])>{{ ucfirst($sale->status) }}</span>
+                            </td>
                             <td class="text-sm">{{ $sale->customer?->name ?? 'Walk-in' }}</td>
                             <td class="text-sm">{{ $sale->user?->name ?? '—' }}</td>
-                            <td class="text-right tabular-nums">₦{{ number_format($net, 2) }}</td>
-                            <td class="text-right tabular-nums text-base-content/60">₦{{ number_format($cost, 2) }}</td>
-                            <td class="text-right tabular-nums font-semibold {{ $profit >= 0 ? 'text-success' : 'text-error' }}">
-                                ₦{{ number_format($profit, 2) }}
-                            </td>
-                            <td class="text-right tabular-nums text-xs text-base-content/60">
-                                {{ $net > 0 ? number_format(($profit / $net) * 100, 1) . '%' : '—' }}
-                            </td>
+
+                            @if($settled)
+                                <td class="text-right tabular-nums">₦{{ number_format($net, 2) }}</td>
+                                <td class="text-right tabular-nums text-base-content/60">₦{{ number_format($cost, 2) }}</td>
+                                <td class="text-right tabular-nums font-semibold {{ $profit >= 0 ? 'text-success' : 'text-error' }}">
+                                    ₦{{ number_format($profit, 2) }}
+                                </td>
+                                <td class="text-right tabular-nums text-xs text-base-content/60">
+                                    {{ $net > 0 ? number_format(($profit / $net) * 100, 1) . '%' : '—' }}
+                                </td>
+                            @else
+                                {{-- Billed value shown for context, but it earns nothing. --}}
+                                <td class="text-right tabular-nums text-base-content/40 line-through">
+                                    ₦{{ number_format((float) $sale->total_amount, 2) }}
+                                </td>
+                                <td colspan="3" class="text-right text-xs text-base-content/50 italic">
+                                    {{ $sale->status === 'cancelled' ? 'cancelled — not counted' : 'not yet paid — not counted' }}
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-base-content/40 py-10">
-                                No settled sales in this period.
+                            <td colspan="9" class="text-center text-base-content/40 py-10">
+                                No invoices in this period.
                             </td>
                         </tr>
                     @endforelse
