@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\NormalisesName;
 use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use NormalisesName;
     use RecordsAudit;
 
     /** Prices drive revenue and margin, so changes must be attributable. */
@@ -26,19 +28,6 @@ class Product extends Model
         'show_in_shop' => 'boolean',
     ];
 
-    /**
-     * Product names are stored uppercase.
-     *
-     * This used to be an accessor, which meant the UI looked consistent while
-     * the stored value kept whatever casing was typed — so a case-sensitive
-     * query or an export behaved differently from the screen. Normalising on
-     * write covers every path (form, quick add, bulk edit, import) instead of
-     * relying on each caller to remember.
-     */
-    public function setNameAttribute(?string $value): void
-    {
-        $this->attributes['name'] = $value === null ? null : strtoupper(trim($value));
-    }
 
     public function getPriceFor(?Customer $customer, int $qty = 1): float
     {

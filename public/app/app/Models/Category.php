@@ -2,18 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\NormalisesName;
 use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
+    use NormalisesName;
+
     protected $fillable = [
         'name', 'description',
     ];
-
-    public function getNameAttribute(string $value): string
-    {
-        return strtoupper($value);
-    }
 
     public function products()
     {

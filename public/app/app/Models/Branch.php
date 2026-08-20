@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\NormalisesName;
 use Illuminate\Database\Eloquent\Model;
 
 class Branch extends Model
 {
+    use NormalisesName;
+
     protected $fillable = ['name', 'address', 'phone', 'is_main'];
 
     protected $casts = [

@@ -311,13 +311,113 @@ class Index extends Component
         $this->success('Invoice cancelled. Stock restored.');
     }
 
+    /** True when the visible results came from typo-tolerant matching. */
+    public bool $searchWasFuzzy = false;
+
+    /**
+     * POS search.
+     *
+     * Staff type in whatever order comes to mind ("500 amox"), so each word is
+     * matched independently against name, SKU and barcode rather than the whole
+     * query being one substring.
+     *
+     * Typo tolerance runs ONLY when exact matching finds nothing. On a dispensing
+     * screen a near-miss must never outrank or hide a real match, and the caller
+     * flags fuzzy results in the UI so staff know to look twice.
+     */
+    private function searchProducts()
+    {
+        $this->searchWasFuzzy = false;
+
+        $base = fn() => Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)]);
+
+        $term = trim($this->search);
+
+        if ($term === '') {
+            return $base()->latest()->limit(20)->get();
+        }
+
+        $words = preg_split('/\s+/', $term, -1, PREG_SPLIT_NO_EMPTY);
+
+        // Every word must appear in at least one searchable field.
+        $matches = $base()
+            ->where(function ($q) use ($words) {
+                foreach ($words as $word) {
+                    $q->where(fn($w) => $w
+                        ->where('name', 'like', "%{$word}%")
+                        ->orWhere('sku', 'like', "%{$word}%")
+                        ->orWhere('barcode', 'like', "%{$word}%"));
+                }
+            })
+            ->limit(40)
+            ->get();
+
+        if ($matches->isNotEmpty()) {
+            return $this->rankByRelevance($matches, $term)->take(20);
+        }
+
+        return $this->fuzzyMatch($base(), $words);
+    }
+
+    /** Closest match first: exact, then starts-with, then contains. */
+    private function rankByRelevance($products, string $term)
+    {
+        $needle = strtoupper($term);
+
+        return $products->sortBy(function ($product) use ($needle) {
+            $name = strtoupper((string) $product->name);
+
+            return match (true) {
+                $name === $needle             => 0,
+                str_starts_with($name, $needle) => 1,
+                str_contains($name, $needle)  => 2,
+                default                       => 3,
+            };
+        })->values();
+    }
+
+    /**
+     * Last resort: allow a small number of typos per word. Only reached when
+     * exact matching returned nothing, so it can never mask a real result.
+     */
+    private function fuzzyMatch($query, array $words)
+    {
+        $candidates = $query->limit(500)->get();
+
+        $scored = $candidates->map(function ($product) use ($words) {
+            $haystack = preg_split('/\s+/', strtoupper((string) $product->name), -1, PREG_SPLIT_NO_EMPTY);
+            $total    = 0;
+
+            foreach ($words as $word) {
+                $word = strtoupper($word);
+                // Short words are easy to confuse, so allow fewer mistakes in them.
+                $allowed = strlen($word) >= 6 ? 2 : (strlen($word) >= 4 ? 1 : 0);
+                $best    = PHP_INT_MAX;
+
+                foreach ($haystack as $piece) {
+                    $best = min($best, levenshtein($word, $piece));
+                }
+
+                if ($best > $allowed) {
+                    return null;   // this word simply is not here
+                }
+
+                $total += $best;
+            }
+
+            $product->fuzzy_distance = $total;
+
+            return $product;
+        })->filter()->sortBy('fuzzy_distance')->values();
+
+        $this->searchWasFuzzy = $scored->isNotEmpty();
+
+        return $scored->take(10);
+    }
+
     public function render()
     {
-        $products = Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)])
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->latest()
-            ->limit(20)
-            ->get();
+        $products = $this->searchProducts();
 
         $customers = Customer::orderBy('name')->get(['id', 'name', 'phone']);
         $selectedCustomer = $this->customer_id ? Customer::find($this->customer_id) : null;

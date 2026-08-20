@@ -10,7 +10,18 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <!-- Product Selection (always visible) -->
         <div class="lg:col-span-2 pb-20 lg:pb-0">
-            <x-input icon="o-magnifying-glass" placeholder="Search products..." wire:model.live.debounce="search" clearable class="mb-3" />
+            <x-input icon="o-magnifying-glass" placeholder="Search products, SKU or barcode..." wire:model.live.debounce="search" clearable class="mb-3" />
+
+            @if($searchWasFuzzy)
+                {{-- Near-misses must never look like an exact hit on a dispensing screen. --}}
+                <div class="alert alert-warning py-2 mb-3 text-sm gap-2">
+                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                    <span>
+                        No exact match for <span class="font-semibold">"{{ $search }}"</span> —
+                        showing closest names. <span class="font-semibold">Check carefully before adding.</span>
+                    </span>
+                </div>
+            @endif
 
             <div class="grid grid-cols-2 gap-2">
                 @forelse($products as $product)
@@ -19,7 +30,8 @@
                         wire:click="addToCart({{ $product->id }})"
                         @class([
                             'p-2 rounded-lg border text-left transition-all active:scale-95',
-                            'border-base-300' => $stock > 0,
+                            'border-base-300' => $stock > 0 && ! $searchWasFuzzy,
+                            'border-warning border-dashed' => $stock > 0 && $searchWasFuzzy,
                             'border-error/30 opacity-50' => $stock == 0,
                         ])
                         @disabled($stock == 0)
@@ -35,7 +47,13 @@
                         <div class="text-xs text-base-content/60">Stock: {{ $stock }}</div>
                     </button>
                 @empty
-                    <div class="col-span-full text-center py-8 text-base-content/60">No products found.</div>
+                    <div class="col-span-full text-center py-8 text-base-content/60">
+                        @if($search)
+                            Nothing matches "{{ $search }}" — try fewer words.
+                        @else
+                            No products found.
+                        @endif
+                    </div>
                 @endforelse
             </div>
         </div>
