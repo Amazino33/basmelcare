@@ -37,7 +37,7 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         });
 
         // Shared sales pages
-        Route::middleware('role:admin,branch_manager,sales,cashier,auditor')->group(function () {
+        Route::middleware('role:admin,branch_manager,sales,cashier')->group(function () {
             Route::get('sales', App\Livewire\Sales\Index::class)->name('sales.index');
             Route::get('invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
             Route::get('receipt/{sale}', [App\Http\Controllers\InvoiceController::class, 'receipt'])->name('receipt.show');
@@ -77,7 +77,7 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         });
 
         // Procurement — commits money to suppliers
-        Route::middleware('role:admin,branch_manager,inventory_manager,auditor')->group(function () {
+        Route::middleware('role:admin,branch_manager,inventory_manager')->group(function () {
             Route::get('suppliers', App\Livewire\Suppliers\Index::class)->name('suppliers.index');
             Route::get('purchase-orders', App\Livewire\PurchaseOrders\Index::class)->name('purchase-orders.index');
         });
@@ -88,7 +88,7 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         });
 
         // Expenses (admin, branch_manager, cashier)
-        Route::middleware('role:admin,branch_manager,cashier,auditor')->group(function () {
+        Route::middleware('role:admin,branch_manager,cashier')->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');
         });
 
@@ -97,9 +97,14 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
         });
 
-        // Financial oversight — the auditor sees all of this but changes none of it.
+        // The auditor's whole surface: the financial picture and the reports
+        // behind it. Individual sales are visible inside Financial Records, so
+        // they do not need the operational Sales History page.
         Route::middleware('role:admin,branch_manager,auditor')->group(function () {
             Route::get('finance', App\Livewire\Finance\Index::class)->name('finance.index');
+        });
+
+        Route::middleware('role:admin,branch_manager')->group(function () {
             Route::get('money-trail', App\Livewire\AuditTrail\Index::class)->name('audit-trail.index');
         });
 

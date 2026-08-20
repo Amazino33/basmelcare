@@ -221,9 +221,6 @@ class Dashboard extends Component
             'audSales'    => Sale::whereIn('status', ['paid', 'completed'])
                 ->whereBetween('created_at', [$from, $to])->count(),
             'audPeriod'   => $from->format('j M') . ' – ' . $to->format('j M Y'),
-            'audRecentChanges' => Schema::hasTable('audit_logs')
-                ? \App\Models\AuditLog::with('user')->latest('created_at')->limit(5)->get()
-                : collect(),
         ];
     }
 

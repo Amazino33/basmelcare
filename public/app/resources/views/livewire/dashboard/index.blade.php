@@ -51,44 +51,16 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <x-card title="Go deeper">
-            <p class="text-sm text-base-content/70 mb-3">
-                Every figure here comes from individual sales you can open and check.
-            </p>
-            <div class="flex flex-wrap gap-2">
-                <x-button label="Financial Records" link="{{ route('finance.index') }}" class="btn-sm btn-primary" icon="o-banknotes" />
-                <x-button label="Every Sale" link="{{ route('sales.index') }}" class="btn-sm btn-ghost" icon="o-clipboard-document-list" />
-                <x-button label="Export Reports" link="{{ route('reports.index') }}" class="btn-sm btn-ghost" icon="o-document-chart-bar" />
-            </div>
-        </x-card>
-
-        <x-card title="Recent changes to money settings">
-            @forelse($audRecentChanges as $log)
-                <div class="flex justify-between items-start gap-2 p-2 border-b border-base-200 last:border-0">
-                    <div class="min-w-0">
-                        <div class="text-sm font-medium truncate">
-                            {{ $log->typeLabel() }} · {{ $log->auditable_label ?? '—' }}
-                        </div>
-                        <div class="text-xs text-base-content/60">
-                            {{ $log->fieldLabel() }}
-                            @if($log->event === 'updated')
-                                <span class="line-through">{{ $log->old_value }}</span> &rarr;
-                                <span class="text-primary font-medium">{{ $log->new_value }}</span>
-                            @endif
-                            · {{ $log->user?->name ?? 'System' }}
-                        </div>
-                    </div>
-                    <span class="text-xs text-base-content/50 shrink-0">{{ $log->created_at?->format('d M') }}</span>
-                </div>
-            @empty
-                <div class="text-center py-6 text-base-content/50 text-sm">No price or setting changes recorded.</div>
-            @endforelse
-            <div class="mt-2">
-                <x-button label="Full Money Trail" link="{{ route('audit-trail.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
-            </div>
-        </x-card>
-    </div>
+    <x-card title="Go deeper">
+        <p class="text-sm text-base-content/70 mb-3">
+            Every figure above is built from individual sales — open Financial Records
+            to see each one with its cost and margin.
+        </p>
+        <div class="flex flex-wrap gap-2">
+            <x-button label="Financial Records" link="{{ route('finance.index') }}" class="btn-sm btn-primary" icon="o-banknotes" />
+            <x-button label="Export Reports" link="{{ route('reports.index') }}" class="btn-sm btn-ghost" icon="o-document-chart-bar" />
+        </div>
+    </x-card>
     @endif
 
     @if(in_array('pharmacist', $panels))

@@ -181,10 +181,6 @@ class AuditorFinanceTest extends TestCase
     {
         return [
             'financial records' => ['finance'],
-            'money trail'       => ['money-trail'],
-            'sales history'     => ['sales'],
-            'expenses'          => ['expenses'],
-            'purchase orders'   => ['purchase-orders'],
             'reports'           => ['reports'],
             'debt book'         => ['debt-book'],
             'change owed'       => ['credits'],
@@ -201,14 +197,22 @@ class AuditorFinanceTest extends TestCase
     public static function forbiddenPaths(): array
     {
         return [
-            'the till'    => ['cashier'],
-            'POS'         => ['pos'],
-            'coupons'     => ['coupons'],
-            'settings'    => ['settings'],
-            'staff'       => ['staff'],
-            'stock adjust'=> ['stock/adjustments'],
-            'customers'   => ['customers'],
-            'products'    => ['products'],
+            // Deliberately removed from the auditor's scope.
+            'sales history'   => ['sales'],
+            'expenses'        => ['expenses'],
+            'purchase orders' => ['purchase-orders'],
+            'suppliers'       => ['suppliers'],
+            'money trail'     => ['money-trail'],
+
+            // Never theirs to begin with.
+            'the till'     => ['cashier'],
+            'POS'          => ['pos'],
+            'coupons'      => ['coupons'],
+            'settings'     => ['settings'],
+            'staff'        => ['staff'],
+            'stock adjust' => ['stock/adjustments'],
+            'customers'    => ['customers'],
+            'products'     => ['products'],
         ];
     }
 
@@ -218,50 +222,62 @@ class AuditorFinanceTest extends TestCase
         $this->actingAs($this->auditor())->get($this->url($path))->assertForbidden();
     }
 
-    // ── Read-only ────────────────────────────────────────────────────
+    // ── Read-only on what they CAN reach ─────────────────────────────
 
-    public function test_auditor_cannot_record_an_expense(): void
+    private function debt(): \App\Models\Debt
     {
-        $this->actingAs($this->auditor());
+        $sale = $this->sell(price: 1000, cost: 600);
 
-        Livewire::test(\App\Livewire\Expenses\Index::class)
-            ->set('category', 'Rent')
-            ->set('description', 'Sneaky')
-            ->set('amount', 5000)
-            ->set('expense_date', today()->format('Y-m-d'))
-            ->call('save');
-
-        $this->assertSame(0, Expense::count(), 'An auditor created an expense.');
+        return \App\Models\Debt::create([
+            'sale_id'     => $sale->id,
+            'customer_id' => \App\Models\Customer::create([
+                'name' => 'Owes Money', 'type' => 'retail', 'phone' => '08031119999',
+            ])->id,
+            'amount_owed' => 1000,
+            'amount_paid' => 0,
+            'status'      => 'unpaid',
+        ]);
     }
 
-    public function test_auditor_cannot_delete_an_expense(): void
+    public function test_auditor_cannot_record_a_debt_payment(): void
     {
-        $expense = Expense::create([
-            'user_id' => User::factory()->create()->id,
-            'category' => 'Rent', 'description' => 'Real', 'amount' => 100,
-            'expense_date' => today(),
-        ]);
-
+        $debt = $this->debt();
         $this->actingAs($this->auditor());
-        Livewire::test(\App\Livewire\Expenses\Index::class)->call('delete', $expense->id);
 
-        $this->assertDatabaseHas('expenses', ['id' => $expense->id]);
+        Livewire::test(\App\Livewire\DebtBook\Index::class)
+            ->set('payDebtId', $debt->id)
+            ->set('pay_amount', '500')
+            ->set('pay_method', 'cash')
+            ->call('recordPayment');
+
+        $this->assertEquals(0, $debt->fresh()->amount_paid,
+            'An auditor recorded a payment against a debt.');
     }
 
     public function test_an_auditor_who_is_also_a_manager_keeps_manager_powers(): void
     {
-        $both = User::factory()->create(['role' => ['auditor', 'branch_manager'], 'status' => 'active']);
-        $this->actingAs($both);
+        $debt = $this->debt();
 
-        Livewire::test(\App\Livewire\Expenses\Index::class)
-            ->set('category', 'Rent')
-            ->set('description', 'Legitimate')
-            ->set('amount', 5000)
-            ->set('expense_date', today()->format('Y-m-d'))
-            ->call('save');
+        $this->actingAs(User::factory()->create([
+            'role' => ['auditor', 'branch_manager'], 'status' => 'active',
+        ]));
 
-        $this->assertSame(1, Expense::count(), 'Holding an operational role must override auditor read-only.');
+        $component = Livewire::test(\App\Livewire\DebtBook\Index::class);
+
+        // Holding an operational role must override auditor read-only.
+        $this->assertFalse($component->instance()->isReadOnlyAuditor());
     }
+
+    public function test_a_pure_auditor_is_flagged_read_only(): void
+    {
+        $this->actingAs($this->auditor());
+
+        $this->assertTrue(
+            Livewire::test(\App\Livewire\DebtBook\Index::class)->instance()->isReadOnlyAuditor()
+        );
+    }
+
+    // ── Read-only ────────────────────────────────────────────────────
 
     // ── Dashboard ────────────────────────────────────────────────────
 
