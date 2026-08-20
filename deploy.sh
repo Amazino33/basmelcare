@@ -1,22 +1,83 @@
 #!/bin/bash
-set -e
+#
+# BasmelCare deployment.
+#
+# This repository holds TWO Laravel applications:
+#   .           the public site
+#   public/app  the staff app
+#
+# They share one git repository, so a single pull updates both, but each has
+# its own composer.json, database migrations and caches — which is why every
+# step below runs against both. The previous root script only migrated the
+# public site, so staff-app migrations had to be run by hand.
+#
+# Front-end assets are NOT built here: public/build is committed to git, so
+# run `npm run build` in whichever app you changed and commit the result
+# BEFORE deploying. The server needs no node.
 
-echo "==> Pulling latest code..."
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APPS=("$ROOT" "$ROOT/public/app")
+
+step() { printf '\n==> %s\n' "$1"; }
+
+# A failed deploy must not silently go live: a half-applied migration is worse
+# than a maintenance page. Leave both apps down and say exactly how to recover.
+on_failure() {
+    printf '\n!! DEPLOY FAILED — both apps are still in maintenance mode.\n'
+    printf '   Fix the problem and re-run ./deploy.sh, or bring them up manually:\n'
+    for app in "${APPS[@]}"; do
+        printf '     (cd %s && php artisan up)\n' "$app"
+    done
+}
+trap on_failure ERR
+
+# ── 1. Maintenance mode ──────────────────────────────────────────────
+step "Taking both apps offline"
+for app in "${APPS[@]}"; do
+    (cd "$app" && php artisan down --retry=60) || true
+done
+
+# ── 2. Pull (one repo covers both apps) ──────────────────────────────
+step "Pulling latest code"
+cd "$ROOT"
 git pull
 
-echo "==> Running migrations..."
-php artisan migrate --force
+# ── 3. Per-app deploy ────────────────────────────────────────────────
+for app in "${APPS[@]}"; do
+    name="$([ "$app" = "$ROOT" ] && echo 'public site' || echo 'staff app')"
+    cd "$app"
 
-echo "==> Clearing main site caches..."
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
+    step "[$name] Installing dependencies"
+    php -d memory_limit=-1 "$(which composer)" install \
+        --no-dev --optimize-autoloader --no-interaction
 
-echo "==> Clearing staff app caches..."
-cd public/app
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-cd ../..
+    step "[$name] Running migrations"
+    php artisan migrate --force
 
-echo "==> Done."
+    step "[$name] Ensuring storage symlink"
+    if [ ! -L "$app/public/storage" ]; then
+        ln -s "$app/storage/app/public" "$app/public/storage"
+        echo "    symlink created"
+    else
+        echo "    symlink already present"
+    fi
+
+    step "[$name] Rebuilding caches"
+    php artisan config:clear
+    php artisan route:clear
+    php artisan view:clear
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+done
+
+# ── 4. Back online ───────────────────────────────────────────────────
+trap - ERR
+step "Bringing both apps back online"
+for app in "${APPS[@]}"; do
+    (cd "$app" && php artisan up)
+done
+
+printf '\n✅ BasmelCare deployed — public site and staff app.\n'
