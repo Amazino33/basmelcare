@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Expenses;
 
+use App\Livewire\Concerns\DeniesAuditorWrites;
+
 use App\Models\Expense;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -9,6 +11,7 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesAuditorWrites;
     use Toast, WithPagination;
 
     public string $search = '';
@@ -56,6 +59,8 @@ class Index extends Component
 
     public function save(): void
     {
+        if ($this->blockedAsAuditor()) return;
+
         $this->validate([
             'category'     => 'required|string',
             'description'  => 'required|string|max:500',
@@ -83,6 +88,8 @@ class Index extends Component
 
     public function delete(int $id): void
     {
+        if ($this->blockedAsAuditor()) return;
+
         if (!$this->canManage) return;
         Expense::findOrFail($id)->delete();
         $this->success('Expense deleted.');

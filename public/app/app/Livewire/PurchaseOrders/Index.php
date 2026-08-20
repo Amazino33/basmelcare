@@ -2,6 +2,8 @@
 
 namespace App\Livewire\PurchaseOrders;
 
+use App\Livewire\Concerns\DeniesAuditorWrites;
+
 use App\Models\Batch;
 use App\Models\Location;
 use App\Models\Product;
@@ -16,6 +18,7 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesAuditorWrites;
     use Toast, WithPagination;
 
     public string $search = '';
@@ -85,6 +88,8 @@ class Index extends Component
 
     public function savePO()
     {
+        if ($this->blockedAsAuditor()) return;
+
         $this->validate([
             'supplier_id' => 'required|exists:suppliers,id',
             'expected_date' => 'nullable|date',
@@ -135,6 +140,8 @@ class Index extends Component
 
     public function cancelPO($id)
     {
+        if ($this->blockedAsAuditor()) return;
+
         $po = PurchaseOrder::findOrFail($id);
         if ($po->status === 'received') {
             $this->error('Cannot cancel a fully received order.');
@@ -161,6 +168,8 @@ class Index extends Component
 
     public function receiveStock()
     {
+        if ($this->blockedAsAuditor()) return;
+
         $this->validate([
             'receive_location_id' => 'required|exists:locations,id',
         ]);

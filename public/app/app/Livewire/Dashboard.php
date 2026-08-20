@@ -15,6 +15,7 @@ use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -147,7 +148,7 @@ class Dashboard extends Component
     private const OPERATIONAL = ['admin', 'branch_manager', 'sales', 'cashier'];
 
     /** Focused roles, in the order their panels should stack. */
-    private const SPECIALIST = ['pharmacist', 'inventory_manager', 'promoter', 'content'];
+    private const SPECIALIST = ['auditor', 'pharmacist', 'inventory_manager', 'promoter', 'content'];
 
     private function roles(): array
     {
@@ -183,6 +184,46 @@ class Dashboard extends Component
                 ->whereNotNull('image')->where('image', '!=', '')->count(),
             'contentQueue'    => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
                 ->latest()->limit(8)->get(),
+        ];
+    }
+
+    /**
+     * Month-to-date money for the auditor, mirroring the Financial Records page
+     * so the two can never disagree.
+     */
+    private function auditorData(): array
+    {
+        $from = today()->startOfMonth()->startOfDay();
+        $to   = today()->endOfDay();
+
+        $revenue = (float) Sale::whereIn('status', ['paid', 'completed'])
+            ->whereBetween('created_at', [$from, $to])
+            ->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
+
+        $cogs = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->whereIn('sales.status', ['paid', 'completed'])
+            ->whereBetween('sales.created_at', [$from, $to])
+            ->sum(DB::raw('sale_items.cost_price * sale_items.quantity'));
+
+        $expenses = Schema::hasTable('expenses')
+            ? (float) DB::table('expenses')
+                ->whereDate('expense_date', '>=', $from)->whereDate('expense_date', '<=', $to)->sum('amount')
+            : 0.0;
+
+        return [
+            'audRevenue'  => $revenue,
+            'audCogs'     => $cogs,
+            'audGross'    => $revenue - $cogs,
+            'audMargin'   => $revenue > 0 ? (($revenue - $cogs) / $revenue) * 100 : 0.0,
+            'audExpenses' => $expenses,
+            'audNet'      => $revenue - $cogs - $expenses,
+            'audSales'    => Sale::whereIn('status', ['paid', 'completed'])
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'audPeriod'   => $from->format('j M') . ' – ' . $to->format('j M Y'),
+            'audRecentChanges' => Schema::hasTable('audit_logs')
+                ? \App\Models\AuditLog::with('user')->latest('created_at')->limit(5)->get()
+                : collect(),
         ];
     }
 
@@ -287,6 +328,7 @@ class Dashboard extends Component
         if ($panels = $this->specialistPanels()) {
             $data = ['panels' => $panels];
 
+            if (in_array('auditor', $panels))           $data += $this->auditorData();
             if (in_array('pharmacist', $panels))        $data += $this->pharmacistData();
             if (in_array('inventory_manager', $panels)) $data += $this->inventoryData();
             if (in_array('promoter', $panels))          $data += $this->promoterData();

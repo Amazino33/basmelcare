@@ -20,6 +20,7 @@
                         'badge-ghost' => $r === 'cashier',
                         'badge-info' => $r === 'inventory_manager',
                         'badge-success' => $r === 'content',
+                        'badge-neutral' => $r === 'auditor',
                     ]) />
                 @endforeach
             </div>
@@ -61,7 +62,7 @@
                 <div class="col-span-1 md:col-span-2">
                     <div class="label"><span class="label-text font-medium text-sm">Role(s)</span></div>
                     <div class="flex flex-wrap gap-x-4 gap-y-2 mt-1">
-                        @foreach(['admin' => 'Admin', 'pharmacist' => 'Pharmacist', 'branch_manager' => 'Branch Manager', 'sales' => 'Sales', 'cashier' => 'Cashier', 'inventory_manager' => 'Inventory Manager', 'promoter' => 'Promoter', 'content' => 'Content (Images)'] as $val => $label)
+                        @foreach(['admin' => 'Admin', 'pharmacist' => 'Pharmacist', 'branch_manager' => 'Branch Manager', 'sales' => 'Sales', 'cashier' => 'Cashier', 'inventory_manager' => 'Inventory Manager', 'promoter' => 'Promoter', 'content' => 'Content (Images)', 'auditor' => 'Auditor (view-only)'] as $val => $label)
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" wire:model.live="role" value="{{ $val }}" class="checkbox checkbox-primary checkbox-sm" />
                                 <span class="text-sm">{{ $label }}</span>

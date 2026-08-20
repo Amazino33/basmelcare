@@ -23,9 +23,13 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');
         });
 
-        // Cashier — takes payments and runs the debt book
+        // The till itself — takes money, so never the auditor.
         Route::middleware('role:admin,branch_manager,cashier')->group(function () {
             Route::get('cashier', App\Livewire\Cashier\Index::class)->name('cashier.index');
+        });
+
+        // Money owed and change held — records the auditor must be able to read.
+        Route::middleware('role:admin,branch_manager,cashier,auditor')->group(function () {
             Route::get('credits', App\Livewire\Credits\Index::class)->name('credits.index');
             Route::get('credit-payout/{creditPayout}/receipt', [App\Http\Controllers\InvoiceController::class, 'creditPayoutReceipt'])->name('credit-payout.receipt');
             Route::get('debt-book', App\Livewire\DebtBook\Index::class)->name('debt-book.index');
@@ -33,7 +37,7 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         });
 
         // Shared sales pages
-        Route::middleware('role:admin,branch_manager,sales,cashier')->group(function () {
+        Route::middleware('role:admin,branch_manager,sales,cashier,auditor')->group(function () {
             Route::get('sales', App\Livewire\Sales\Index::class)->name('sales.index');
             Route::get('invoice/{sale}', [App\Http\Controllers\InvoiceController::class, 'show'])->name('invoice.show');
             Route::get('receipt/{sale}', [App\Http\Controllers\InvoiceController::class, 'receipt'])->name('receipt.show');
@@ -63,7 +67,7 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('expiry-alerts', App\Livewire\ExpiryAlerts\Index::class)->name('expiry-alerts.index');
         });
 
-        // Stock operations — moving and adjusting stock is inventory work, not clinical.
+        // Stock operations — these move stock, so not the auditor.
         Route::middleware('role:admin,branch_manager,inventory_manager')->group(function () {
             Route::get('products/import-template', App\Http\Controllers\ProductImportTemplateController::class)->name('products.import-template');
             Route::get('locations', App\Livewire\Locations\Index::class)->name('locations.index');
@@ -73,24 +77,29 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         });
 
         // Procurement — commits money to suppliers
-        Route::middleware('role:admin,branch_manager,inventory_manager')->group(function () {
+        Route::middleware('role:admin,branch_manager,inventory_manager,auditor')->group(function () {
             Route::get('suppliers', App\Livewire\Suppliers\Index::class)->name('suppliers.index');
             Route::get('purchase-orders', App\Livewire\PurchaseOrders\Index::class)->name('purchase-orders.index');
         });
 
-        // Reports — revenue and profit
-        Route::middleware('role:admin,branch_manager')->group(function () {
+        // Reports — revenue, profit and CSV exports
+        Route::middleware('role:admin,branch_manager,auditor')->group(function () {
             Route::get('reports', App\Livewire\Reports\Index::class)->name('reports.index');
         });
 
         // Expenses (admin, branch_manager, cashier)
-        Route::middleware('role:admin,branch_manager,cashier')->group(function () {
+        Route::middleware('role:admin,branch_manager,cashier,auditor')->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');
         });
 
-        // Coupons + money oversight (admin, branch_manager)
+        // Coupons (admin, branch_manager)
         Route::middleware('role:admin,branch_manager')->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
+        });
+
+        // Financial oversight — the auditor sees all of this but changes none of it.
+        Route::middleware('role:admin,branch_manager,auditor')->group(function () {
+            Route::get('finance', App\Livewire\Finance\Index::class)->name('finance.index');
             Route::get('money-trail', App\Livewire\AuditTrail\Index::class)->name('audit-trail.index');
         });
 

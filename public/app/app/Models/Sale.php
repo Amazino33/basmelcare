@@ -14,6 +14,9 @@ class Sale extends Model
         'total_amount', 'payment_method', 'payment_details',
         'status', 'paid_at', 'confirmed_at', 'note',
         'voucher_redeemed_at', 'voucher_revoked_at',
+        // Were missing, so processPayment()'s mass update silently dropped them
+        // and every discount given at the till was lost from the sale record.
+        'coupon_id', 'coupon_discount',
     ];
 
     protected $casts = [

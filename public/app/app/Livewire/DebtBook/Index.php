@@ -2,6 +2,8 @@
 
 namespace App\Livewire\DebtBook;
 
+use App\Livewire\Concerns\DeniesAuditorWrites;
+
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use Livewire\Component;
@@ -10,6 +12,7 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesAuditorWrites;
     use Toast, WithPagination;
 
     public string $search = '';
@@ -39,6 +42,8 @@ class Index extends Component
 
     public function recordPayment()
     {
+        if ($this->blockedAsAuditor()) return;
+
         $this->validate([
             'pay_amount' => 'required|numeric|min:0.01',
             'pay_method' => 'required|in:cash,card,transfer',

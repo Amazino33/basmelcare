@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Credits;
 
+use App\Livewire\Concerns\DeniesAuditorWrites;
+
 use App\Models\CreditPayout;
 use App\Models\Customer;
 use Livewire\Component;
@@ -10,6 +12,7 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesAuditorWrites;
     use Toast, WithPagination;
 
     public string $search = '';
@@ -33,6 +36,8 @@ class Index extends Component
 
     public function recordPayout(): void
     {
+        if ($this->blockedAsAuditor()) return;
+
         $customer = Customer::findOrFail($this->payingCustomerId);
 
         $this->validate([

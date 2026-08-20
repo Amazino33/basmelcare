@@ -15,11 +15,81 @@
     {{-- ── Focused-role dashboard: one panel per role held ── --}}
     @php $multi = count($panels) > 1; @endphp
     <x-header title="Dashboard" size="text-xl" :subtitle="$multi ? 'Your work areas' : match($panels[0]) {
+        'auditor'           => 'Money in, money out, profit',
         'pharmacist'        => 'Patients and drug safety',
         'inventory_manager' => 'Stock overview',
         'promoter'          => 'Your referral activity',
         'content'           => 'Product image coverage',
     }" />
+
+    @if(in_array('auditor', $panels))
+    @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide">Finance</div>@endif
+
+    <p class="text-xs text-base-content/50 mb-3">{{ $audPeriod }} · {{ number_format($audSales) }} settled sale(s)</p>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <x-stat title="Revenue" value="₦{{ number_format($audRevenue, 2) }}"
+            description="money earned" icon="o-arrow-down-tray" color="text-success"
+            class="text-sm h-full {{ $stat }}" />
+        <x-stat title="Cost of Goods" value="₦{{ number_format($audCogs, 2) }}"
+            description="what it cost us" icon="o-arrow-up-tray" color="text-error"
+            class="text-sm h-full {{ $stat }}" />
+        <x-stat title="Gross Profit" value="₦{{ number_format($audGross, 2) }}"
+            description="{{ number_format($audMargin, 1) }}% margin" icon="o-chart-bar" color="text-primary"
+            class="text-sm h-full {{ $stat }}" />
+        <x-stat title="Net Profit" value="₦{{ number_format($audNet, 2) }}"
+            description="after expenses"
+            icon="{{ $audNet >= 0 ? 'o-arrow-trending-up' : 'o-arrow-trending-down' }}"
+            color="{{ $audNet >= 0 ? 'text-success' : 'text-error' }}"
+            class="text-sm h-full {{ $stat }}" />
+    </div>
+
+    @if($audExpenses == 0)
+        <div class="alert alert-warning py-2 mb-4 text-sm gap-2">
+            <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+            <span>No expenses recorded this month, so net profit equals gross profit.</span>
+        </div>
+    @endif
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <x-card title="Go deeper">
+            <p class="text-sm text-base-content/70 mb-3">
+                Every figure here comes from individual sales you can open and check.
+            </p>
+            <div class="flex flex-wrap gap-2">
+                <x-button label="Financial Records" link="{{ route('finance.index') }}" class="btn-sm btn-primary" icon="o-banknotes" />
+                <x-button label="Every Sale" link="{{ route('sales.index') }}" class="btn-sm btn-ghost" icon="o-clipboard-document-list" />
+                <x-button label="Export Reports" link="{{ route('reports.index') }}" class="btn-sm btn-ghost" icon="o-document-chart-bar" />
+            </div>
+        </x-card>
+
+        <x-card title="Recent changes to money settings">
+            @forelse($audRecentChanges as $log)
+                <div class="flex justify-between items-start gap-2 p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium truncate">
+                            {{ $log->typeLabel() }} · {{ $log->auditable_label ?? '—' }}
+                        </div>
+                        <div class="text-xs text-base-content/60">
+                            {{ $log->fieldLabel() }}
+                            @if($log->event === 'updated')
+                                <span class="line-through">{{ $log->old_value }}</span> &rarr;
+                                <span class="text-primary font-medium">{{ $log->new_value }}</span>
+                            @endif
+                            · {{ $log->user?->name ?? 'System' }}
+                        </div>
+                    </div>
+                    <span class="text-xs text-base-content/50 shrink-0">{{ $log->created_at?->format('d M') }}</span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">No price or setting changes recorded.</div>
+            @endforelse
+            <div class="mt-2">
+                <x-button label="Full Money Trail" link="{{ route('audit-trail.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+    </div>
+    @endif
 
     @if(in_array('pharmacist', $panels))
     @if($multi)<div class="divider text-xs text-base-content/50 uppercase tracking-wide">Clinical</div>@endif

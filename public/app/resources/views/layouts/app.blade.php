@@ -58,7 +58,7 @@
                     <x-menu-item title="Product Images" icon="o-photo" link="{{ route('media.index') }}" />
                 @endif
 
-                @if(array_intersect($roles,['admin', 'branch_manager', 'sales', 'cashier']))
+                @if(array_intersect($roles,['admin', 'branch_manager', 'sales', 'cashier', 'auditor']))
                     @php $onlineOrderCount = \App\Models\Order::whereNull('claimed_by')->whereIn('status', ['pending', 'processing'])->count(); @endphp
                     <x-menu-sub title="Sales" icon="o-shopping-cart">
                         @if(array_intersect($roles,['admin', 'branch_manager', 'sales']))
@@ -70,7 +70,7 @@
                         @endif
                         <x-menu-item title="Sales History" icon="o-clipboard-document-list" link="{{ route('sales.index') }}" />
                         <x-menu-item title="Change Owed" icon="o-gift" link="{{ route('credits.index') }}" />
-                        @if(array_intersect($roles,['admin', 'branch_manager', 'cashier']))
+                        @if(array_intersect($roles,['admin', 'branch_manager', 'cashier', 'auditor']))
                             <x-menu-item title="Debt Book" icon="o-book-open" link="{{ route('debt-book.index') }}" />
                         @endif
                     </x-menu-sub>
@@ -96,7 +96,7 @@
                     </x-menu-sub>
                 @endif
 
-                @if(array_intersect($roles,['admin', 'branch_manager', 'inventory_manager']))
+                @if(array_intersect($roles,['admin', 'branch_manager', 'inventory_manager', 'auditor']))
                     <x-menu-sub title="Procurement" icon="o-truck">
                         <x-menu-item title="Purchase Orders" icon="o-clipboard-document" link="{{ route('purchase-orders.index') }}" />
                         <x-menu-item title="Suppliers" icon="o-truck" link="{{ route('suppliers.index') }}" />
@@ -113,12 +113,7 @@
                     @endif
                 </x-menu-sub>
 
-                @if(array_intersect($roles,['admin', 'branch_manager']))
-                    <x-menu-separator />
-                    <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
-                @endif
-
-                @if(array_intersect($roles, ['admin', 'branch_manager', 'cashier']))
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'cashier', 'auditor']))
                     <x-menu-item title="Expenses" icon="o-banknotes" link="{{ route('expenses.index') }}" />
                 @endif
 
@@ -128,7 +123,15 @@
 
                 @if(in_array('admin', $roles) || in_array('branch_manager', $roles))
                     <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
-                    <x-menu-item title="Money Trail" icon="o-shield-check" link="{{ route('audit-trail.index') }}" />
+                @endif
+
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'auditor']))
+                    <x-menu-separator />
+                    <x-menu-sub title="Finance" icon="o-calculator">
+                        <x-menu-item title="Financial Records" icon="o-banknotes" link="{{ route('finance.index') }}" />
+                        <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
+                        <x-menu-item title="Money Trail" icon="o-shield-check" link="{{ route('audit-trail.index') }}" />
+                    </x-menu-sub>
                 @endif
 
                 @if(in_array('admin', $roles))
