@@ -382,7 +382,10 @@ class Index extends Component
      */
     private function fuzzyMatch($query, array $words)
     {
-        $candidates = $query->limit(500)->get();
+        // Score against id+name only. Scoring the full models with their batches
+        // would put a hard cap on how much of the catalogue we can consider, and
+        // a cap here fails silently — it just stops finding things.
+        $candidates = Product::query()->get(['id', 'name']);
 
         $scored = $candidates->map(function ($product) use ($words) {
             $haystack = preg_split('/\s+/', strtoupper((string) $product->name), -1, PREG_SPLIT_NO_EMPTY);
@@ -408,11 +411,23 @@ class Index extends Component
             $product->fuzzy_distance = $total;
 
             return $product;
-        })->filter()->sortBy('fuzzy_distance')->values();
+        })->filter()->sortBy('fuzzy_distance')->take(10)->values();
 
         $this->searchWasFuzzy = $scored->isNotEmpty();
 
-        return $scored->take(10);
+        if ($scored->isEmpty()) {
+            return $scored;
+        }
+
+        // Load the full models for just the handful we are actually showing,
+        // preserving the closest-first order.
+        $ids = $scored->pluck('id')->all();
+
+        return Product::with(['batches' => fn($q) => $q->where('quantity', '>', 0)])
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy(fn($p) => array_search($p->id, $ids, true))
+            ->values();
     }
 
     public function render()
