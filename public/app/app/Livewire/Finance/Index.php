@@ -203,6 +203,10 @@ class Index extends Component
         $debtByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
         if (Schema::hasTable('debt_payments')) {
             $rows = DB::table('debt_payments')
+                // The opening part-payment is already counted in the sale's
+                // payment_details. Counting it again here reported more cash
+                // than the drawer actually held.
+                ->where('debt_payments.at_point_of_sale', false)
                 ->whereBetween('debt_payments.created_at', [$from, $to])
                 ->when($this->hasFilters(), fn($q) => $q
                     ->join('debts', 'debts.id', '=', 'debt_payments.debt_id')

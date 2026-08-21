@@ -335,7 +335,8 @@ class Index extends Component
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
 
         $filteredSales = $this->periodQuery(clone $salesQuery)->whereIn('status', ['paid', 'completed']);
-        $totalRevenue = $filteredSales->sum('total_amount');
+        // Net of discount — total_amount is the pre-discount figure.
+        $totalRevenue = (float) (clone $filteredSales)->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
         $totalTransactions = $filteredSales->count();
 
         $filteredItems = SaleItem::whereHas('sale', function ($q) use ($scopeFn) {

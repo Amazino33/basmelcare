@@ -356,7 +356,15 @@ class Index extends Component
             return $this->rankByRelevance($matches, $term)->take(20);
         }
 
-        return $this->fuzzyMatch($base(), $words);
+        $fuzzy = $this->fuzzyMatch($base(), $words);
+
+        // Nothing matched, even loosely: someone asked for a drug we do not
+        // stock. That lost sale leaves no other trace in the data.
+        if ($fuzzy->isEmpty()) {
+            \App\Models\FailedSearch::record($term, auth()->id());
+        }
+
+        return $fuzzy;
     }
 
     /** Closest match first: exact, then starts-with, then contains. */

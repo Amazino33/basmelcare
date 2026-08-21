@@ -449,13 +449,25 @@
             <x-stat
                 title="POS Sales · {{ $periodLabel }}"
                 value="₦{{ number_format($totalSalesToday, 2) }}"
-                description="{{ $salesCountToday }} transactions"
+                description="billed · {{ $salesCountToday }} transactions"
                 icon="o-banknotes"
                 color="text-primary"
                 class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
         @endif
+        @if($seesRevenue)
+        {{-- What actually reached the drawer, so a cashier can count against it. --}}
+        <x-stat
+            title="Cash Collected · {{ $periodLabel }}"
+            value="₦{{ number_format($cashCollectedToday, 2) }}"
+            description="in the drawer"
+            icon="o-wallet"
+            color="text-success"
+            class="text-sm h-full {{ $stat }}"
+        />
+        @endif
+
         @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
         <a href="{{ route('reports.index') }}" class="block">
             <x-stat
@@ -673,6 +685,80 @@
         </x-card>
         @endif
     </div>
+
+    {{-- Hot products: the same sales read three ways --}}
+    @if(array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']))
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+            @foreach([
+                ['key' => 'byUnits',   'title' => 'Most units sold',  'sub' => 'what walks out of the door', 'metric' => 'units',   'money' => false],
+                ['key' => 'byRevenue', 'title' => 'Most revenue',     'sub' => 'biggest sellers by value',   'metric' => 'revenue', 'money' => true],
+                ['key' => 'byProfit',  'title' => 'Most profit',      'sub' => 'what actually earns',        'metric' => 'profit',  'money' => true],
+            ] as $panel)
+                <x-card :title="$panel['title']" :subtitle="$panel['sub']">
+                    @forelse($hot[$panel['key']] as $i => $row)
+                        <div class="flex items-center gap-3 p-2 border-b border-base-200 last:border-0">
+                            <span class="text-xs font-bold text-base-content/30 w-4 shrink-0 tabular-nums">{{ $i + 1 }}</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-medium truncate">{{ $row->name }}</div>
+                                <div class="text-xs text-base-content/50">
+                                    {{ $row->times_sold }} {{ \Illuminate\Support\Str::plural('sale', $row->times_sold) }}
+                                    @if($row->times_sold == 1 && $row->units > 5)
+                                        <span class="text-warning">· one bulk order</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <span class="text-sm font-bold shrink-0 tabular-nums {{ $panel['money'] ? 'text-primary' : '' }}">
+                                @if($panel['money'])
+                                    ₦{{ number_format((float) $row->{$panel['metric']}, 0) }}
+                                @else
+                                    {{ number_format((float) $row->{$panel['metric']}) }}
+                                @endif
+                            </span>
+                        </div>
+                    @empty
+                        <div class="text-center py-6 text-base-content/40 text-sm">No sales in this period.</div>
+                    @endforelse
+                </x-card>
+            @endforeach
+        </div>
+
+        @if($hot['any'] && $hot['byUnits']->first() && $hot['byProfit']->first()
+            && $hot['byUnits']->first()->id !== $hot['byProfit']->first()->id)
+            {{-- Worth saying out loud: the busiest product is not the earner. --}}
+            <div class="alert alert-info py-2 mt-3 text-sm gap-2">
+                <x-icon name="o-light-bulb" class="w-4 h-4 shrink-0" />
+                <span>
+                    <strong>{{ $hot['byUnits']->first()->name }}</strong> moves the most units,
+                    but <strong>{{ $hot['byProfit']->first()->name }}</strong> earns you the most
+                    (₦{{ number_format((float) $hot['byProfit']->first()->profit, 0) }}).
+                </span>
+            </div>
+        @endif
+
+        <x-card title="Asked for, not stocked" subtitle="Searches at the till that found nothing" class="mt-4">
+            @forelse($missedDemand as $miss)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium">{{ $miss->term }}</div>
+                        <div class="text-xs text-base-content/50">
+                            last {{ $miss->last_searched_at?->diffForHumans() }}
+                            @if($miss->lastUser) · {{ $miss->lastUser->name }} @endif
+                        </div>
+                    </div>
+                    <span class="badge badge-warning badge-sm shrink-0">
+                        {{ $miss->times }}&times;
+                    </span>
+                </div>
+            @empty
+                <div class="text-center py-6 text-base-content/50 text-sm">
+                    Nothing so far — every search at the till found a product.
+                </div>
+            @endforelse
+            <p class="text-xs text-base-content/50 mt-2">
+                These are sales you could not make. Sales reports can never show them.
+            </p>
+        </x-card>
+    @endif
 
     @endif
     {{-- end standard dashboard --}}

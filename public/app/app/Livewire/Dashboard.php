@@ -318,6 +318,55 @@ class Dashboard extends Component
         ];
     }
 
+
+    /**
+     * Best sellers, measured three ways.
+     *
+     * Units, revenue and profit rank differently, and the gap is the point: the
+     * drug that moves most can be the one that earns least. Reporting a single
+     * number would hide that, so all three are shown.
+     *
+     * "Times sold" separates steady demand from a single bulk order — 25 units
+     * across one sale is not a popular product.
+     */
+    private function hotProducts($from, $to): array
+    {
+        $rows = DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->join('products', 'products.id', '=', 'sale_items.product_id')
+            ->whereIn('sales.status', ['paid', 'completed'])
+            ->whereBetween('sales.created_at', [$from, $to])
+            ->groupBy('products.id', 'products.name')
+            ->selectRaw('products.id, products.name,
+                         SUM(sale_items.quantity) AS units,
+                         COUNT(DISTINCT sales.id) AS times_sold,
+                         SUM(sale_items.subtotal) AS revenue,
+                         SUM(sale_items.subtotal - sale_items.cost_price * sale_items.quantity) AS profit')
+            ->get();
+
+        $top = fn(string $col) => $rows->sortByDesc(fn($r) => (float) $r->$col)->take(5)->values();
+
+        return [
+            'byUnits'   => $top('units'),
+            'byRevenue' => $top('revenue'),
+            'byProfit'  => $top('profit'),
+            'any'       => $rows->isNotEmpty(),
+        ];
+    }
+
+    /** Searches at the till that found nothing — demand we could not meet. */
+    private function missedDemand($from, $to)
+    {
+        if (! Schema::hasTable('failed_searches')) {
+            return collect();
+        }
+
+        return \App\Models\FailedSearch::whereBetween('last_searched_at', [$from, $to])
+            ->orderByDesc('times')
+            ->limit(6)
+            ->get();
+    }
+
     public function render()
     {
         // Focused roles get their own stacked panels and none of the sales
@@ -338,7 +387,16 @@ class Dashboard extends Component
         $periodLabel  = $this->getPeriodLabel();
 
         $todaySales = Sale::whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']);
-        $totalSalesToday = $todaySales->sum('total_amount');
+        // Net of discount: total_amount is the pre-discount figure, so summing
+        // it reported revenue the customer was never charged.
+        $totalSalesToday = (float) (clone $todaySales)->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
+
+        // What actually reached the drawer: billed, less what went out on
+        // credit, plus repayments taken today. This is the number a cashier
+        // can count against.
+        $newDebtToday = DB::table('debts')->whereBetween('created_at', [$from, $to])->sum('amount_owed');
+        $repaidToday  = DB::table('debt_payments')->whereBetween('created_at', [$from, $to])->sum('amount');
+        $cashCollectedToday = $totalSalesToday - (float) $newDebtToday + (float) $repaidToday;
         $salesCountToday = $todaySales->count();
 
         $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']));
@@ -414,6 +472,7 @@ class Dashboard extends Component
             'panels' => [],
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
+            'cashCollectedToday' => $cashCollectedToday,
             'salesCountToday' => $salesCountToday,
             'todayProfit' => $todayProfit,
             'totalProducts' => $totalProducts,
@@ -431,6 +490,8 @@ class Dashboard extends Component
             'pendingOnlineOrders' => $pendingOnlineOrders,
             'recentOnlineOrders' => $recentOnlineOrders,
             'setupProgress'      => $setupProgress,
+            'hot'                => $this->hotProducts($from, $to),
+            'missedDemand'       => $this->missedDemand($from, $to),
         ]);
     }
 }

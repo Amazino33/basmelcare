@@ -388,6 +388,9 @@ class Index extends Component
                         'debt_id'        => $debt->id,
                         'amount'         => $totalCollected,
                         'payment_method' => $paymentMethod,
+                        // Already recorded in the sale's payment_details; flagged so
+                        // cash reporting does not count the same money twice.
+                        'at_point_of_sale' => true,
                         'received_by'    => auth()->id(),
                         'note'           => 'Partial payment at checkout',
                     ]);
