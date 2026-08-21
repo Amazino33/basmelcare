@@ -19,12 +19,44 @@
                 <x-input label="To" wire:model.live="to" type="date" :max="today()->format('Y-m-d')" class="input-sm" />
             </div>
         </div>
+        <div class="flex flex-wrap items-end gap-2 mt-3 pt-3 border-t border-base-200">
+            <x-input placeholder="Search invoice, customer, staff or product..."
+                     wire:model.live.debounce.400ms="search"
+                     icon="o-magnifying-glass" class="input-sm flex-1 min-w-[16rem]" clearable />
+
+            <x-select wire:model.live="statusFilter" class="select-sm"
+                :options="[
+                    ['id'=>'all',      'name'=>'All invoices'],
+                    ['id'=>'settled',  'name'=>'Settled only'],
+                    ['id'=>'cancelled','name'=>'Cancelled only'],
+                    ['id'=>'pending',  'name'=>'Unpaid only'],
+                ]" option-value="id" option-label="name" />
+
+            @if($filtered)
+                <x-button label="Clear" wire:click="clearFilters" icon="o-x-mark" class="btn-sm btn-ghost" />
+            @endif
+        </div>
+
         <p class="text-xs text-base-content/50 mt-2">
             {{ \Carbon\Carbon::parse($from)->format('j M Y') }} –
             {{ \Carbon\Carbon::parse($to)->format('j M Y') }} ·
             {{ number_format($f['saleCount']) }} settled sale(s)
         </p>
     </x-card>
+
+    @if($filtered)
+        {{-- The panels below describe ONLY these invoices, so say so loudly. --}}
+        <div class="alert alert-info py-2 mb-4 text-sm gap-2">
+            <x-icon name="o-funnel" class="w-4 h-4 shrink-0" />
+            <span>
+                <strong>Filtered view</strong> — every figure below covers the
+                <strong>{{ number_format($sales->total()) }}</strong> matching
+                {{ \Illuminate\Support\Str::plural('invoice', $sales->total()) }}
+                of {{ number_format($totalInPeriod) }} in this period, not the whole period.
+            </span>
+            <x-button label="Show all" wire:click="clearFilters" class="btn-xs btn-ghost" />
+        </div>
+    @endif
 
     {{-- Headline --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
@@ -179,6 +211,19 @@
             @endif
         </x-card>
 
+        @if($filtered)
+            <x-card title="Cash" subtitle="Whole period only">
+                <div class="flex items-start gap-2 text-sm text-base-content/70">
+                    <x-icon name="o-information-circle" class="w-5 h-5 shrink-0 mt-0.5" />
+                    <p>
+                        Expenses, stock purchases and debt cannot be tied to a search on
+                        invoices, so cash movement is not shown while a filter is active.
+                        <button type="button" wire:click="clearFilters" class="link link-primary">Clear the filter</button>
+                        to see it.
+                    </p>
+                </div>
+            </x-card>
+        @else
         <x-card title="Cash" subtitle="What actually moved in and out?">
             <table class="table table-sm">
                 <tbody>
@@ -225,6 +270,7 @@
                 which is why this differs from trading profit.
             </p>
         </x-card>
+        @endif
     </div>
 
     {{-- Every sale behind the numbers --}}

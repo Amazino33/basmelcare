@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The financial picture: what was earned, what it cost, and what actually
@@ -21,6 +22,10 @@ use Livewire\Component;
  */
 class Index extends Component
 {
+    // paginate() alone does not give Livewire page state; without this the
+    // pager did not actually work and resetPage() was unavailable.
+    use WithPagination;
+
     #[Url]
     public string $from = '';
 
@@ -29,6 +34,13 @@ class Index extends Component
 
     #[Url]
     public string $preset = 'this_month';
+
+    #[Url]
+    public string $search = '';
+
+    /** all | settled | cancelled | pending */
+    #[Url]
+    public string $statusFilter = 'all';
 
     /** Invoice opened in the detail drawer. */
     public ?int $viewSaleId = null;
@@ -61,6 +73,21 @@ class Index extends Component
     public function updatedFrom(): void { $this->preset = 'custom'; }
     public function updatedTo(): void   { $this->preset = 'custom'; }
 
+    public function updatedSearch(): void       { $this->resetPage(); }
+    public function updatedStatusFilter(): void { $this->resetPage(); }
+
+    public function clearFilters(): void
+    {
+        $this->search       = '';
+        $this->statusFilter = 'all';
+        $this->resetPage();
+    }
+
+    public function hasFilters(): bool
+    {
+        return trim($this->search) !== '' || $this->statusFilter !== 'all';
+    }
+
     public function viewSale(int $saleId): void
     {
         $this->viewSaleId = $saleId;
@@ -81,11 +108,40 @@ class Index extends Component
         ];
     }
 
+    /**
+     * Every invoice in the period, with the auditor's search applied.
+     *
+     * The search is deliberately part of THIS query rather than applied to the
+     * table alone, so the totals above always describe exactly the invoices
+     * listed below. If they could diverge, a filtered total would be
+     * indistinguishable from a period total.
+     */
+    private function invoices($from, $to)
+    {
+        $term = trim($this->search);
+
+        return Sale::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->when($term !== '', function ($q) use ($term) {
+                $like = '%' . $term . '%';
+
+                $q->where(function ($w) use ($like) {
+                    $w->where('invoice_number', 'like', $like)
+                        ->orWhereHas('customer', fn($c) => $c->where('name', 'like', $like))
+                        ->orWhereHas('user', fn($u) => $u->where('name', 'like', $like))
+                        ->orWhereHas('cashier', fn($u) => $u->where('name', 'like', $like))
+                        ->orWhereHas('saleItems.product', fn($p) => $p->where('name', 'like', $like));
+                });
+            })
+            ->when($this->statusFilter === 'settled', fn($q) => $q->whereIn('status', ['paid', 'completed']))
+            ->when($this->statusFilter === 'cancelled', fn($q) => $q->where('status', 'cancelled'))
+            ->when($this->statusFilter === 'pending', fn($q) => $q->where('status', 'pending'));
+    }
+
     /** Only settled sales count — pending invoices are not income. */
     private function settledSales($from, $to)
     {
-        return Sale::whereIn('status', ['paid', 'completed'])
-            ->whereBetween('created_at', [$from, $to]);
+        return $this->invoices($from, $to)->whereIn('status', ['paid', 'completed']);
     }
 
     /**
@@ -142,12 +198,17 @@ class Index extends Component
         }
 
         // Debt repayments record their own method and are real money taken today.
+        // Under a search they are traced back through their originating sale, so
+        // a repayment only counts when that sale is part of the filtered set.
         $debtByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
         if (Schema::hasTable('debt_payments')) {
             $rows = DB::table('debt_payments')
-                ->whereBetween('created_at', [$from, $to])
-                ->selectRaw('payment_method, SUM(amount) AS total')
-                ->groupBy('payment_method')
+                ->whereBetween('debt_payments.created_at', [$from, $to])
+                ->when($this->hasFilters(), fn($q) => $q
+                    ->join('debts', 'debts.id', '=', 'debt_payments.debt_id')
+                    ->whereIn('debts.sale_id', $this->invoices($from, $to)->select('sales.id')))
+                ->selectRaw('debt_payments.payment_method, SUM(debt_payments.amount) AS total')
+                ->groupBy('debt_payments.payment_method')
                 ->get();
 
             foreach ($rows as $row) {
@@ -188,14 +249,20 @@ class Index extends Component
         $revenue = (float) $this->settledSales($from, $to)
             ->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
 
+        // Cost and refunds are scoped to the SAME invoices the panels describe,
+        // via a subquery of the filtered set. Left unscoped they would keep
+        // reporting the whole period while revenue reflected a search.
+        $settledIds = $this->settledSales($from, $to)->select('sales.id');
+
         $refunds = Schema::hasTable('sale_returns')
-            ? (float) DB::table('sale_returns')->whereBetween('created_at', [$from, $to])->sum('total_credit')
+            ? (float) DB::table('sale_returns')
+                ->whereIn('sale_id', $settledIds)
+                ->whereBetween('created_at', [$from, $to])
+                ->sum('total_credit')
             : 0.0;
 
         $cogs = (float) DB::table('sale_items')
-            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
-            ->whereIn('sales.status', ['paid', 'completed'])
-            ->whereBetween('sales.created_at', [$from, $to])
+            ->whereIn('sale_id', $settledIds)
             ->sum(DB::raw('sale_items.cost_price * sale_items.quantity'));
 
         // Returned goods come back into stock, so their cost is no longer a cost.
@@ -204,6 +271,7 @@ class Index extends Component
             $returnedCost = (float) DB::table('sale_return_items')
                 ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
                 ->join('sale_items', 'sale_items.id', '=', 'sale_return_items.sale_item_id')
+                ->whereIn('sale_returns.sale_id', $settledIds)
                 ->whereBetween('sale_returns.created_at', [$from, $to])
                 ->sum(DB::raw('sale_items.cost_price * sale_return_items.quantity_returned'));
         }
@@ -288,8 +356,8 @@ class Index extends Component
         //
         // Ordered by invoice number so the sequence reads straight down and a
         // missing one is obvious.
-        $sales = Sale::with('customer', 'user')
-            ->whereBetween('created_at', [$from, $to])
+        $sales = $this->invoices($from, $to)
+            ->with('customer', 'user')
             ->withSum('saleItems as cogs', DB::raw('cost_price * quantity'))
             ->orderByDesc('created_at')
             ->orderByDesc('invoice_number')
@@ -302,6 +370,8 @@ class Index extends Component
         return view('livewire.finance.index', [
             'f'     => $this->figures(),
             'viewSale' => $viewSale,
+            'filtered' => $this->hasFilters(),
+            'totalInPeriod' => Sale::whereBetween('created_at', [$from, $to])->count(),
             'sales' => $sales,
             'expensesRecorded' => Schema::hasTable('expenses')
                 ? Expense::whereDate('expense_date', '>=', $from)->whereDate('expense_date', '<=', $to)->count()
