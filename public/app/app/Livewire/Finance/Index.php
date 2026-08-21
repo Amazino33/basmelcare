@@ -30,6 +30,10 @@ class Index extends Component
     #[Url]
     public string $preset = 'this_month';
 
+    /** Invoice opened in the detail drawer. */
+    public ?int $viewSaleId = null;
+    public bool $saleDrawer = false;
+
     public function mount(): void
     {
         if ($this->from === '' || $this->to === '') {
@@ -56,6 +60,18 @@ class Index extends Component
 
     public function updatedFrom(): void { $this->preset = 'custom'; }
     public function updatedTo(): void   { $this->preset = 'custom'; }
+
+    public function viewSale(int $saleId): void
+    {
+        $this->viewSaleId = $saleId;
+        $this->saleDrawer = true;
+    }
+
+    public function closeSale(): void
+    {
+        $this->saleDrawer = false;
+        $this->viewSaleId = null;
+    }
 
     private function range(): array
     {
@@ -279,8 +295,13 @@ class Index extends Component
             ->orderByDesc('invoice_number')
             ->paginate(25);
 
+        $viewSale = $this->viewSaleId
+            ? Sale::with(['customer', 'user', 'cashier', 'saleItems.product'])->find($this->viewSaleId)
+            : null;
+
         return view('livewire.finance.index', [
             'f'     => $this->figures(),
+            'viewSale' => $viewSale,
             'sales' => $sales,
             'expensesRecorded' => Schema::hasTable('expenses')
                 ? Expense::whereDate('expense_date', '>=', $from)->whereDate('expense_date', '<=', $to)->count()

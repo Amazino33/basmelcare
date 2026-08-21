@@ -266,8 +266,11 @@
                             $cost    = $settled ? (float) ($sale->cogs ?? 0) : 0.0;
                             $profit  = $net - $cost;
                         @endphp
-                        <tr class="hover {{ $settled ? '' : 'opacity-60' }}">
-                            <td class="font-mono text-xs">{{ $sale->invoice_number ?? '#' . $sale->id }}</td>
+                        <tr wire:click="viewSale({{ $sale->id }})"
+                            class="hover cursor-pointer {{ $settled ? '' : 'opacity-60' }}">
+                            <td class="font-mono text-xs text-primary underline decoration-dotted underline-offset-2">
+                                {{ $sale->invoice_number ?? '#' . $sale->id }}
+                            </td>
                             <td class="text-xs whitespace-nowrap">{{ $sale->created_at->format('d M H:i') }}</td>
                             <td>
                                 <span @class([
@@ -316,4 +319,213 @@
             <div class="mt-3">{{ $sales->links() }}</div>
         @endif
     </x-card>
+
+    {{-- Invoice detail: everything needed to check the figure without leaving the page --}}
+    <x-drawer wire:model="saleDrawer" right class="w-full sm:w-[34rem] lg:w-[44rem]"
+              title="{{ $viewSale?->invoice_number ?? 'Invoice' }}">
+        @if($viewSale)
+            @php
+                $settled = in_array($viewSale->status, ['paid', 'completed']);
+                $gross   = (float) $viewSale->total_amount;
+                $disc    = (float) ($viewSale->coupon_discount ?? 0);
+                $net     = $gross - $disc;
+                $cogs    = $viewSale->saleItems->sum(fn($i) => (float) $i->cost_price * $i->quantity);
+                $profit  = $net - $cogs;
+
+                $pd = $viewSale->payment_details;
+                $pd = is_string($pd) ? json_decode($pd, true) : $pd;
+                $pd = is_array($pd) ? $pd : [];
+            @endphp
+
+            {{-- Who and when --}}
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+                <span @class([
+                    'badge',
+                    'badge-success' => $viewSale->status === 'completed',
+                    'badge-info'    => $viewSale->status === 'paid',
+                    'badge-warning' => $viewSale->status === 'pending',
+                    'badge-error'   => $viewSale->status === 'cancelled',
+                ])>{{ ucfirst($viewSale->status) }}</span>
+                <span class="text-sm text-base-content/60">
+                    {{ $viewSale->created_at->format('D, j M Y · H:i') }}
+                </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-5 text-sm">
+                <div>
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Customer</div>
+                    <div>{{ $viewSale->customer?->name ?? 'Walk-in' }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Sold by</div>
+                    <div>{{ $viewSale->user?->name ?? '—' }}</div>
+                </div>
+                @if($viewSale->cashier)
+                    <div>
+                        <div class="text-xs text-base-content/50 uppercase tracking-wide">Payment taken by</div>
+                        <div>{{ $viewSale->cashier->name }}</div>
+                    </div>
+                @endif
+                @if($viewSale->paid_at)
+                    <div>
+                        <div class="text-xs text-base-content/50 uppercase tracking-wide">Paid</div>
+                        <div>{{ $viewSale->paid_at->format('j M Y · H:i') }}</div>
+                    </div>
+                @endif
+            </div>
+
+            {{-- What was sold, with the margin on each line --}}
+            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">Items</div>
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-right">Qty</th>
+                            <th class="text-right">Sold at</th>
+                            <th class="text-right">Cost</th>
+                            <th class="text-right">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($viewSale->saleItems as $item)
+                            @php
+                                $lineRevenue = (float) $item->subtotal;
+                                $lineCost    = (float) $item->cost_price * $item->quantity;
+                                $lineProfit  = $lineRevenue - $lineCost;
+                            @endphp
+                            <tr>
+                                <td class="text-sm">{{ $item->product?->name ?? '—' }}</td>
+                                <td class="text-right tabular-nums">{{ $item->quantity }}</td>
+                                <td class="text-right tabular-nums">₦{{ number_format($item->unit_price, 2) }}</td>
+                                <td class="text-right tabular-nums text-base-content/60">₦{{ number_format($item->cost_price, 2) }}</td>
+                                <td class="text-right tabular-nums {{ $lineProfit >= 0 ? 'text-success' : 'text-error' }}">
+                                    ₦{{ number_format($lineProfit, 2) }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- The figure, and how it was reached --}}
+            <div class="mt-4 p-3 rounded-lg bg-base-200/60">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td>Items total</td>
+                            <td class="text-right tabular-nums">₦{{ number_format($gross, 2) }}</td>
+                        </tr>
+                        @if($disc > 0)
+                            <tr class="text-base-content/70">
+                                <td>Coupon discount</td>
+                                <td class="text-right tabular-nums text-error">−₦{{ number_format($disc, 2) }}</td>
+                            </tr>
+                        @endif
+                        <tr class="font-semibold">
+                            <td>Customer paid</td>
+                            <td class="text-right tabular-nums">₦{{ number_format($net, 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Cost of goods</td>
+                            <td class="text-right tabular-nums text-error">−₦{{ number_format($cogs, 2) }}</td>
+                        </tr>
+                        <tr class="border-t-2 border-base-300 font-bold">
+                            <td>Profit on this sale</td>
+                            <td class="text-right tabular-nums {{ $profit >= 0 ? 'text-success' : 'text-error' }}">
+                                ₦{{ number_format($profit, 2) }}
+                                <span class="font-normal text-xs text-base-content/50">
+                                    ({{ $net > 0 ? number_format(($profit / $net) * 100, 1) : '0.0' }}%)
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                @unless($settled)
+                    <p class="text-xs text-warning mt-2">
+                        This invoice is {{ $viewSale->status }}, so none of it counts towards the totals.
+                    </p>
+                @endunless
+            </div>
+
+            {{-- How it was paid --}}
+            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mt-5 mb-2">Payment</div>
+            @if($pd)
+                <table class="table table-sm">
+                    <tbody>
+                        @foreach(['cash' => 'Cash', 'card' => 'Card', 'transfer' => 'Transfer'] as $key => $label)
+                            @if(isset($pd[$key]) && is_numeric($pd[$key]))
+                                <tr>
+                                    <td>{{ $label }}</td>
+                                    <td class="text-right tabular-nums">₦{{ number_format((float) $pd[$key], 2) }}</td>
+                                </tr>
+                            @endif
+                        @endforeach
+
+                        @if(isset($pd['credit']) && is_numeric($pd['credit']))
+                            <tr class="text-base-content/70">
+                                <td>Store credit used
+                                    <span class="text-xs block opacity-70">not new money</span>
+                                </td>
+                                <td class="text-right tabular-nums">₦{{ number_format((float) $pd['credit'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(isset($pd['change_given']) && is_numeric($pd['change_given']))
+                            <tr class="text-base-content/70">
+                                <td>Change given</td>
+                                <td class="text-right tabular-nums">−₦{{ number_format((float) $pd['change_given'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(isset($pd['stored_credit']) && is_numeric($pd['stored_credit']))
+                            <tr class="text-base-content/70">
+                                <td>Kept as store credit</td>
+                                <td class="text-right tabular-nums">₦{{ number_format((float) $pd['stored_credit'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(isset($pd['shortfall']) && is_numeric($pd['shortfall']))
+                            <tr class="text-error">
+                                <td>Unpaid — became debt</td>
+                                <td class="text-right tabular-nums">₦{{ number_format((float) $pd['shortfall'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(!empty($pd['coupon_code']))
+                            <tr class="text-base-content/70">
+                                <td>Coupon</td>
+                                <td class="text-right font-mono text-sm">{{ $pd['coupon_code'] }}</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+
+                @if(!empty($pd['debts_cleared']) && is_array($pd['debts_cleared']))
+                    <div class="mt-2 text-xs text-base-content/60">
+                        Overpayment cleared older debt:
+                        @foreach($pd['debts_cleared'] as $d)
+                            <span class="font-mono">{{ $d['invoice'] ?? '—' }}</span>
+                            (₦{{ number_format((float) ($d['amount'] ?? 0), 2) }}){{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                    </div>
+                @endif
+            @else
+                <div class="flex items-start gap-2 p-2 bg-warning/10 rounded-lg text-xs">
+                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+                    <span>
+                        No payment breakdown was recorded for this sale. It predates the till
+                        storing how money was taken, so it appears under
+                        <strong>Method not recorded</strong>.
+                    </span>
+                </div>
+            @endif
+
+            @if($viewSale->note)
+                <div class="mt-4 text-sm text-base-content/60">Note: {{ $viewSale->note }}</div>
+            @endif
+        @endif
+
+        <x-slot:actions>
+            <x-button label="Close" wire:click="closeSale" class="btn-ghost btn-sm" />
+        </x-slot:actions>
+    </x-drawer>
+
 </div>
