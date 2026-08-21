@@ -19,24 +19,6 @@
                 <x-input label="To" wire:model.live="to" type="date" :max="today()->format('Y-m-d')" class="input-sm" />
             </div>
         </div>
-        <div class="flex flex-wrap items-end gap-2 mt-3 pt-3 border-t border-base-200">
-            <x-input placeholder="Search invoice, customer, staff or product..."
-                     wire:model.live.debounce.400ms="search"
-                     icon="o-magnifying-glass" class="input-sm flex-1 min-w-[16rem]" clearable />
-
-            <x-select wire:model.live="statusFilter" class="select-sm"
-                :options="[
-                    ['id'=>'all',      'name'=>'All invoices'],
-                    ['id'=>'settled',  'name'=>'Settled only'],
-                    ['id'=>'cancelled','name'=>'Cancelled only'],
-                    ['id'=>'pending',  'name'=>'Unpaid only'],
-                ]" option-value="id" option-label="name" />
-
-            @if($filtered)
-                <x-button label="Clear" wire:click="clearFilters" icon="o-x-mark" class="btn-sm btn-ghost" />
-            @endif
-        </div>
-
         <p class="text-xs text-base-content/50 mt-2">
             {{ \Carbon\Carbon::parse($from)->format('j M Y') }} –
             {{ \Carbon\Carbon::parse($to)->format('j M Y') }} ·
@@ -276,6 +258,24 @@
     {{-- Every sale behind the numbers --}}
     <x-card title="Every invoice in this period"
             subtitle="Cancelled and unpaid invoices are listed too, so no number is unaccounted for">
+
+            <div class="flex flex-wrap items-end gap-2 mb-4">
+                <x-input placeholder="Search invoice, customer, staff or product..."
+                         wire:model.live.debounce.400ms="search"
+                         icon="o-magnifying-glass" class="input-sm flex-1 min-w-[16rem]" clearable />
+
+                <x-select wire:model.live="statusFilter" class="select-sm"
+                    :options="[
+                        ['id'=>'all',      'name'=>'All invoices'],
+                        ['id'=>'settled',  'name'=>'Settled only'],
+                        ['id'=>'cancelled','name'=>'Cancelled only'],
+                        ['id'=>'pending',  'name'=>'Unpaid only'],
+                    ]" option-value="id" option-label="name" />
+
+                @if($filtered)
+                    <x-button label="Clear" wire:click="clearFilters" icon="o-x-mark" class="btn-sm btn-ghost" />
+                @endif
+            </div>
 
         @if($f['cancelledCount'] > 0 || $f['pendingCount'] > 0)
             <div class="flex flex-wrap gap-2 mb-3 text-xs">
