@@ -58,7 +58,7 @@
     @endif
 
     {{-- The two views, deliberately separate --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
 
         <x-card title="Trading" subtitle="Did we make money on what we sold?">
             <table class="table table-sm">
@@ -105,6 +105,78 @@
                     </tr>
                 </tbody>
             </table>
+        </x-card>
+
+        <x-card title="Collected by method" subtitle="How the money was taken">
+            @php $m = $f['methods']; @endphp
+            <table class="table table-sm">
+                <tbody>
+                    @foreach(['cash' => 'Cash', 'card' => 'Card', 'transfer' => 'Transfer'] as $key => $label)
+                        <tr>
+                            <td>
+                                {{ $label }}
+                                @if($m['debtByMethod'][$key] > 0)
+                                    <span class="text-xs text-base-content/50">
+                                        (incl. ₦{{ number_format($m['debtByMethod'][$key], 2) }} debt repaid)
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="text-right tabular-nums">₦{{ number_format($m['byMethod'][$key], 2) }}</td>
+                        </tr>
+                    @endforeach
+
+                    <tr class="border-t-2 border-base-300 font-bold">
+                        <td>Recorded by method</td>
+                        <td class="text-right tabular-nums">₦{{ number_format($m['methodTotal'], 2) }}</td>
+                    </tr>
+
+                    @if($m['unrecorded'] > 0)
+                        <tr class="text-warning">
+                            <td>
+                                Method not recorded
+                                <span class="text-xs opacity-70 block">
+                                    {{ $m['salesTotal'] - $m['salesWithMethod'] }} of {{ $m['salesTotal'] }} sales
+                                </span>
+                            </td>
+                            <td class="text-right tabular-nums">₦{{ number_format($m['unrecorded'], 2) }}</td>
+                        </tr>
+                    @endif
+
+                    <tr class="border-t border-base-300 text-base-content/70">
+                        <td class="text-sm">Settled sales total</td>
+                        <td class="text-right tabular-nums text-sm">₦{{ number_format($m['settledTotal'], 2) }}</td>
+                    </tr>
+
+                    @if($m['storeCredit'] > 0 || $m['changeGiven'] > 0)
+                        <tr><td colspan="2" class="pt-3 pb-0 text-xs uppercase tracking-wide text-base-content/40">Also worth knowing</td></tr>
+                        @if($m['storeCredit'] > 0)
+                            <tr class="text-base-content/70">
+                                <td class="text-sm">Paid with store credit
+                                    <span class="text-xs block opacity-70">not new money — taken earlier</span>
+                                </td>
+                                <td class="text-right tabular-nums text-sm">₦{{ number_format($m['storeCredit'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if($m['changeGiven'] > 0)
+                            <tr class="text-base-content/70">
+                                <td class="text-sm">Change handed back</td>
+                                <td class="text-right tabular-nums text-sm">−₦{{ number_format($m['changeGiven'], 2) }}</td>
+                            </tr>
+                        @endif
+                    @endif
+                </tbody>
+            </table>
+
+            @if($m['unrecorded'] > 0)
+                <div class="flex items-start gap-2 p-2 mt-2 bg-warning/10 rounded-lg text-xs">
+                    <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+                    <span>
+                        Older sales were recorded before the till stored a payment method,
+                        so their money cannot be split by cash, card or transfer.
+                        Sales taken from now on will be.
+                    </span>
+                </div>
+            @endif
         </x-card>
 
         <x-card title="Cash" subtitle="What actually moved in and out?">

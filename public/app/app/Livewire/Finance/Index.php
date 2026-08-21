@@ -72,6 +72,95 @@ class Index extends Component
             ->whereBetween('created_at', [$from, $to]);
     }
 
+    /**
+     * How money was actually taken: cash, card or transfer.
+     *
+     * payment_details is JSON written by the till, and its shape has changed
+     * over time — older sales carry a different structure or none at all. Any
+     * amount we cannot attribute to a method is reported as "not recorded"
+     * rather than dropped, because a breakdown that silently omits two thirds
+     * of the money is worse for an auditor than no breakdown at all.
+     *
+     * Store credit is deliberately excluded: it is credit being spent, taken
+     * on an earlier day, not money arriving today.
+     */
+    private function collectionMethods($from, $to): array
+    {
+        $methods = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+        $storeCredit = 0.0;
+        $changeGiven = 0.0;
+        $attributed  = 0.0;
+        $withMethod  = 0;
+
+        $sales = $this->settledSales($from, $to)->get(['id', 'total_amount', 'coupon_discount', 'payment_details']);
+
+        foreach ($sales as $sale) {
+            $pd = $sale->payment_details;
+            $pd = is_string($pd) ? json_decode($pd, true) : $pd;
+
+            if (! is_array($pd)) {
+                continue;   // no breakdown recorded
+            }
+
+            $found = false;
+
+            foreach (array_keys($methods) as $method) {
+                if (isset($pd[$method]) && is_numeric($pd[$method])) {
+                    $methods[$method] += (float) $pd[$method];
+                    $found = true;
+                }
+            }
+
+            if (isset($pd['credit']) && is_numeric($pd['credit'])) {
+                $storeCredit += (float) $pd['credit'];
+            }
+
+            if (isset($pd['change_given']) && is_numeric($pd['change_given'])) {
+                $changeGiven += (float) $pd['change_given'];
+            }
+
+            if ($found) {
+                $withMethod++;
+                $attributed += (float) $sale->total_amount - (float) ($sale->coupon_discount ?? 0);
+            }
+        }
+
+        // Debt repayments record their own method and are real money taken today.
+        $debtByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+        if (Schema::hasTable('debt_payments')) {
+            $rows = DB::table('debt_payments')
+                ->whereBetween('created_at', [$from, $to])
+                ->selectRaw('payment_method, SUM(amount) AS total')
+                ->groupBy('payment_method')
+                ->get();
+
+            foreach ($rows as $row) {
+                $key = strtolower((string) $row->payment_method);
+                if (array_key_exists($key, $debtByMethod)) {
+                    $debtByMethod[$key] += (float) $row->total;
+                    $methods[$key]      += (float) $row->total;
+                }
+            }
+        }
+
+        $settledTotal = (float) $sales->sum(
+            fn($s) => (float) $s->total_amount - (float) ($s->coupon_discount ?? 0)
+        );
+
+        return [
+            'byMethod'      => $methods,
+            'debtByMethod'  => $debtByMethod,
+            'methodTotal'   => array_sum($methods),
+            'storeCredit'   => $storeCredit,
+            'changeGiven'   => $changeGiven,
+            // What the till took but never labelled with a method.
+            'unrecorded'    => max(0, $settledTotal - $attributed),
+            'salesWithMethod' => $withMethod,
+            'salesTotal'      => $sales->count(),
+            'settledTotal'    => $settledTotal,
+        ];
+    }
+
     private function figures(): array
     {
         [$from, $to] = $this->range();
@@ -162,6 +251,7 @@ class Index extends Component
             'netCash'        => $collected - $paidOut,
 
             'saleCount'    => $this->settledSales($from, $to)->count(),
+            'methods'      => $this->collectionMethods($from, $to),
 
             // Shown so the auditor can account for every invoice number. A gap
             // in the sequence with no visible reason is what fraud looks like.
