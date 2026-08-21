@@ -47,13 +47,21 @@
 
     @if($tab === 'pos')
         <!-- POS Summary Stats -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
             <x-stat
                 title="Revenue"
                 value="₦{{ number_format($totalRevenue, 2) }}"
-                description="{{ $totalTransactions }} sales"
+                description="billed · {{ $totalTransactions }} sales"
                 icon="o-banknotes"
                 color="text-primary"
+            />
+            {{-- What the drawer should actually hold. --}}
+            <x-stat
+                title="Cash Collected"
+                value="₦{{ number_format($cashCollected, 2) }}"
+                description="in the drawer"
+                icon="o-wallet"
+                color="text-success"
             />
             @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
             <x-stat
@@ -72,23 +80,33 @@
                 color="text-info"
             />
             <div class="bg-base-100 rounded-lg p-4 shadow-sm">
-                <div class="text-sm text-base-content/60 mb-2">Payment Methods</div>
-                @forelse($paymentBreakdown as $method)
+                <div class="text-sm text-base-content/60 mb-2">Money Taken</div>
+                {{-- Amounts actually tendered, not the billed total. --}}
+                @foreach(['cash' => 'Cash', 'card' => 'Card', 'transfer' => 'Transfer'] as $key => $label)
                     <div class="flex justify-between items-center text-sm mb-1">
-                        <span class="flex items-center gap-2">
-                            <x-badge :value="ucfirst($method->payment_method)" @class([
-                                'badge-xs',
-                                'badge-success' => $method->payment_method === 'cash',
-                                'badge-info' => $method->payment_method === 'transfer',
-                                'badge-primary' => $method->payment_method === 'card',
-                            ]) />
-                            <span class="text-base-content/60">{{ $method->count }}×</span>
-                        </span>
-                        <span class="font-semibold">₦{{ number_format($method->total, 2) }}</span>
+                        <x-badge :value="$label" @class([
+                            'badge-xs',
+                            'badge-success' => $key === 'cash',
+                            'badge-info'    => $key === 'transfer',
+                            'badge-primary' => $key === 'card',
+                        ]) />
+                        <span class="font-semibold tabular-nums">₦{{ number_format($collected[$key], 2) }}</span>
                     </div>
-                @empty
-                    <div class="text-sm text-base-content/40">No sales yet</div>
-                @endforelse
+                @endforeach
+
+                @if($creditUsed > 0)
+                    <div class="flex justify-between items-center text-xs text-base-content/50 mt-1">
+                        <span>Store credit</span>
+                        <span class="tabular-nums">₦{{ number_format($creditUsed, 2) }}</span>
+                    </div>
+                @endif
+
+                @if($unrecordedCash > 0)
+                    <div class="flex justify-between items-center text-xs text-warning mt-1">
+                        <span>Method not recorded</span>
+                        <span class="tabular-nums">₦{{ number_format($unrecordedCash, 2) }}</span>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -205,7 +223,7 @@
 
     @else
         <!-- Online Orders Summary Stats -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
             <x-stat
                 title="Revenue"
                 value="₦{{ number_format($onlineRevenue, 2) }}"

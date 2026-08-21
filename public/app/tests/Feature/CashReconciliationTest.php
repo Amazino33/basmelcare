@@ -171,4 +171,45 @@ class CashReconciliationTest extends TestCase
         $this->assertEquals(5000, $c->viewData('totalSalesToday'));
         $this->assertEquals(5000, $c->viewData('cashCollectedToday'));
     }
+    public function test_sales_history_cash_matches_the_drawer(): void
+    {
+        $this->theRealTransaction();
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        // The reported problem: this screen showed the billed figure as cash.
+        $this->assertEquals(9600, $c->viewData('cashCollected'),
+            'Sales History cash does not match the drawer.');
+        $this->assertEquals(9600, $c->viewData('collected')['cash']);
+    }
+
+    public function test_sales_history_money_taken_excludes_the_discount_and_debt(): void
+    {
+        $this->theRealTransaction();
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        // Billed 10,100 but only 9,600 tendered - the 500 is owed, not held.
+        $this->assertEquals(10100, $c->viewData('totalRevenue'));
+        $this->assertEquals(500, $c->viewData('totalRevenue') - $c->viewData('cashCollected'));
+    }
+
+    public function test_sales_history_counts_a_later_repayment_as_cash(): void
+    {
+        $sale = $this->theRealTransaction();
+        $debt = Debt::where('sale_id', $sale->id)->firstOrFail();
+
+        DebtPayment::create([
+            'debt_id' => $debt->id, 'amount' => 500,
+            'payment_method' => 'cash', 'at_point_of_sale' => false,
+            'received_by' => User::factory()->create()->id,
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        $this->assertEquals(10100, $c->viewData('cashCollected'));
+    }
 }

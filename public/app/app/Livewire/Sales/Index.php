@@ -351,11 +351,60 @@ class Index extends Component
         $totalProfit = $totalRevenue - $totalCost;
         $avgSale = $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0;
 
-        $paymentBreakdown = $this->periodQuery(
-            Sale::whereIn('status', ['paid', 'completed'])->tap($scopeFn)
-            )->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
-            ->groupBy('payment_method')
-            ->get();
+        // What each method ACTUALLY took, read from payment_details.
+        //
+        // This previously summed total_amount grouped by payment_method, which
+        // is the billed figure: it included discounts never charged and balances
+        // sold on credit, and a split payment put its whole value under "split".
+        // Staff read this row as the drawer, so it has to be money tendered.
+        $collected = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+        $creditUsed = 0.0;
+        $changeGiven = 0.0;
+        $unrecorded  = 0.0;
+
+        foreach ((clone $filteredSales)->get(['total_amount', 'coupon_discount', 'payment_details']) as $paid) {
+            $details = $paid->payment_details;
+            $details = is_string($details) ? json_decode($details, true) : $details;
+
+            if (! is_array($details)) {
+                // Older sales stored no breakdown; report rather than guess.
+                $unrecorded += (float) $paid->total_amount - (float) ($paid->coupon_discount ?? 0);
+                continue;
+            }
+
+            $matched = false;
+
+            foreach (array_keys($collected) as $method) {
+                if (isset($details[$method]) && is_numeric($details[$method])) {
+                    $collected[$method] += (float) $details[$method];
+                    $matched = true;
+                }
+            }
+
+            if (isset($details['credit']) && is_numeric($details['credit'])) {
+                $creditUsed += (float) $details['credit'];
+            }
+
+            if (isset($details['change_given']) && is_numeric($details['change_given'])) {
+                $changeGiven += (float) $details['change_given'];
+            }
+
+            if (! $matched) {
+                $unrecorded += (float) $paid->total_amount - (float) ($paid->coupon_discount ?? 0);
+            }
+        }
+
+        // Money handed back is not in the drawer.
+        $cashCollected = array_sum($collected) - $changeGiven;
+
+        // Repayments on older debts taken during this period are real money in,
+        // but the opening part-payment is already counted above.
+        $repaidInPeriod = (float) $this->periodQuery(\App\Models\DebtPayment::query())
+            ->where('at_point_of_sale', false)
+            ->sum('amount');
+
+        $cashCollected += $repaidInPeriod;
+        $collected['cash'] += $repaidInPeriod;
 
         $sales = $this->periodQuery(clone $salesQuery)->latest()->paginate(20);
 
@@ -426,7 +475,10 @@ class Index extends Component
             'totalTransactions'    => $totalTransactions,
             'totalItemsSold'       => $totalItemsSold,
             'avgSale'              => $avgSale,
-            'paymentBreakdown'     => $paymentBreakdown,
+            'collected'            => $collected,
+            'cashCollected'        => $cashCollected,
+            'creditUsed'           => $creditUsed,
+            'unrecordedCash'       => $unrecorded,
             'onlineHeaders'        => $onlineHeaders,
             'onlineOrders'         => $onlineOrders,
             'viewOrder'            => $viewOrder,
