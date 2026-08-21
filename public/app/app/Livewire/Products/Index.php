@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Products;
 
+use App\Livewire\Concerns\DeniesCatalogueWrites;
+
 use App\Imports\ProductsImport;
 use App\Models\Batch;
 use App\Models\Category;
@@ -17,6 +19,7 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesCatalogueWrites;
     use Toast, WithPagination, WithFileUploads;
 
     /**
@@ -99,6 +102,8 @@ class Index extends Component
 
     public function toggleBulkEdit(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->bulkEditMode = !$this->bulkEditMode;
         if (!$this->bulkEditMode) {
             $this->bulkEdits      = [];
@@ -120,6 +125,8 @@ class Index extends Component
 
     public function saveBulkEdits(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         if (empty($this->bulkEdits)) {
             $this->bulkEditMode = false;
             return;
@@ -196,12 +203,16 @@ class Index extends Component
 
     public function openImport(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->reset(['importFile', 'importResults']);
         $this->importModal = true;
     }
 
     public function processImport(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->validate(['importFile' => 'required|file|mimes:xlsx,xls|max:10240']);
 
         $path     = $this->importFile->store('imports/tmp', 'local');
@@ -229,6 +240,8 @@ class Index extends Component
 
     public function openQuickAdd(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->reset(['quick_name', 'quick_selling_price', 'quick_cost_price', 'quick_expiry_date']);
         $this->quick_quantity = 1;
         $this->quickAddCount = 0;
@@ -238,6 +251,8 @@ class Index extends Component
 
     public function saveQuickAdd(): void
     {
+        if ($this->blockedFromCatalogue()) return;
+
         // Auto-calculate selling price if the user left it blank
         if (empty($this->quick_selling_price) && (float) $this->quick_cost_price > 0) {
             $this->quick_selling_price = $this->calculateSellingPrice((float) $this->quick_cost_price);
@@ -298,12 +313,16 @@ class Index extends Component
 
     public function createProduct()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
     public function saveProduct()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->validate([
             'name' => ['required', 'string', 'max:255', function ($attr, $value, $fail) {
                 $exists = Product::whereRaw('LOWER(name) = ?', [strtolower($value)])
@@ -368,6 +387,8 @@ class Index extends Component
 
     public function editProduct($id)
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $product = Product::findOrFail($id);
         $this->productId = $product->id;
         $this->name = $product->name;
@@ -387,6 +408,8 @@ class Index extends Component
 
     public function removeImage()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->photo = null;
         $this->existingImage = null;
         if ($this->productId) {
@@ -396,12 +419,16 @@ class Index extends Component
 
     public function deleteProduct($id)
     {
+        if ($this->blockedFromCatalogue()) return;
+
         Product::findOrFail($id)->delete();
         $this->success('Product deleted.');
     }
 
     public function openBatchModal($productId)
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->reset(['batch_number', 'expiry_date', 'cost_price', 'quantity', 'batch_note']);
         $this->batchProductId = $productId;
         $this->batchProductSellingPrice = (float) Product::find($productId)?->selling_price ?? 0;
@@ -410,6 +437,8 @@ class Index extends Component
 
     public function saveBatch()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->validate([
             'batch_number' => 'nullable|string|max:100',
             'expiry_date'  => ['required', 'date_format:Y-m', function ($attr, $value, $fail) {

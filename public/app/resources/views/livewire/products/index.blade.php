@@ -4,6 +4,7 @@
             <x-input icon="o-magnifying-glass" placeholder="Search by name or barcode..." wire:model.live.debounce="search" clearable />
         </x-slot:middle>
         <x-slot:actions>
+            @if($this->canEditCatalogue())
             <x-button label="Import" wire:click="openImport" icon="o-arrow-up-tray" class="btn-outline btn-sm" />
             <x-button
                 :label="$bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'"
@@ -14,6 +15,7 @@
             @if(!$bulkEditMode)
                 <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
                 <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
+            @endif
             @endif
         </x-slot:actions>
     </x-header>
@@ -187,11 +189,15 @@
             @endscope
 
             @scope('actions', $product)
+                {{-- @scope does not inherit view variables — resolve the role here. --}}
+                @php $mayEditCatalogue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager', 'inventory_manager']); @endphp
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
+                    @if($mayEditCatalogue)
                     <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
                     <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                     <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
+                    @endif
                 </div>
             @endscope
         </x-table>
@@ -494,7 +500,9 @@
         @endif
 
         <x-slot:actions>
-            <x-button label="Add Batch" wire:click="openBatchModal({{ $viewBatchesProductId }})" icon="o-plus" class="btn-primary" />
+            @if($this->canEditCatalogue())
+                <x-button label="Add Batch" wire:click="openBatchModal({{ $viewBatchesProductId }})" icon="o-plus" class="btn-primary" />
+            @endif
         </x-slot:actions>
     </x-drawer>
 </div>

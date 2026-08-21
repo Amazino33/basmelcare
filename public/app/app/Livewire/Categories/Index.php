@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Categories;
 
+use App\Livewire\Concerns\DeniesCatalogueWrites;
+
 use App\Models\Category;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Index extends Component
 {
+    use DeniesCatalogueWrites;
     use Toast;
 
     public string $name = '';
@@ -17,12 +20,16 @@ class Index extends Component
 
     public function create()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->reset(['name', 'description', 'categoryId']);
         $this->modal = true;
     }
 
     public function save()
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $this->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -48,6 +55,8 @@ class Index extends Component
 
     public function edit($id)
     {
+        if ($this->blockedFromCatalogue()) return;
+
         $category = Category::findOrFail($id);
         $this->categoryId = $category->id;
         $this->name = $category->name;
@@ -57,6 +66,8 @@ class Index extends Component
 
     public function delete($id)
     {
+        if ($this->blockedFromCatalogue()) return;
+
         Category::findOrFail($id)->delete();
         $this->success('Category deleted.');
     }

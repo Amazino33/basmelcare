@@ -2,7 +2,9 @@
     {{-- Header with title and create button --}}
     <x-header title="Categories" subtitle="Manage product categories">
         <x-slot:actions>
-            <x-button label="Create" wire:click="create" icon="o-plus" class="btn-primary" />
+            @if($this->canEditCatalogue())
+                <x-button label="Create" wire:click="create" icon="o-plus" class="btn-primary" />
+            @endif
         </x-slot:actions>
     </x-header>
 
@@ -10,8 +12,12 @@
     <x-table :headers="$headers" :rows="$categories">
         @scope('actions', $category)
             <div class="flex gap-1">
+                {{-- @scope does not inherit view variables — resolve the role here. --}}
+                @php $mayEditCatalogue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager', 'inventory_manager']); @endphp
+                @if($mayEditCatalogue)
                 <x-button icon="o-pencil" wire:click="edit({{ $category->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                 <x-button icon="o-trash" wire:click="delete({{ $category->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this category?" tooltip="Delete" />
+                @endif
             </div>
         @endscope
     </x-table>

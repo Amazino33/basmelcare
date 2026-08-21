@@ -46,7 +46,9 @@ class PriceLockdownTest extends TestCase
     public static function nonPricingRoles(): array
     {
         return [
-            'pharmacist'        => [['pharmacist']],
+            // Pharmacist is deliberately absent: they can no longer create or
+            // edit products at all, so "can create but not price" no longer
+            // describes them. See PharmacistCatalogueReadOnlyTest.
             'inventory_manager' => [['inventory_manager']],
         ];
     }
