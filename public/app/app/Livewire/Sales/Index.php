@@ -357,18 +357,34 @@ class Index extends Component
         // is the billed figure: it included discounts never charged and balances
         // sold on credit, and a split payment put its whole value under "split".
         // Staff read this row as the drawer, so it has to be money tendered.
+        // Sales with no recorded method still had money taken, but part of it
+        // may never have arrived. Outstanding debt per sale lets that bucket
+        // report cash actually collected rather than the amount billed.
+        $owedPerSale = \App\Models\Debt::query()
+            ->selectRaw('sale_id, SUM(COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)) AS still_owed')
+            ->groupBy('sale_id')
+            ->pluck('still_owed', 'sale_id');
+
         $collected = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+
+        // Billed on this sale, less anything still outstanding on it.
+        $actuallyTaken = function ($sale) use ($owedPerSale) {
+            $billed = (float) $sale->total_amount - (float) ($sale->coupon_discount ?? 0);
+
+            return max(0, $billed - (float) ($owedPerSale[$sale->id] ?? 0));
+        };
+
         $creditUsed = 0.0;
         $changeGiven = 0.0;
         $unrecorded  = 0.0;
 
-        foreach ((clone $filteredSales)->get(['total_amount', 'coupon_discount', 'payment_details']) as $paid) {
+        foreach ((clone $filteredSales)->get(['id', 'total_amount', 'coupon_discount', 'payment_details']) as $paid) {
             $details = $paid->payment_details;
             $details = is_string($details) ? json_decode($details, true) : $details;
 
             if (! is_array($details)) {
                 // Older sales stored no breakdown; report rather than guess.
-                $unrecorded += (float) $paid->total_amount - (float) ($paid->coupon_discount ?? 0);
+                $unrecorded += $actuallyTaken($paid);
                 continue;
             }
 
@@ -390,21 +406,36 @@ class Index extends Component
             }
 
             if (! $matched) {
-                $unrecorded += (float) $paid->total_amount - (float) ($paid->coupon_discount ?? 0);
+                $unrecorded += $actuallyTaken($paid);
             }
         }
 
-        // Money handed back is not in the drawer.
-        $cashCollected = array_sum($collected) - $changeGiven;
+        // Change is handed back in cash, so it comes off the cash line itself —
+        // otherwise the three method figures sum to more than Cash Collected.
+        $collected['cash'] -= $changeGiven;
 
-        // Repayments on older debts taken during this period are real money in,
-        // but the opening part-payment is already counted above.
-        $repaidInPeriod = (float) $this->periodQuery(\App\Models\DebtPayment::query())
+        // Repayments on older debts taken during this period are real money in.
+        // The opening part-payment is excluded: it is already counted above from
+        // the sale. Each repayment is attributed to the method it was taken by,
+        // not assumed to be cash.
+        $repaidByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+
+        $repayments = $this->periodQuery(\App\Models\DebtPayment::query())
             ->where('at_point_of_sale', false)
-            ->sum('amount');
+            ->selectRaw('payment_method, SUM(amount) AS total')
+            ->groupBy('payment_method')
+            ->get();
 
-        $cashCollected += $repaidInPeriod;
-        $collected['cash'] += $repaidInPeriod;
+        foreach ($repayments as $repayment) {
+            $method = strtolower((string) $repayment->payment_method);
+
+            if (array_key_exists($method, $repaidByMethod)) {
+                $repaidByMethod[$method] += (float) $repayment->total;
+                $collected[$method]      += (float) $repayment->total;
+            }
+        }
+
+        $cashCollected = array_sum($collected);
 
         $sales = $this->periodQuery(clone $salesQuery)->latest()->paginate(20);
 

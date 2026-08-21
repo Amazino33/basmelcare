@@ -212,4 +212,146 @@ class CashReconciliationTest extends TestCase
 
         $this->assertEquals(10100, $c->viewData('cashCollected'));
     }
+    public function test_a_repayment_by_transfer_is_not_counted_as_cash(): void
+    {
+        $sale = $this->theRealTransaction();
+        $debt = Debt::where('sale_id', $sale->id)->firstOrFail();
+
+        DebtPayment::create([
+            'debt_id' => $debt->id, 'amount' => 500,
+            'payment_method' => 'transfer', 'at_point_of_sale' => false,
+            'received_by' => User::factory()->create()->id,
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        $collected = $c->viewData('collected');
+
+        $this->assertEquals(9600, $collected['cash'], 'A transfer repayment was counted as cash.');
+        $this->assertEquals(500, $collected['transfer']);
+        $this->assertEquals(10100, $c->viewData('cashCollected'));
+    }
+
+    public function test_change_given_comes_off_the_cash_line(): void
+    {
+        Sale::create([
+            'invoice_number' => 'INV-CHANGE-1',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 4500,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            // Customer handed over 5,000 and took 500 back.
+            'payment_details' => ['cash' => 5000, 'change_given' => 500],
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        $this->assertEquals(4500, $c->viewData('collected')['cash']);
+        $this->assertEquals(4500, $c->viewData('cashCollected'));
+    }
+
+    public function test_the_method_lines_add_up_to_cash_collected(): void
+    {
+        $this->theRealTransaction();
+
+        Sale::create([
+            'invoice_number' => 'INV-SPLIT-1',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 45000,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            'payment_details' => ['cash' => 22500, 'transfer' => 22500],
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        $collected = $c->viewData('collected');
+
+        // What the panel lists must equal the headline figure, or the two
+        // disagree on screen and neither can be trusted.
+        $this->assertEquals(
+            array_sum($collected),
+            $c->viewData('cashCollected'),
+            'The per-method lines do not add up to Cash Collected.'
+        );
+    }
+
+    public function test_a_split_payment_is_shared_between_methods(): void
+    {
+        Sale::create([
+            'invoice_number' => 'INV-SPLIT-2',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 45000,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            'payment_details' => ['cash' => 22500, 'transfer' => 22500],
+        ]);
+
+        $collected = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class)
+            ->viewData('collected');
+
+        $this->assertEquals(22500, $collected['cash']);
+        $this->assertEquals(22500, $collected['transfer']);
+    }
+    public function test_an_unrecorded_sale_reports_money_taken_not_billed(): void
+    {
+        $customer = Customer::create([
+            'name' => 'Old Debtor', 'type' => 'retail', 'phone' => '08039998888',
+        ]);
+
+        // An older sale with no payment breakdown, part of it still owed.
+        $sale = Sale::create([
+            'invoice_number'  => 'INV-OLD-1',
+            'user_id'         => User::factory()->create(['role' => ['cashier']])->id,
+            'customer_id'     => $customer->id,
+            'total_amount'    => 5000,
+            'coupon_discount' => 0,
+            'status'          => 'completed',
+            'payment_details' => null,
+        ]);
+
+        Debt::create([
+            'sale_id' => $sale->id, 'customer_id' => $customer->id,
+            'amount_owed' => 5000, 'amount_paid' => 3000, 'status' => 'partial',
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        // 3,000 was taken; the other 2,000 is still owed and was never money.
+        $this->assertEquals(3000, $c->viewData('unrecordedCash'),
+            'Unrecorded money still reports the billed amount.');
+    }
+
+    public function test_a_fully_unpaid_unrecorded_sale_contributes_nothing(): void
+    {
+        $customer = Customer::create([
+            'name' => 'Owes Everything', 'type' => 'retail', 'phone' => '08037776666',
+        ]);
+
+        $sale = Sale::create([
+            'invoice_number'  => 'INV-OLD-2',
+            'user_id'         => User::factory()->create(['role' => ['cashier']])->id,
+            'customer_id'     => $customer->id,
+            'total_amount'    => 5000,
+            'coupon_discount' => 0,
+            'status'          => 'completed',
+            'payment_details' => null,
+        ]);
+
+        Debt::create([
+            'sale_id' => $sale->id, 'customer_id' => $customer->id,
+            'amount_owed' => 5000, 'amount_paid' => 0, 'status' => 'unpaid',
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Index::class);
+
+        $this->assertEquals(0, $c->viewData('unrecordedCash'));
+        $this->assertEquals(0, $c->viewData('cashCollected'));
+    }
 }

@@ -224,6 +224,12 @@ class Index extends Component
             }
         }
 
+        $stillOwed = Schema::hasTable('debts')
+            ? (float) DB::table('debts')
+                ->whereIn('sale_id', $sales->pluck('id'))
+                ->sum(DB::raw('COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)'))
+            : 0.0;
+
         $settledTotal = (float) $sales->sum(
             fn($s) => (float) $s->total_amount - (float) ($s->coupon_discount ?? 0)
         );
@@ -235,7 +241,9 @@ class Index extends Component
             'storeCredit'   => $storeCredit,
             'changeGiven'   => $changeGiven,
             // What the till took but never labelled with a method.
-            'unrecorded'    => max(0, $settledTotal - $attributed),
+            // Billed less what is still owed: an unattributed amount that was
+            // never collected is not money taken.
+            'unrecorded'    => max(0, $settledTotal - $stillOwed - $attributed),
             'salesWithMethod' => $withMethod,
             'salesTotal'      => $sales->count(),
             'settledTotal'    => $settledTotal,
