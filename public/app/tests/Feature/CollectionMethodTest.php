@@ -108,7 +108,9 @@ class CollectionMethodTest extends TestCase
 
         $m = $this->methods();
 
-        $this->assertEquals(1500, $m['byMethod']['cash']);
+        // 1,500 tendered, 500 handed back: 1,000 stayed in the drawer.
+        $this->assertEquals(1000, $m['byMethod']['cash'],
+            'Cash should be net of change handed back.');
         $this->assertEquals(500, $m['changeGiven']);
     }
 

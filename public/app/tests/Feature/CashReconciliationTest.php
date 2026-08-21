@@ -354,4 +354,70 @@ class CashReconciliationTest extends TestCase
         $this->assertEquals(0, $c->viewData('unrecordedCash'));
         $this->assertEquals(0, $c->viewData('cashCollected'));
     }
+    /**
+     * The two screens report the same money over the same period. They drifted
+     * once already - Sales History netted change off cash while Financial
+     * Records only displayed it - so this pins them together.
+     */
+    public function test_both_pages_report_the_same_cash(): void
+    {
+        $this->theRealTransaction();
+
+        Sale::create([
+            'invoice_number' => 'INV-CHANGE-2',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 4500,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            'payment_details' => ['cash' => 5000, 'change_given' => 500],
+        ]);
+
+        Sale::create([
+            'invoice_number' => 'INV-SPLIT-3',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 45000,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            'payment_details' => ['cash' => 22500, 'transfer' => 22500],
+        ]);
+
+        $admin = User::factory()->create(['role' => ['admin'], 'status' => 'active']);
+
+        $history = Livewire::actingAs($admin)
+            ->test(\App\Livewire\Sales\Index::class)
+            ->viewData('collected');
+
+        $finance = Livewire::actingAs($admin)
+            ->test(\App\Livewire\Finance\Index::class)
+            ->viewData('f')['methods']['byMethod'];
+
+        foreach (['cash', 'card', 'transfer'] as $method) {
+            $this->assertEquals(
+                $history[$method],
+                $finance[$method],
+                "Sales History and Financial Records disagree on {$method}."
+            );
+        }
+    }
+
+    public function test_change_is_netted_off_cash_on_the_auditor_page(): void
+    {
+        Sale::create([
+            'invoice_number' => 'INV-CHANGE-3',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'total_amount' => 4500,
+            'coupon_discount' => 0,
+            'status' => 'completed',
+            'payment_details' => ['cash' => 5000, 'change_given' => 500],
+        ]);
+
+        $m = Livewire::actingAs(User::factory()->create(['role' => ['auditor'], 'status' => 'active']))
+            ->test(\App\Livewire\Finance\Index::class)
+            ->viewData('f')['methods'];
+
+        // 5,000 in, 500 back out: 4,500 is in the drawer.
+        $this->assertEquals(4500, $m['byMethod']['cash'],
+            'Financial Records reports cash before change was handed back.');
+        $this->assertEquals(500, $m['changeGiven']);
+    }
 }

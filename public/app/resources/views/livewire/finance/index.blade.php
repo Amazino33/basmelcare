@@ -173,8 +173,10 @@
                         @endif
                         @if($m['changeGiven'] > 0)
                             <tr class="text-base-content/70">
-                                <td class="text-sm">Change handed back</td>
-                                <td class="text-right tabular-nums text-sm">−₦{{ number_format($m['changeGiven'], 2) }}</td>
+                                <td class="text-sm">Change handed back
+                                    <span class="text-xs block opacity-70">already deducted from cash above</span>
+                                </td>
+                                <td class="text-right tabular-nums text-sm">₦{{ number_format($m['changeGiven'], 2) }}</td>
                             </tr>
                         @endif
                     @endif
