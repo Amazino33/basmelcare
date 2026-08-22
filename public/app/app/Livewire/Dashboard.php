@@ -387,16 +387,38 @@ class Dashboard extends Component
         $periodLabel  = $this->getPeriodLabel();
 
         $todaySales = Sale::whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']);
-        // Net of discount: total_amount is the pre-discount figure, so summing
-        // it reported revenue the customer was never charged.
-        $totalSalesToday = (float) (clone $todaySales)->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
+        // The money story for the period, in the order it happens:
+        //
+        //   expected  −  discounts  −  still owed  +  old debts repaid  =  collected
+        //
+        // Each figure is one step, so the gap between what was expected and what
+        // is in the drawer explains itself instead of looking like an error.
 
-        // What actually reached the drawer: billed, less what went out on
-        // credit, plus repayments taken today. This is the number a cashier
-        // can count against.
-        $newDebtToday = DB::table('debts')->whereBetween('created_at', [$from, $to])->sum('amount_owed');
-        $repaidToday  = DB::table('debt_payments')->whereBetween('created_at', [$from, $to])->sum('amount');
-        $cashCollectedToday = $totalSalesToday - (float) $newDebtToday + (float) $repaidToday;
+        // 1. What the sales came to before anything was taken off.
+        $expectedSales = (float) (clone $todaySales)->sum('total_amount');
+
+        // 2. What was given away.
+        $discountsGiven = (float) (clone $todaySales)->sum(DB::raw('COALESCE(coupon_discount, 0)'));
+
+        // Billed, i.e. what customers were actually charged.
+        $totalSalesToday = $expectedSales - $discountsGiven;
+
+        // 3. Of those charges, what is still outstanding.
+        $owedFromPeriod = (float) DB::table('debts')
+            ->whereBetween('created_at', [$from, $to])
+            ->sum(DB::raw('COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)'));
+
+        // Repayments of debts raised earlier are money in today, but they belong
+        // to no sale in this period — shown separately so the sum still ties.
+        $oldDebtRepaid = (float) DB::table('debt_payments')
+            ->where('at_point_of_sale', false)
+            ->whereBetween('debt_payments.created_at', [$from, $to])
+            ->join('debts', 'debts.id', '=', 'debt_payments.debt_id')
+            ->whereNotBetween('debts.created_at', [$from, $to])
+            ->sum('debt_payments.amount');
+
+        // 4. What actually reached the drawer.
+        $cashCollectedToday = $totalSalesToday - $owedFromPeriod + $oldDebtRepaid;
         $salesCountToday = $todaySales->count();
 
         $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']));
@@ -473,6 +495,10 @@ class Dashboard extends Component
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
             'cashCollectedToday' => $cashCollectedToday,
+            'expectedSales'      => $expectedSales,
+            'discountsGiven'     => $discountsGiven,
+            'owedFromPeriod'     => $owedFromPeriod,
+            'oldDebtRepaid'      => $oldDebtRepaid,
             'salesCountToday' => $salesCountToday,
             'todayProfit' => $todayProfit,
             'totalProducts' => $totalProducts,

@@ -442,44 +442,77 @@
 
     @php $seesRevenue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']); @endphp
 
-    <!-- Stats Row -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        @if($seesRevenue)
-        <a href="{{ route('sales.index') }}" class="block">
+    @if($seesRevenue)
+        {{-- The money story, left to right, in the order it happens:
+             expected → less discounts → less owed → what reached the drawer. --}}
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-2">
             <x-stat
-                title="POS Sales · {{ $periodLabel }}"
-                value="₦{{ number_format($totalSalesToday, 2) }}"
-                description="billed · {{ $salesCountToday }} transactions"
-                icon="o-banknotes"
-                color="text-primary"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+                title="Expected Sales"
+                value="₦{{ number_format($expectedSales, 2) }}"
+                description="{{ $salesCountToday }} sales, before discount"
+                icon="o-receipt-percent"
+                color="text-base-content"
+                class="text-sm h-full {{ $stat }}"
             />
-        </a>
-        @endif
-        @if($seesRevenue)
-        {{-- What actually reached the drawer, so a cashier can count against it. --}}
-        <x-stat
-            title="Cash Collected · {{ $periodLabel }}"
-            value="₦{{ number_format($cashCollectedToday, 2) }}"
-            description="in the drawer"
-            icon="o-wallet"
-            color="text-success"
-            class="text-sm h-full {{ $stat }}"
-        />
-        @endif
 
-        @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
-        <a href="{{ route('reports.index') }}" class="block">
             <x-stat
-                title="Profit · {{ $periodLabel }}"
-                value="₦{{ number_format($todayProfit, 2) }}"
-                description="Revenue - cost"
-                icon="o-arrow-trending-up"
-                color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
-                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+                title="Discounts"
+                value="₦{{ number_format($discountsGiven, 2) }}"
+                description="given to customers"
+                icon="o-tag"
+                color="{{ $discountsGiven > 0 ? 'text-warning' : 'text-base-content/40' }}"
+                class="text-sm h-full {{ $stat }}"
             />
-        </a>
-        @endif
+
+            <a href="{{ route('debt-book.index') }}" class="block">
+                <x-stat
+                    title="Owed"
+                    value="₦{{ number_format($owedFromPeriod, 2) }}"
+                    description="unpaid on these sales"
+                    icon="o-clock"
+                    color="{{ $owedFromPeriod > 0 ? 'text-error' : 'text-base-content/40' }}"
+                    class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+                />
+            </a>
+
+            <x-stat
+                title="Money Collected"
+                value="₦{{ number_format($cashCollectedToday, 2) }}"
+                description="actually received"
+                icon="o-wallet"
+                color="text-success"
+                class="text-sm h-full {{ $stat }}"
+            />
+
+            @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
+                <a href="{{ route('reports.index') }}" class="block">
+                    <x-stat
+                        title="Profit"
+                        value="₦{{ number_format($todayProfit, 2) }}"
+                        description="after cost of goods"
+                        icon="{{ $todayProfit >= 0 ? 'o-arrow-trending-up' : 'o-arrow-trending-down' }}"
+                        color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
+                        class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+                    />
+                </a>
+            @endif
+        </div>
+
+        {{-- Spell out the arithmetic, so a gap between expected and collected
+             reads as an explanation rather than a discrepancy. --}}
+        <p class="text-xs text-base-content/50 mb-5 tabular-nums">
+            ₦{{ number_format($expectedSales, 2) }} expected
+            − ₦{{ number_format($discountsGiven, 2) }} discount
+            − ₦{{ number_format($owedFromPeriod, 2) }} owed
+            @if($oldDebtRepaid > 0)
+                + ₦{{ number_format($oldDebtRepaid, 2) }} older debt repaid
+            @endif
+            = <span class="font-semibold text-base-content/70">₦{{ number_format($cashCollectedToday, 2) }} collected</span>
+        </p>
+    @endif
+
+    {{-- Stock at a glance. Kept brief: Low Stock and Expiry below carry detail. --}}
+    <div class="grid grid-cols-2 gap-3 mb-5">
         <a href="{{ route('products.index') }}" class="block">
             <x-stat
                 title="Products"
@@ -494,9 +527,9 @@
             <x-stat
                 title="Out of Stock"
                 value="{{ $outOfStock }}"
-                description="Need restocking"
+                description="need restocking"
                 icon="o-exclamation-circle"
-                color="text-error"
+                color="{{ $outOfStock > 0 ? 'text-error' : 'text-success' }}"
                 class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>

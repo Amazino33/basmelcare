@@ -136,6 +136,8 @@ class CashReconciliationTest extends TestCase
             'payment_method' => 'cash', 'at_point_of_sale' => false,
             'received_by' => User::factory()->create()->id,
         ]);
+        // DebtBook::recordPayment() increments this; the debt is now clear.
+        $debt->increment('amount_paid', 500);
 
         $c = $this->dashboard();
 
@@ -150,9 +152,9 @@ class CashReconciliationTest extends TestCase
 
         $html = $this->dashboard()->html();
 
-        $this->assertStringContainsString('Cash Collected', $html);
-        $this->assertStringContainsString('in the drawer', $html);
-        $this->assertStringContainsString('billed', $html);
+        $this->assertStringContainsString('Money Collected', $html);
+        $this->assertStringContainsString('actually received', $html);
+        $this->assertStringContainsString('before discount', $html);
     }
 
     public function test_a_fully_paid_sale_shows_no_gap(): void
@@ -419,5 +421,85 @@ class CashReconciliationTest extends TestCase
         $this->assertEquals(4500, $m['byMethod']['cash'],
             'Financial Records reports cash before change was handed back.');
         $this->assertEquals(500, $m['changeGiven']);
+    }
+    // -- Dashboard money story ----------------------------------------
+
+    public function test_the_five_figures_tell_the_whole_story(): void
+    {
+        $this->theRealTransaction();
+
+        $c = $this->dashboard();
+
+        $this->assertEquals(10800, $c->viewData('expectedSales'), 'Expected sales is the pre-discount total.');
+        $this->assertEquals(700, $c->viewData('discountsGiven'));
+        $this->assertEquals(500, $c->viewData('owedFromPeriod'));
+        $this->assertEquals(9600, $c->viewData('cashCollectedToday'));
+    }
+
+    public function test_the_figures_reconcile(): void
+    {
+        $this->theRealTransaction();
+
+        $c = $this->dashboard();
+
+        // expected - discounts - owed + old repayments = collected
+        $this->assertEquals(
+            $c->viewData('cashCollectedToday'),
+            $c->viewData('expectedSales')
+                - $c->viewData('discountsGiven')
+                - $c->viewData('owedFromPeriod')
+                + $c->viewData('oldDebtRepaid'),
+            'The dashboard figures do not add up.'
+        );
+    }
+
+    public function test_repaying_an_older_debt_counts_as_money_in(): void
+    {
+        // A debt raised before this period, settled today.
+        $customer = Customer::create([
+            'name' => 'Old Debtor', 'type' => 'retail', 'phone' => '08035554444',
+        ]);
+
+        $old = Sale::create([
+            'invoice_number' => 'INV-LAST-MONTH',
+            'user_id' => User::factory()->create(['role' => ['cashier']])->id,
+            'customer_id' => $customer->id,
+            'total_amount' => 2000, 'coupon_discount' => 0,
+            'status' => 'completed', 'payment_details' => ['cash' => 0],
+        ]);
+        $old->forceFill(['created_at' => today()->subMonth()])->saveQuietly();
+
+        $debt = Debt::create([
+            'sale_id' => $old->id, 'customer_id' => $customer->id,
+            'amount_owed' => 2000, 'amount_paid' => 0, 'status' => 'unpaid',
+        ]);
+        $debt->forceFill(['created_at' => today()->subMonth()])->saveQuietly();
+
+        DebtPayment::create([
+            'debt_id' => $debt->id, 'amount' => 2000,
+            'payment_method' => 'cash', 'at_point_of_sale' => false,
+            'received_by' => User::factory()->create()->id,
+        ]);
+
+        $c = $this->dashboard();
+
+        $this->assertEquals(2000, $c->viewData('oldDebtRepaid'));
+        $this->assertEquals(2000, $c->viewData('cashCollectedToday'),
+            'Settling an old debt is money in today.');
+    }
+
+    public function test_the_dashboard_shows_the_arithmetic(): void
+    {
+        $this->theRealTransaction();
+
+        $html = $this->dashboard()->html();
+
+        foreach (['Expected Sales', 'Discounts', 'Owed', 'Money Collected'] as $label) {
+            $this->assertStringContainsString($label, $html);
+        }
+
+        // The reconciliation strip explains the gap in words.
+        $this->assertStringContainsString('expected', $html);
+        $this->assertStringContainsString('collected', $html);
     }
 }
