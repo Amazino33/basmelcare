@@ -19,6 +19,15 @@ class Index extends Component
     use Toast;
 
     public string $search = '';
+
+    /** Set during render when a search matched nothing at all. */
+    public bool $foundNothing = false;
+
+    /** Terms already flagged this session, so a re-render cannot double-log. */
+    public array $notedTerms = [];
+
+    /** The term just flagged, to confirm it briefly in place. */
+    public string $justNoted = '';
     public array $cart = [];
     public ?int $customer_id = null;
     public string $note = '';
@@ -89,6 +98,32 @@ class Index extends Component
         $this->createCustomerModal = false;
         $this->selectCustomer($customer->id);
         $this->success($customer->name . ' created and selected.');
+    }
+
+    /**
+     * Record that a customer actually asked for something we do not stock.
+     *
+     * Deliberate, not automatic: a tap means a person judged this a real
+     * request, which is a far stronger signal than a search that failed.
+     */
+    public function noteMissedDemand(): void
+    {
+        $term = strtoupper(trim($this->search));
+
+        if ($term === '' || in_array($term, $this->notedTerms, true)) {
+            return;
+        }
+
+        \App\Models\FailedSearch::record($term, auth()->id());
+
+        $this->notedTerms[] = $term;
+        $this->justNoted    = $term;
+    }
+
+    public function updatedSearch(): void
+    {
+        // Clear the confirmation as soon as they carry on working.
+        $this->justNoted = '';
     }
 
     public function addToCart($productId)
@@ -358,11 +393,11 @@ class Index extends Component
 
         $fuzzy = $this->fuzzyMatch($base(), $words);
 
-        // Nothing matched, even loosely: someone asked for a drug we do not
-        // stock. That lost sale leaves no other trace in the data.
-        if ($fuzzy->isEmpty()) {
-            \App\Models\FailedSearch::record($term, auth()->id());
-        }
+        // Nothing matched, even loosely. This is NOT recorded automatically:
+        // most failed searches are typos and half-typed words, and a list of
+        // those is ignored rather than acted on. The salesperson confirms it
+        // was a real request — see noteMissedDemand().
+        $this->foundNothing = $fuzzy->isEmpty();
 
         return $fuzzy;
     }

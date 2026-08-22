@@ -191,40 +191,6 @@ class HotProductsTest extends TestCase
         $this->assertSame(0, FailedSearch::count());
     }
 
-    public function test_the_pos_records_a_search_that_finds_nothing(): void
-    {
-        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 1, sales: 1);
-
-        Livewire::actingAs(User::factory()->create(['role' => ['sales'], 'status' => 'active']))
-            ->test(\App\Livewire\Pos\Index::class)
-            ->set('search', 'insulin glargine');
-
-        $this->assertDatabaseHas('failed_searches', ['term' => 'INSULIN GLARGINE']);
-    }
-
-    public function test_a_successful_search_records_nothing(): void
-    {
-        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 1, sales: 1);
-
-        Livewire::actingAs(User::factory()->create(['role' => ['sales'], 'status' => 'active']))
-            ->test(\App\Livewire\Pos\Index::class)
-            ->set('search', 'paracetamol');
-
-        $this->assertSame(0, FailedSearch::count(), 'A search that found a product was logged as missed demand.');
-    }
-
-    public function test_a_typo_that_still_finds_the_drug_records_nothing(): void
-    {
-        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 1, sales: 1);
-
-        // Fuzzy matching rescues this, so it is not missed demand.
-        Livewire::actingAs(User::factory()->create(['role' => ['sales'], 'status' => 'active']))
-            ->test(\App\Livewire\Pos\Index::class)
-            ->set('search', 'paracetmol');
-
-        $this->assertSame(0, FailedSearch::count());
-    }
-
     public function test_missed_demand_appears_on_the_dashboard(): void
     {
         FailedSearch::record('insulin glargine');
@@ -234,5 +200,89 @@ class HotProductsTest extends TestCase
 
         $this->assertStringContainsString('Asked for, not stocked', $html);
         $this->assertStringContainsString('INSULIN GLARGINE', $html);
+    }
+    // -- Capture is opt-in ---------------------------------------------
+
+    private function till(): \Livewire\Features\SupportTesting\Testable
+    {
+        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 1, sales: 1);
+
+        return Livewire::actingAs(User::factory()->create(['role' => ['sales'], 'status' => 'active']))
+            ->test(\App\Livewire\Pos\Index::class);
+    }
+
+    public function test_a_failed_search_is_not_recorded_on_its_own(): void
+    {
+        // Most failed searches are typos; logging them all buries the real ones.
+        $this->till()->set('search', 'insulin glargine');
+
+        $this->assertSame(0, FailedSearch::count(),
+            'A search was recorded without anyone confirming it.');
+    }
+
+    public function test_it_offers_to_record_when_nothing_matches(): void
+    {
+        $c = $this->till()->set('search', 'insulin glargine');
+
+        $c->assertSet('foundNothing', true);
+        $this->assertStringContainsString('Did a customer actually ask for this?', $c->html());
+    }
+
+    public function test_tapping_yes_records_it(): void
+    {
+        $this->till()
+            ->set('search', 'insulin glargine')
+            ->call('noteMissedDemand');
+
+        $this->assertDatabaseHas('failed_searches', ['term' => 'INSULIN GLARGINE', 'times' => 1]);
+    }
+
+    public function test_it_confirms_in_place_rather_than_interrupting(): void
+    {
+        $c = $this->till()
+            ->set('search', 'insulin glargine')
+            ->call('noteMissedDemand');
+
+        $c->assertSet('justNoted', 'INSULIN GLARGINE');
+
+        // The prompt turns into an inline confirmation in the same spot; the
+        // question is gone and nothing was opened over the till.
+        $this->assertStringContainsString('Noted', $c->html());
+        $this->assertStringNotContainsString('Did a customer actually ask for this?', $c->html());
+    }
+
+    public function test_tapping_twice_does_not_double_count(): void
+    {
+        $this->till()
+            ->set('search', 'insulin glargine')
+            ->call('noteMissedDemand')
+            ->call('noteMissedDemand');
+
+        $this->assertSame(1, (int) FailedSearch::first()->times);
+    }
+
+    public function test_typing_again_clears_the_confirmation(): void
+    {
+        $this->till()
+            ->set('search', 'insulin glargine')
+            ->call('noteMissedDemand')
+            ->set('search', 'paracetamol')
+            ->assertSet('justNoted', '');
+    }
+
+    public function test_nothing_is_offered_when_a_product_matches(): void
+    {
+        $c = $this->till()->set('search', 'paracetamol');
+
+        $c->assertSet('foundNothing', false);
+        $this->assertStringNotContainsString('Did a customer actually ask for this?', $c->html());
+    }
+
+    public function test_a_typo_rescued_by_fuzzy_matching_offers_nothing(): void
+    {
+        // The drug was found, so there is no missed demand to record.
+        $c = $this->till()->set('search', 'paracetmol');
+
+        $c->assertSet('foundNothing', false);
     }
 }

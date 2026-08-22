@@ -12,6 +12,27 @@
         <div class="lg:col-span-2 pb-20 lg:pb-0">
             <x-input icon="o-magnifying-glass" placeholder="Search products, SKU or barcode..." wire:model.live.debounce="search" clearable class="mb-3" />
 
+            {{-- Opt-in capture of real demand.
+
+                 Deliberately a single muted line, not an alert or a modal: the
+                 salesperson has a customer in front of them, so this must be
+                 ignorable. Typing again clears it. --}}
+            @if($justNoted !== '')
+                <div class="flex items-center gap-2 mb-3 text-xs text-success">
+                    <x-icon name="o-check-circle" class="w-4 h-4 shrink-0" />
+                    <span>Noted — <span class="font-medium">{{ $justNoted }}</span> added to what customers are asking for.</span>
+                </div>
+            @elseif($foundNothing && $search !== '')
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3 text-xs text-base-content/60">
+                    <span>No match for <span class="font-medium text-base-content/80">"{{ $search }}"</span>.</span>
+                    <span>Did a customer actually ask for this?</span>
+                    <button type="button"
+                            wire:click="noteMissedDemand"
+                            class="link link-primary font-medium">
+                        Yes
+                    </button>
+                </div>
+            @endif
             @if($searchWasFuzzy)
                 {{-- Near-misses must never look like an exact hit on a dispensing screen. --}}
                 <div class="alert alert-warning py-2 mb-3 text-sm gap-2">
