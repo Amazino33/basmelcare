@@ -63,7 +63,20 @@ done
 # ── 2. Pull (one repo covers both apps) ──────────────────────────────
 step "Pulling latest code"
 cd "$ROOT"
+before="$(git rev-parse HEAD)"
 git pull
+after="$(git rev-parse HEAD)"
+
+# Bash reads a script incrementally, so `git pull` above can rewrite THIS FILE
+# while it is still executing. Any step added below the pull is then read from
+# a stale byte offset, or skipped entirely - which is how a deploy can report
+# success while silently doing less than the script says. Re-exec the freshly
+# pulled version once, so what runs is what was committed.
+if [ "$before" != "$after" ] && [ -z "${DEPLOY_REEXECED:-}" ]; then
+    step "Script updated by the pull - restarting with the new version"
+    export DEPLOY_REEXECED=1
+    exec bash "$ROOT/deploy.sh" "$@"
+fi
 
 # ── 3. Per-app deploy ────────────────────────────────────────────────
 for app in "${APPS[@]}"; do
@@ -78,11 +91,33 @@ for app in "${APPS[@]}"; do
     php artisan migrate --force
 
     step "[$name] Ensuring storage symlink"
-    if [ ! -L "$app/public/storage" ]; then
-        ln -s "$app/storage/app/public" "$app/public/storage"
-        echo "    symlink created"
+    link="$app/public/storage"
+    target="$app/storage/app/public"
+    if [ -L "$link" ]; then
+        # A link that points at the wrong place serves nothing. Repoint it.
+        if [ "$(readlink "$link")" != "$target" ]; then
+            rm "$link" && ln -s "$target" "$link"
+            echo "    symlink repointed at $target"
+        else
+            echo "    symlink already present"
+        fi
+    elif [ -d "$link" ]; then
+        # 'ln -s a b' where b is a real directory silently creates b/public
+        # instead of failing, and the deploy reports success while every
+        # uploaded file stays unreachable. Refuse rather than guess.
+        printf '
+!! %s/public/storage is a real directory, not a symlink.
+' "$app"
+        printf '   Uploaded files cannot be served through it.
+'
+        printf '   Move anything inside it into %s, delete it, then re-run.
+
+' "$target"
+        exit 1
     else
-        echo "    symlink already present"
+        mkdir -p "$target"
+        ln -s "$target" "$link"
+        echo "    symlink created"
     fi
 
     step "[$name] Rebuilding caches"
