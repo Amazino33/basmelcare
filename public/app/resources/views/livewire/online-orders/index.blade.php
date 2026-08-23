@@ -205,7 +205,7 @@
                 </div>
 
                 @if($viewOrder->prescription_path)
-                    <a href="{{ asset('storage/' . $viewOrder->prescription_path) }}" class="btn btn-ghost btn-sm btn-block" target="_blank">
+                    <a href="{{ Storage::disk('public_site')->url($viewOrder->prescription_path) }}" class="btn btn-ghost btn-sm btn-block" target="_blank">
                         <x-icon name="o-document" class="w-4 h-4" /> View Prescription
                     </a>
                 @endif

@@ -33,6 +33,27 @@ on_failure() {
 }
 trap on_failure ERR
 
+# ── 0. Pre-flight ────────────────────────────────────────────────────
+# The staff app writes product images into the public site's storage and
+# builds their URLs from PUBLIC_SITE_URL. .env is not in git, so a server
+# that has never been told the shop's address would fall back to localhost
+# and serve broken images. Catch that before anything goes offline.
+step "Checking configuration"
+if ! grep -qE '^PUBLIC_SITE_URL=.+' "$ROOT/public/app/.env"; then
+    printf '
+!! PUBLIC_SITE_URL is not set in public/app/.env
+'
+    printf '   Add the shop address, e.g.
+'
+    printf '     PUBLIC_SITE_URL=https://basmelcare.com
+'
+    printf '   Nothing has been changed. Re-run ./deploy.sh afterwards.
+
+'
+    exit 1
+fi
+echo "    PUBLIC_SITE_URL: $(grep -E '^PUBLIC_SITE_URL=' "$ROOT/public/app/.env" | cut -d= -f2-)"
+
 # ── 1. Maintenance mode ──────────────────────────────────────────────
 step "Taking both apps offline"
 for app in "${APPS[@]}"; do
@@ -72,6 +93,14 @@ for app in "${APPS[@]}"; do
     php artisan route:cache
     php artisan view:cache
 done
+
+# ── 3b. Relocate product images ──────────────────────────────────────
+# Images uploaded before the shared disk existed are sitting in the staff
+# app's own storage, where the shop cannot serve them. This copies them
+# across; it is a no-op once everything is in place, so it is safe to run
+# on every deploy.
+step "[staff app] Moving product images into the public site storage"
+(cd "$ROOT/public/app" && php artisan products:move-images)
 
 # ── 4. Back online ───────────────────────────────────────────────────
 trap - ERR

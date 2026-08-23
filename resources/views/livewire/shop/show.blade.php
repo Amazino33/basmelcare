@@ -8,7 +8,7 @@
         <!-- Image -->
         <div class="bg-base-200 rounded-xl h-64 md:h-80 flex items-center justify-center overflow-hidden">
             @if($product->image)
-                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
+                <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
             @else
                 <x-icon name="o-cube" class="w-20 h-20 text-base-content/15" />
             @endif

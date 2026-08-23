@@ -26,7 +26,7 @@
                     {{-- Thumbnail --}}
                     <div class="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-base-200 flex items-center justify-center border border-base-300">
                         @if($product->image)
-                            <img src="{{ asset('storage/' . $product->image) }}"
+                            <img src="{{ $product->imageUrl() }}"
                                  class="w-full h-full object-cover" alt="{{ $product->name }}">
                         @else
                             <x-icon name="o-photo" class="w-6 h-6 text-base-content/30" />

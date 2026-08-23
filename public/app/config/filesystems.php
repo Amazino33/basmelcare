@@ -38,6 +38,30 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Product images live in the PUBLIC site's storage, not this app's.
+         *
+         * The two applications share a database but not a filesystem, so an
+         * image uploaded here was invisible to the shop: the row said
+         * "products/x.jpg" and the public site looked in its own storage,
+         * where the file had never been written.
+         *
+         * What belongs here is anything the SHOP has to render or that a
+         * customer uploaded through it: product images, and the prescriptions
+         * attached to online orders.
+         *
+         * Medical record attachments stay on the 'public' disk below, on the
+         * staff subdomain, so patient files are never served from the
+         * customer-facing site.
+         */
+        'public_site' => [
+            'driver'     => 'local',
+            'root'       => env('PUBLIC_SITE_STORAGE', base_path('../../storage/app/public')),
+            'url'        => rtrim(env('PUBLIC_SITE_URL', 'http://localhost'), '/') . '/storage',
+            'visibility' => 'public',
+            'throw'      => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

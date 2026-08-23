@@ -157,7 +157,7 @@
         <x-table :headers="$headers" :rows="$products" with-pagination>
             @scope('cell_image', $product)
                 @if($product->image)
-                    <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
+                    <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
                 @else
                     <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center">
                         <x-icon name="o-cube" class="w-5 h-5 text-base-content/30" />
@@ -255,7 +255,7 @@
                         @if($photo)
                             <img src="{{ $photo->temporaryUrl() }}" class="w-20 h-20 rounded object-cover border" />
                         @elseif($existingImage)
-                            <img src="{{ asset('storage/' . $existingImage) }}" class="w-20 h-20 rounded object-cover border" />
+                            <img src="{{ Storage::disk('public_site')->url($existingImage) }}" class="w-20 h-20 rounded object-cover border" />
                         @else
                             <div class="w-20 h-20 rounded bg-base-200 flex items-center justify-center border">
                                 <x-icon name="o-photo" class="w-8 h-8 text-base-content/30" />

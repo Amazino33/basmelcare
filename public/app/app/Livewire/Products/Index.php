@@ -366,7 +366,14 @@ class Index extends Component
         }
 
         if ($this->photo) {
-            $data['image'] = $this->photo->store('products', 'public');
+            // 'products' disk is the PUBLIC site's storage. An image written to
+            // this app's own storage exists only on the staff subdomain, so the
+            // shop renders a broken image for every customer.
+            if ($this->existingImage) {
+                Storage::disk('public_site')->delete($this->existingImage);
+            }
+
+            $data['image'] = $this->photo->store('products', 'public_site');
         }
 
         Product::updateOrCreate(
@@ -411,7 +418,13 @@ class Index extends Component
         if ($this->blockedFromCatalogue()) return;
 
         $this->photo = null;
+
+        if ($this->existingImage) {
+            Storage::disk('public_site')->delete($this->existingImage);
+        }
+
         $this->existingImage = null;
+
         if ($this->productId) {
             Product::where('id', $this->productId)->update(['image' => null]);
         }

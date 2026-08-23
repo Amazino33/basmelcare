@@ -89,7 +89,7 @@
                     <a href="/shop/{{ $product->id }}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
                         <figure class="bg-base-200 h-32 md:h-40 flex items-center justify-center">
                             @if($product->image)
-                                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
+                                <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
                             @else
                                 <x-icon name="o-cube" class="w-12 h-12 text-base-content/20" />
                             @endif

@@ -44,6 +44,21 @@ class Product extends Model
         return (float) $this->selling_price;
     }
 
+    /**
+     * Public URL of the product image, or null.
+     *
+     * Product images are written to the PUBLIC site's storage, so the URL must
+     * be built from that site's address — asset() here would point at the staff
+     * subdomain, where the file does not exist.
+     */
+    public function imageUrl(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+
+        return rtrim((string) config('filesystems.disks.public_site.url'), '/') . '/' . ltrim($this->image, '/');
+    }
     public function category()
     {
         return $this->belongsTo(Category::class);

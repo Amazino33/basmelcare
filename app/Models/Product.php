@@ -40,6 +40,16 @@ class Product extends Model
         return (float) $this->selling_price;
     }
 
+    /**
+     * Public URL of the product image, or null.
+     *
+     * Images are uploaded through the staff app but written into THIS site's
+     * storage, so they are served from here.
+     */
+    public function imageUrl(): ?string
+    {
+        return $this->image ? asset('storage/' . ltrim($this->image, '/')) : null;
+    }
     public function category()
     {
         return $this->belongsTo(Category::class);
