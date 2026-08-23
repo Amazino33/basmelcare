@@ -239,7 +239,9 @@ class Index extends Component
             return;
         }
 
-        $saleId = DB::transaction(function () {
+        // Retried rather than plain DB::transaction: two tills can generate
+        // the same invoice number at the same instant. See Sale::transactWithRetry.
+        $saleId = Sale::transactWithRetry(function () {
             $sale = Sale::create([
                 'invoice_number' => Sale::generateInvoiceNumber(),
                 'wifi_code'      => Sale::generateWifiCode(),

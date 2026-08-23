@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 
 class Sale extends Model
 {
@@ -80,6 +82,55 @@ class Sale extends Model
     public function debt()
     {
         return $this->hasOne(Debt::class);
+    }
+
+    /**
+     * Run a sale-creating transaction, retrying if its invoice number or
+     * Wi-Fi code collided with one another till claimed first.
+     *
+     * generateInvoiceNumber() reads the highest number for today and adds
+     * one. Two tills pressing "create invoice" in the same moment read the
+     * same value and compute the same successor; the unique index rejects
+     * whichever insert lands second. Wrapping it in a transaction does not
+     * help - the row being read does not exist yet, so there is nothing to
+     * lock - and reserving numbers up front would leave gaps whenever a
+     * reservation went unused, which the invoice sequence must not have.
+     *
+     * So let the database arbitrate. The loser's transaction has already
+     * rolled back, stock included, which makes a fresh attempt safe: it
+     * re-reads the sequence and takes the next free number.
+     *
+     * Only identity clashes are retried. Any other unique violation is a
+     * real bug and must surface rather than be run five times over.
+     */
+    public static function transactWithRetry(callable $callback, int $attempts = 5)
+    {
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return DB::transaction($callback);
+            } catch (UniqueConstraintViolationException $e) {
+                if ($attempt >= $attempts || ! static::isIdentityClash($e)) {
+                    throw $e;
+                }
+
+                // Jittered back-off: two tills that collided will otherwise
+                // wake together and collide again on the same next number.
+                usleep(random_int(10000, 60000));
+            }
+        }
+    }
+
+    /**
+     * Driver-independent check that a unique violation was about a sale's
+     * own identity. MySQL names the index ("sales_invoice_number_unique"),
+     * SQLite names the column ("sales.invoice_number"); both mention it.
+     */
+    private static function isIdentityClash(UniqueConstraintViolationException $e): bool
+    {
+        $message = $e->getMessage();
+
+        return str_contains($message, 'invoice_number')
+            || str_contains($message, 'wifi_code');
     }
 
     public static function generateInvoiceNumber(): string
