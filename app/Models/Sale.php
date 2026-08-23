@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\BranchScope;
 use App\Models\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -133,7 +134,15 @@ class Sale extends Model
     public static function generateInvoiceNumber(): string
     {
         $prefix = 'INV-' . now()->format('Ymd') . '-';
-        $last = static::where('invoice_number', 'like', $prefix . '%')
+
+        // Deliberately outside BranchScope. invoice_number is unique across
+        // the whole table, but the scope hides other branches' sales - and a
+        // number this cashier cannot see is still a number they cannot use.
+        // A till whose branch did not ring up the highest sale of the day
+        // would otherwise return that same taken number on every attempt,
+        // failing identically forever rather than intermittently.
+        $last = static::withoutGlobalScope(BranchScope::class)
+            ->where('invoice_number', 'like', $prefix . '%')
             ->orderByDesc('invoice_number')
             ->value('invoice_number');
 
@@ -145,9 +154,11 @@ class Sale extends Model
     /** Cryptographically-random 6-char Wi-Fi code, unique across all sales. */
     public static function generateWifiCode(): string
     {
+        // Outside BranchScope for the same reason: wifi_code is unique across
+        // the whole table, so a code taken by another branch is taken.
         do {
             $code = static::randomCode();
-        } while (static::where('wifi_code', $code)->exists());
+        } while (static::withoutGlobalScope(BranchScope::class)->where('wifi_code', $code)->exists());
 
         return $code;
     }
