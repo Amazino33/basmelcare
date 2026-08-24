@@ -14,9 +14,14 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * "Hot" is measured three ways because they disagree: the drug that moves the
- * most units can be the one that earns the least. Reporting one number would
- * hide that, so units, revenue and profit are each ranked.
+ * "Hot" is measured three ways because they disagree: the drug asked for most
+ * often can be the one that earns the least. Reporting one number would hide
+ * that, so demand, revenue and profit are each ranked.
+ *
+ * Demand is counted in SALES, not units. Quantity adds up things that are not
+ * the same kind of thing - a pharmacy sells vitamin C as loose tablets and
+ * antibiotics as packs - so ranking by it only ever finds whatever is sold in
+ * the smallest unit.
  *
  * Failed searches capture the opposite - demand that produced no sale at all,
  * and therefore appears in no sales report.
@@ -78,14 +83,14 @@ class HotProductsTest extends TestCase
 
     public function test_the_three_measures_can_disagree(): void
     {
-        // Cheap, high volume, thin margin.
-        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 125, sales: 5);
-        // Dearer, lower volume, fat margin.
-        $this->sell('CIPROFLOXACIN', price: 1730, cost: 1100, qty: 45, sales: 9);
+        // Cheap, asked for constantly, thin margin.
+        $this->sell('PARACETAMOL', price: 160, cost: 85, qty: 24, sales: 12);
+        // Dear, asked for rarely, fat margin.
+        $this->sell('CIPROFLOXACIN', price: 1730, cost: 1100, qty: 9, sales: 3);
 
         $hot = $this->dashboard()->viewData('hot');
 
-        $this->assertSame('PARACETAMOL', $hot['byUnits']->first()->name);
+        $this->assertSame('PARACETAMOL', $hot['byTimesSold']->first()->name);
         $this->assertSame('CIPROFLOXACIN', $hot['byRevenue']->first()->name);
         $this->assertSame('CIPROFLOXACIN', $hot['byProfit']->first()->name,
             'The most profitable product should not be assumed to be the best seller.');
@@ -108,13 +113,19 @@ class HotProductsTest extends TestCase
         // Same units spread over many sales is real demand.
         $this->sell('METFORMIN', price: 1200, cost: 700, qty: 25, sales: 5);
 
-        $rows = $this->dashboard()->viewData('hot')['byUnits'];
+        $rows = $this->dashboard()->viewData('hot')['byTimesSold'];
 
         $bulk   = $rows->firstWhere('name', 'AMLODIPINE');
         $steady = $rows->firstWhere('name', 'METFORMIN');
 
         $this->assertSame(1, (int) $bulk->times_sold);
         $this->assertSame(5, (int) $steady->times_sold);
+
+        // And the ranking must follow that, not the quantity: both sold 25
+        // units, so a units ranking would call them equal - or worse, put a
+        // single bulk buyer above a week of steady demand.
+        $this->assertSame('METFORMIN', $rows->first()->name,
+            'A one-off bulk order outranked repeat custom.');
     }
 
     public function test_unsettled_sales_are_excluded(): void
@@ -135,7 +146,7 @@ class HotProductsTest extends TestCase
 
         $hot = $this->dashboard()->viewData('hot');
 
-        $this->assertCount(5, $hot['byUnits']);
+        $this->assertCount(5, $hot['byTimesSold']);
         $this->assertCount(5, $hot['byProfit']);
     }
 
@@ -145,7 +156,8 @@ class HotProductsTest extends TestCase
 
         $html = $this->dashboard()->html();
 
-        $this->assertStringContainsString('Most units sold', $html);
+        $this->assertStringContainsString('Bought most often', $html);
+        $this->assertStringNotContainsString('Most units sold', $html);
         $this->assertStringContainsString('Most revenue', $html);
         $this->assertStringContainsString('Most profit', $html);
     }

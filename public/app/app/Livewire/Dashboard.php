@@ -347,10 +347,15 @@ class Dashboard extends Component
         $top = fn(string $col) => $rows->sortByDesc(fn($r) => (float) $r->$col)->take(5)->values();
 
         return [
-            'byUnits'   => $top('units'),
-            'byRevenue' => $top('revenue'),
-            'byProfit'  => $top('profit'),
-            'any'       => $rows->isNotEmpty(),
+            // Ranked by how many separate sales included the product, not by
+            // quantity. Quantity sums things that are not comparable: 60 loose
+            // vitamin C tablets and one pack of antibiotics both count as
+            // "quantity", so ranking by it only ever finds whatever is sold in
+            // the smallest unit.
+            'byTimesSold' => $top('times_sold'),
+            'byRevenue'   => $top('revenue'),
+            'byProfit'    => $top('profit'),
+            'any'         => $rows->isNotEmpty(),
         ];
     }
 

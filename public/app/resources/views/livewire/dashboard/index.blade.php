@@ -723,9 +723,9 @@
     @if(array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']))
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
             @foreach([
-                ['key' => 'byUnits',   'title' => 'Most units sold',  'sub' => 'what walks out of the door', 'metric' => 'units',   'money' => false],
-                ['key' => 'byRevenue', 'title' => 'Most revenue',     'sub' => 'biggest sellers by value',   'metric' => 'revenue', 'money' => true],
-                ['key' => 'byProfit',  'title' => 'Most profit',      'sub' => 'what actually earns',        'metric' => 'profit',  'money' => true],
+                ['key' => 'byTimesSold', 'title' => 'Bought most often', 'sub' => 'how many customers asked for it', 'metric' => 'times_sold', 'money' => false],
+                ['key' => 'byRevenue',   'title' => 'Most revenue',      'sub' => 'biggest sellers by value',        'metric' => 'revenue',    'money' => true],
+                ['key' => 'byProfit',    'title' => 'Most profit',       'sub' => 'what actually earns',             'metric' => 'profit',     'money' => true],
             ] as $panel)
                 <x-card :title="$panel['title']" :subtitle="$panel['sub']">
                     @forelse($hot[$panel['key']] as $i => $row)
@@ -734,7 +734,11 @@
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-medium truncate">{{ $row->name }}</div>
                                 <div class="text-xs text-base-content/50">
-                                    {{ $row->times_sold }} {{ \Illuminate\Support\Str::plural('sale', $row->times_sold) }}
+                                    @if($panel['key'] === 'byTimesSold')
+                                        {{ number_format((float) $row->units) }} {{ \Illuminate\Support\Str::plural('unit', (float) $row->units) }} in total
+                                    @else
+                                        {{ $row->times_sold }} {{ \Illuminate\Support\Str::plural('sale', $row->times_sold) }}
+                                    @endif
                                     @if($row->times_sold == 1 && $row->units > 5)
                                         <span class="text-warning">· one bulk order</span>
                                     @endif
@@ -744,7 +748,7 @@
                                 @if($panel['money'])
                                     ₦{{ number_format((float) $row->{$panel['metric']}, 0) }}
                                 @else
-                                    {{ number_format((float) $row->{$panel['metric']}) }}
+                                    {{ number_format((float) $row->{$panel['metric']}) }}@if($panel['key'] === 'byTimesSold')<span class="font-normal text-base-content/50 text-xs"> {{ \Illuminate\Support\Str::plural('sale', (float) $row->times_sold) }}</span>@endif
                                 @endif
                             </span>
                         </div>
@@ -755,13 +759,13 @@
             @endforeach
         </div>
 
-        @if($hot['any'] && $hot['byUnits']->first() && $hot['byProfit']->first()
-            && $hot['byUnits']->first()->id !== $hot['byProfit']->first()->id)
+        @if($hot['any'] && $hot['byTimesSold']->first() && $hot['byProfit']->first()
+            && $hot['byTimesSold']->first()->id !== $hot['byProfit']->first()->id)
             {{-- Worth saying out loud: the busiest product is not the earner. --}}
             <div class="alert alert-info py-2 mt-3 text-sm gap-2">
                 <x-icon name="o-light-bulb" class="w-4 h-4 shrink-0" />
                 <span>
-                    <strong>{{ $hot['byUnits']->first()->name }}</strong> moves the most units,
+                    <strong>{{ $hot['byTimesSold']->first()->name }}</strong> is asked for most often,
                     but <strong>{{ $hot['byProfit']->first()->name }}</strong> earns you the most
                     (₦{{ number_format((float) $hot['byProfit']->first()->profit, 0) }}).
                 </span>
