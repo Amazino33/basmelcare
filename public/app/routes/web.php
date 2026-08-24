@@ -87,6 +87,13 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('reports', App\Livewire\Reports\Index::class)->name('reports.index');
         });
 
+        // The printed Top Products sheet shows margin, so it is narrower than
+        // Reports itself: the auditor reaches that page but not this one.
+        Route::middleware('role:admin,branch_manager')->group(function () {
+            Route::get('reports/top-products/print', App\Http\Controllers\TopProductsPrintController::class)
+                ->name('reports.top-products.print');
+        });
+
         // Expenses (admin, branch_manager, cashier)
         Route::middleware('role:admin,branch_manager,cashier')->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');

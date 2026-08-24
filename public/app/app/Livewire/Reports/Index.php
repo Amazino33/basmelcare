@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
+use App\Support\TopProducts;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -23,6 +24,17 @@ class Index extends Component
         $this->dateTo = now()->format('Y-m-d');
     }
 
+    /**
+     * Revenue and profit rankings expose margin, so this report is limited to
+     * the roles that already see it on the dashboard. The auditor can open
+     * Reports but is deliberately not one of them - their margin view lives in
+     * Financial Records, where it is presented with the rest of the picture.
+     */
+    public function canSeeTopProducts(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
+    }
+
     public function export(): StreamedResponse
     {
         return match ($this->reportType) {
@@ -32,6 +44,7 @@ class Index extends Component
             'expiry' => $this->exportExpiry(),
             'debts' => $this->exportDebts(),
             'movements' => $this->exportMovements(),
+            'top-products' => $this->exportTopProducts(),
             default => $this->exportSales(),
         };
     }
@@ -105,6 +118,40 @@ class Index extends Component
         return $this->streamCsv('movements-report.csv', ['Date', 'Product', 'Batch', 'Type', 'Qty', 'From', 'To', 'Reference', 'By'], $movements->map(fn($m) => [
             $m->created_at->format('Y-m-d H:i'), $m->batch->product->name, $m->batch->batch_number, $m->type, $m->quantity, $m->fromLocation?->name ?? '—', $m->toLocation?->name ?? '—', $m->reference ?? '', $m->user?->name ?? '—',
         ])->toArray());
+    }
+
+    private function exportTopProducts(): StreamedResponse
+    {
+        abort_unless($this->canSeeTopProducts(), 403);
+
+        $rows = TopProducts::rows($this->from(), $this->to())
+            ->sortByDesc(fn ($row) => (float) $row->times_sold)
+            ->map(fn ($row) => [
+                $row->name,
+                (int) $row->times_sold,
+                (int) $row->units,
+                number_format((float) $row->revenue, 2, '.', ''),
+                number_format((float) $row->profit, 2, '.', ''),
+            ])
+            ->values()
+            ->all();
+
+        return $this->streamCsv(
+            'top-products-' . $this->dateFrom . '-to-' . $this->dateTo . '.csv',
+            ['Product', 'Times sold', 'Units', 'Revenue', 'Profit'],
+            $rows
+        );
+    }
+
+    /** Whole days, so a report "to" today includes everything sold today. */
+    private function from()
+    {
+        return \Carbon\Carbon::parse($this->dateFrom)->startOfDay();
+    }
+
+    private function to()
+    {
+        return \Carbon\Carbon::parse($this->dateTo)->endOfDay();
     }
 
     private function streamCsv(string $filename, array $headers, array $rows): StreamedResponse

@@ -14,6 +14,7 @@ use App\Models\PurchaseOrder;
 use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Support\TopProducts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
@@ -331,32 +332,8 @@ class Dashboard extends Component
      */
     private function hotProducts($from, $to): array
     {
-        $rows = DB::table('sale_items')
-            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
-            ->join('products', 'products.id', '=', 'sale_items.product_id')
-            ->whereIn('sales.status', ['paid', 'completed'])
-            ->whereBetween('sales.created_at', [$from, $to])
-            ->groupBy('products.id', 'products.name')
-            ->selectRaw('products.id, products.name,
-                         SUM(sale_items.quantity) AS units,
-                         COUNT(DISTINCT sales.id) AS times_sold,
-                         SUM(sale_items.subtotal) AS revenue,
-                         SUM(sale_items.subtotal - sale_items.cost_price * sale_items.quantity) AS profit')
-            ->get();
-
-        $top = fn(string $col) => $rows->sortByDesc(fn($r) => (float) $r->$col)->take(5)->values();
-
-        return [
-            // Ranked by how many separate sales included the product, not by
-            // quantity. Quantity sums things that are not comparable: 60 loose
-            // vitamin C tablets and one pack of antibiotics both count as
-            // "quantity", so ranking by it only ever finds whatever is sold in
-            // the smallest unit.
-            'byTimesSold' => $top('times_sold'),
-            'byRevenue'   => $top('revenue'),
-            'byProfit'    => $top('profit'),
-            'any'         => $rows->isNotEmpty(),
-        ];
+        // Shared with the printed Top Products report - see App\Support\TopProducts.
+        return TopProducts::between($from, $to);
     }
 
     /** Searches at the till that found nothing — demand we could not meet. */
