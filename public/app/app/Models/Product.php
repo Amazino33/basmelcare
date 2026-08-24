@@ -13,13 +13,15 @@ class Product extends Model
     use RecordsAudit;
 
     /** Prices drive revenue and margin, so changes must be attributable. */
-    protected array $audited = ['selling_price', 'wholesale_price', 'wholesale_markup_percent'];
+    protected array $audited = ['selling_price', 'wholesale_price', 'wholesale_markup_percent', 'pack_price'];
 
     private static ?float $defaultMarkup = null;
 
     protected $fillable = [
         'name', 'sku', 'category_id', 'selling_price', 'wholesale_price',
-        'wholesale_min_qty', 'wholesale_markup_percent', 'reorder_level', 'description', 'image', 'barcode',
+        'wholesale_min_qty', 'wholesale_markup_percent',
+        'has_pack', 'pack_size', 'pack_price',
+        'reorder_level', 'description', 'image', 'barcode',
         'requires_prescription', 'is_featured', 'show_in_shop',
     ];
 
@@ -27,6 +29,8 @@ class Product extends Model
         'selling_price' => 'decimal:2',
         'wholesale_price' => 'decimal:2',
         'wholesale_markup_percent' => 'decimal:2',
+        'has_pack' => 'boolean',
+        'pack_price' => 'decimal:2',
         'requires_prescription' => 'boolean',
         'is_featured' => 'boolean',
         'show_in_shop' => 'boolean',
@@ -35,10 +39,7 @@ class Product extends Model
 
     public function getPriceFor(?Customer $customer, int $qty = 1): float
     {
-        $qualifies = ($customer && $customer->type === 'wholesale')
-            || ($this->wholesale_min_qty && $qty >= $this->wholesale_min_qty);
-
-        if (! $qualifies) {
+        if (! $this->qualifiesForWholesale($customer, $qty)) {
             return (float) $this->selling_price;
         }
 
@@ -50,6 +51,54 @@ class Product extends Model
         }
 
         return $this->calculatedWholesalePrice() ?? (float) $this->selling_price;
+    }
+
+    /**
+     * Wholesale applies either because of who is buying or how much of it.
+     *
+     * Shared so that pack pricing asks the same question as unit pricing;
+     * two copies of this rule would drift.
+     */
+    private function qualifiesForWholesale(?Customer $customer, int $qty): bool
+    {
+        return ($customer && $customer->type === 'wholesale')
+            || ($this->wholesale_min_qty && $qty >= $this->wholesale_min_qty);
+    }
+
+    /** Sold in packs as well as singly, and priced for it. */
+    public function sellsInPacks(): bool
+    {
+        return (bool) $this->has_pack
+            && (int) $this->pack_size > 1
+            && $this->pack_price !== null;
+    }
+
+    /**
+     * What one pack costs this customer.
+     *
+     * Retail buyers pay the pack price typed into the product, which is how a
+     * pack can be cheaper than the same tablets bought loose.
+     *
+     * Wholesale buyers do NOT: they pay their per-unit price multiplied by the
+     * pack size. Wholesale pricing is already derived from cost per unit, so it
+     * scales on its own, and a pack is then just a quicker way of entering
+     * twenty tablets. It also means the wholesale margin is protected even if
+     * the retail pack price is set below cost by mistake - and that a
+     * wholesaler is never better off buying loose.
+     */
+    public function packPriceFor(?Customer $customer, int $packs = 1): ?float
+    {
+        if (! $this->sellsInPacks()) {
+            return null;
+        }
+
+        $units = $packs * (int) $this->pack_size;
+
+        if ($this->qualifiesForWholesale($customer, $units)) {
+            return round($this->getPriceFor($customer, $units) * $this->pack_size, 2);
+        }
+
+        return (float) $this->pack_price;
     }
 
     /**

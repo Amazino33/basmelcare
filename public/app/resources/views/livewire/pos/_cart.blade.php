@@ -5,11 +5,27 @@
                 <div class="flex-1 min-w-0">
                     <div class="font-semibold text-xs truncate">{{ $item['name'] }}</div>
                     <div class="text-xs text-base-content/60">
-                        ₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}
+                        @if($item['is_pack'])
+                            {{-- Show the pack price, since that is what was quoted --}}
+                            ₦{{ number_format($item['subtotal'] / max($item['qty'], 1), 2) }} × {{ $item['qty'] }}
+                            {{ Str::plural('pack', $item['qty']) }} of {{ $item['pack_size'] }}
+                            <span class="opacity-60">({{ $item['units'] }} units)</span>
+                        @else
+                            ₦{{ number_format($item['unit_price'], 2) }} × {{ $item['qty'] }}
+                        @endif
+
                         @if($item['unit_price'] < $item['retail_price'])
                             <span class="text-info">(w/s)</span>
                         @endif
                     </div>
+
+                    @if($item['pack_size'])
+                        {{-- One tap to switch how this line is being sold --}}
+                        <button type="button" wire:click="togglePack('{{ $key }}')"
+                                class="mt-1 text-[11px] font-semibold {{ $item['is_pack'] ? 'text-primary' : 'text-base-content/50' }} hover:underline">
+                            {{ $item['is_pack'] ? '↺ sell loose instead' : '↻ sell as pack of ' . $item['pack_size'] }}
+                        </button>
+                    @endif
                 </div>
                 <input type="number" wire:change="updateQty('{{ $key }}', $event.target.value)" value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}" class="input input-xs input-bordered w-14 text-center" />
                 <x-button icon="o-x-mark" wire:click="removeFromCart('{{ $key }}')" class="btn-xs btn-ghost text-error" />

@@ -81,7 +81,14 @@
                     <div class="item-batch">Batch: {{ $item->batch->batch_number }}</div>
                 @endif
                 <div class="row item-detail">
-                    <span>{{ $item->quantity }} x ₦{{ number_format($item->unit_price, 2) }}</span>
+                    @if($item->is_pack && $item->pack_size)
+                        {{-- quantity is stored in units; the customer bought packs --}}
+                        @php $packs = intdiv((int) $item->quantity, (int) $item->pack_size); @endphp
+                        <span>{{ $packs }} {{ Str::plural('pack', $packs) }} of {{ $item->pack_size }}
+                            x ₦{{ number_format($item->subtotal / max($packs, 1), 2) }}</span>
+                    @else
+                        <span>{{ $item->quantity }} x ₦{{ number_format($item->unit_price, 2) }}</span>
+                    @endif
                     <span>₦{{ number_format($item->subtotal, 2) }}</span>
                 </div>
             </div>

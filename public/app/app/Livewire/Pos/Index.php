@@ -141,52 +141,167 @@ class Index extends Component
         $key = $productId . '-' . $batch->id;
 
         if (isset($this->cart[$key])) {
-            if ($this->cart[$key]['qty'] >= $batch->quantity) {
-                $this->error('Not enough stock in this batch.');
-                return;
+            // Tapping again means one more of the product, which may have to
+            // come from a later batch once this one is used up. Re-laying the
+            // whole allocation handles that in one place.
+            $line   = $this->cart[$key];
+            $inCart = 0;
+
+            foreach ($this->cart as $existing) {
+                if ((int) $existing['product_id'] === (int) $productId) {
+                    $inCart += (int) $existing['qty'];
+                }
             }
-            $this->cart[$key]['qty']++;
-            $price = $product->getPriceFor($customer, $this->cart[$key]['qty']);
-            $this->cart[$key]['unit_price'] = $price;
-            $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $price;
+
+            if ($this->allocate($productId, $inCart + 1, (bool) $line['is_pack'],
+                    $line['pack_size'] ? (int) $line['pack_size'] : null, $line) > 0) {
+                $this->error('No more stock for this product.');
+            }
+
+            $this->saveCartToSession();
+            return;
         } else {
-            $price = $product->getPriceFor($customer, 1);
             $this->cart[$key] = [
                 'product_id' => $product->id,
                 'batch_id' => $batch->id,
                 'name' => $product->name,
                 'batch_number' => $batch->batch_number,
-                'unit_price' => $price,
+                'unit_price' => 0.0,
                 'retail_price' => (float) $product->selling_price,
-                'wholesale_price' => $product->wholesale_price ? (float) $product->wholesale_price : null,
-                'wholesale_min_qty' => $product->wholesale_min_qty,
+                // Cost is per unit and stays that way whether the line is sold
+                // loose or by the pack. Profit is computed as subtotal minus
+                // cost_price times quantity, and quantity is always in units,
+                // so this is the only reading that keeps that true.
                 'cost_price' => (float) $batch->cost_price,
                 'qty' => 1,
-                'subtotal' => $price,
-                'max_qty' => $batch->quantity,
+                'units' => 1,
+                'subtotal' => 0.0,
+                'is_pack' => false,
+                'pack_size' => $product->sellsInPacks() ? (int) $product->pack_size : null,
+                'max_qty' => (int) $batch->quantity,
             ];
         }
+
+        $this->resolvePrice($key);
         $this->saveCartToSession();
     }
 
+    /**
+     * Set how much of this product the customer is taking.
+     *
+     * The number typed is the TOTAL for the product, not for the one line it
+     * was typed into. A line is tied to a single batch, and a large order is
+     * spread over several, so "400" has to mean four hundred tablets rather
+     * than four hundred more on top of whatever is already allocated.
+     */
     public function updateQty($key, $qty)
     {
-        if (!isset($this->cart[$key])) return;
+        if (! isset($this->cart[$key])) return;
 
-        $qty = (int) $qty;
+        $line = $this->cart[$key];
+        $qty  = (int) $qty;
+
         if ($qty <= 0) {
-            unset($this->cart[$key]);
+            $this->removeProduct((int) $line['product_id']);
+            $this->saveCartToSession();
             return;
         }
 
-        if ($qty > $this->cart[$key]['max_qty']) {
-            $this->error('Only ' . $this->cart[$key]['max_qty'] . ' available.');
-            return;
-        }
+        $short = $this->allocate(
+            (int) $line['product_id'],
+            $qty,
+            (bool) $line['is_pack'],
+            $line['pack_size'] ? (int) $line['pack_size'] : null,
+            $line
+        );
 
-        $this->cart[$key]['qty'] = $qty;
-        $this->resolvePrice($key);
         $this->saveCartToSession();
+
+        if ($short > 0) {
+            $unit = $line['is_pack'] ? 'packs' : 'units';
+            $this->error('Short by ' . $short . ' ' . $unit . ' - that is all the stock there is.');
+        }
+    }
+
+    /**
+     * Lay a product's quantity across its batches, earliest expiry first.
+     *
+     * Rebuilt from scratch each time rather than adjusted, so the allocation
+     * cannot drift out of step with what was asked for. Each line carries ITS
+     * OWN batch cost: profit is subtotal minus cost_price times quantity, per
+     * line, so copying one batch's cost across the rest would misstate the
+     * margin on every delivery but the first.
+     *
+     * @return int  how much of the request could not be met
+     */
+    private function allocate(int $productId, int $wanted, bool $asPack, ?int $packSize, array $template): int
+    {
+        $this->removeProduct($productId);
+
+        $batches = Batch::where('product_id', $productId)
+            ->where('quantity', '>', 0)
+            ->orderBy('expiry_date')
+            ->get();
+
+        $remaining = $wanted;
+
+        foreach ($batches as $batch) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $capacity = $asPack
+                ? (int) floor($batch->quantity / max((int) $packSize, 1))
+                : (int) $batch->quantity;
+
+            if ($capacity < 1) {
+                // A pack is a sealed card - it cannot be made up out of two
+                // deliveries, so a batch holding less than one is skipped.
+                continue;
+            }
+
+            $take = min($capacity, $remaining);
+            $key  = $productId . '-' . $batch->id;
+
+            $this->cart[$key] = [
+                'product_id'   => $productId,
+                'batch_id'     => $batch->id,
+                'name'         => $template['name'],
+                'batch_number' => $batch->batch_number,
+                'unit_price'   => 0.0,
+                'retail_price' => $template['retail_price'],
+                'cost_price'   => (float) $batch->cost_price,
+                'qty'          => $take,
+                'units'        => 0,
+                'subtotal'     => 0.0,
+                'is_pack'      => $asPack,
+                'pack_size'    => $packSize,
+                'max_qty'      => $capacity,
+            ];
+
+            $remaining -= $take;
+        }
+
+        // Priced only once the whole allocation exists: whether wholesale
+        // applies depends on the total across every batch, not on what landed
+        // on any single line.
+        foreach (array_keys($this->cart) as $key) {
+            if ((int) $this->cart[$key]['product_id'] === $productId) {
+                $this->resolvePrice($key);
+            }
+        }
+
+        return $remaining;
+    }
+
+    /** Drop every line belonging to one product. */
+    private function removeProduct(int $productId): void
+    {
+        foreach (array_keys($this->cart) as $key) {
+            if ((int) $this->cart[$key]['product_id'] === $productId) {
+                unset($this->cart[$key]);
+            }
+        }
     }
 
     public function removeFromCart($key)
@@ -214,22 +329,122 @@ class Index extends Component
         }
     }
 
-    private function resolvePrice(string $key)
+    /**
+     * Price one cart line for the customer currently selected.
+     *
+     * Asks the product rather than reimplementing the rule. This method used
+     * to carry its own copy of the wholesale logic, which then failed to learn
+     * about prices calculated from stock cost - so changing a quantity snapped
+     * the line back to the retail price.
+     *
+     * qty is what the operator typed: packs when the line is set to packs,
+     * otherwise loose units. Everything downstream works in units.
+     */
+    private function resolvePrice(string $key): void
     {
         $item = &$this->cart[$key];
-        $customer = $this->customer_id ? Customer::find($this->customer_id) : null;
-        $isWholesale = $customer && $customer->type === 'wholesale';
 
-        if ($isWholesale && $item['wholesale_price']) {
-            $price = $item['wholesale_price'];
-        } elseif ($item['wholesale_price'] && $item['wholesale_min_qty'] && $item['qty'] >= $item['wholesale_min_qty']) {
-            $price = $item['wholesale_price'];
-        } else {
-            $price = $item['retail_price'];
+        $product = Product::find($item['product_id']);
+
+        if (! $product) {
+            return;
         }
 
+        $customer = $this->customer_id ? Customer::find($this->customer_id) : null;
+
+        $item['units'] = $units = $this->unitsFor($item);
+
+        // A large order can be split across several batches, so the quantity
+        // that decides whether wholesale applies is the total of this product
+        // in the cart - not what happens to sit on this one line. Otherwise
+        // asking for 200 against a minimum of 100 would lose the discount
+        // simply because stock arrived in two deliveries.
+        $qualifyingUnits = $this->unitsOfProductInCart($item['product_id']);
+
+        if ($item['is_pack']) {
+            $packPrice = $product->packPriceFor($customer, (int) ceil($qualifyingUnits / max((int) $item['pack_size'], 1)));
+
+            if ($packPrice !== null) {
+                // subtotal is authoritative: a pack price need not divide
+                // evenly by the pack size, and money must not drift by a kobo
+                // per line. unit_price is carried for the receipt.
+                $item['subtotal']   = round($item['qty'] * $packPrice, 2);
+                $item['unit_price'] = round($item['subtotal'] / max($units, 1), 2);
+
+                return;
+            }
+
+            // Pack pricing withdrawn since it was added to the cart.
+            $item['is_pack'] = false;
+            $units = $this->unitsFor($item);
+        }
+
+        $price = $product->getPriceFor($customer, $qualifyingUnits);
+
         $item['unit_price'] = $price;
-        $item['subtotal'] = $item['qty'] * $price;
+        $item['subtotal']   = round($units * $price, 2);
+    }
+
+    /** Total units of one product across every line in the cart. */
+    private function unitsOfProductInCart(int $productId): int
+    {
+        $total = 0;
+
+        foreach ($this->cart as $line) {
+            if ((int) $line['product_id'] === $productId) {
+                $total += $this->unitsFor($line);
+            }
+        }
+
+        return max($total, 1);
+    }
+
+    /** Units of stock a line represents, whichever way it is being sold. */
+    private function unitsFor(array $item): int
+    {
+        return ($item['is_pack'] ?? false)
+            ? (int) $item['qty'] * (int) ($item['pack_size'] ?: 1)
+            : (int) $item['qty'];
+    }
+
+    /**
+     * Switch a line between loose units and packs.
+     *
+     * Quantity resets to one rather than being converted: "3" meaning three
+     * tablets and "3" meaning three packs are different enough orders that
+     * carrying the number across would be a way to sell thirty by accident.
+     */
+    public function togglePack(string $key): void
+    {
+        if (! isset($this->cart[$key]) || ! $this->cart[$key]['pack_size']) {
+            return;
+        }
+
+        $item = &$this->cart[$key];
+
+        $item['is_pack'] = ! $item['is_pack'];
+        $item['qty']     = 1;
+        $item['max_qty'] = $this->maxQtyFor($item);
+
+        if ($item['max_qty'] < 1) {
+            // Not enough stock for even one pack.
+            $item['is_pack'] = false;
+            $item['max_qty'] = $this->maxQtyFor($item);
+            $this->error('Not enough stock for a full pack.');
+        }
+
+        $this->resolvePrice($key);
+        $this->saveCartToSession();
+    }
+
+    /** The most the operator can enter, in whichever unit the line uses. */
+    private function maxQtyFor(array $item): int
+    {
+        $inStock = (int) Batch::where('id', $item['batch_id'])->value('quantity');
+
+        return ($item['is_pack'] ?? false)
+            ? (int) floor($inStock / max((int) $item['pack_size'], 1))
+            : $inStock;
     }
 
     public function createInvoice()
@@ -253,21 +468,30 @@ class Index extends Component
             ]);
 
             foreach ($this->cart as $item) {
+                // quantity is ALWAYS units, never packs. Every profit and
+                // margin figure in the system is subtotal minus cost_price
+                // times quantity, and cost_price is per unit - so recording
+                // packs here would overstate profit by the pack size.
+                $units = $item['units'];
+
                 SaleItem::create([
                     'sale_id' => $sale->id,
                     'product_id' => $item['product_id'],
                     'batch_id' => $item['batch_id'],
-                    'quantity' => $item['qty'],
+                    'quantity' => $units,
                     'unit_price' => $item['unit_price'],
                     'cost_price' => $item['cost_price'],
                     'subtotal' => $item['subtotal'],
+                    // Presentation only: lets a receipt say "2 packs of 10".
+                    'is_pack' => $item['is_pack'],
+                    'pack_size' => $item['is_pack'] ? $item['pack_size'] : null,
                 ]);
 
-                Batch::where('id', $item['batch_id'])->decrement('quantity', $item['qty']);
+                Batch::where('id', $item['batch_id'])->decrement('quantity', $units);
 
                 StockMovement::create([
                     'batch_id' => $item['batch_id'],
-                    'quantity' => -$item['qty'],
+                    'quantity' => -$units,
                     'type' => 'sale',
                     'reference' => $sale->invoice_number,
                     'user_id' => auth()->id(),

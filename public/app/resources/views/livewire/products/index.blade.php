@@ -338,6 +338,30 @@
 
                 <x-input label="Wholesale Markup" wire:model="wholesale_markup_percent" type="number" step="0.01" min="0" max="100" suffix="%"
                          hint="Leave empty to use the pharmacy default. Only applies when no wholesale price is set above." />
+
+                <div class="md:col-span-2 rounded-lg border border-base-300 p-4">
+                    <x-checkbox label="Also sold as a pack" wire:model.live="has_pack"
+                                hint="A card, strip or bottle sold whole, as well as loose" />
+
+                    @if($has_pack)
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                            <x-input label="Units per pack" wire:model="pack_size" type="number" min="2"
+                                     hint="e.g. 10 tablets in a card" />
+                            <x-input label="Pack price" wire:model="pack_price" prefix="₦" type="number" step="0.01"
+                                     hint="What a retail customer pays for one whole pack" />
+                        </div>
+
+                        <p class="text-xs text-base-content/60 mt-3">
+                            Stock is always counted in single units. Selling one pack of
+                            {{ $pack_size ?: '?' }} takes {{ $pack_size ?: '?' }} off the shelf.
+                        </p>
+                        <p class="text-xs text-base-content/60 mt-1">
+                            Wholesale customers are not charged this price &mdash; they pay their own
+                            per-unit rate multiplied by the pack size, so a pack is never a worse
+                            deal for them than buying loose.
+                        </p>
+                    @endif
+                </div>
                 <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
                 <div class="md:col-span-2">
                     <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
