@@ -87,11 +87,6 @@ class Index extends Component
     public bool $importModal = false;
     public array $importResults = [];
 
-    // Bulk edit
-    public bool $bulkEditMode    = false;
-    public array $bulkEdits      = [];
-    public bool $bulkApplyMarkup = false;
-
     private function calculateSellingPrice(float $cost): string
     {
         return (string) (ceil(($cost * 1.4) / 100) * 100);
@@ -105,105 +100,68 @@ class Index extends Component
         }
     }
 
-    public function toggleBulkEdit(): void
+    // ── Correcting a batch ──────────────────────────────────────────────
+    //
+    // Cost price and expiry could only ever be set when a batch was created,
+    // so a typo was uncorrectable through the interface. That matters more
+    // than it used to: cost drives profit, and since wholesale prices are
+    // derived from the dearest batch in stock, a wrong cost quietly misprices
+    // every wholesale sale of that drug.
+    //
+    // Quantity is deliberately NOT here. Changing how much stock exists is a
+    // physical claim that needs a reason and a note, which Stock Adjustments
+    // already asks for; correcting a mistyped number is a different act.
+
+    public ?int $editingBatchId = null;
+    public string $edit_batch_number = '';
+    public string $edit_cost_price = '';
+    public string $edit_expiry_date = '';
+
+    public function editBatch(int $batchId): void
     {
         if ($this->blockedFromCatalogue()) return;
 
-        $this->bulkEditMode = !$this->bulkEditMode;
-        if (!$this->bulkEditMode) {
-            $this->bulkEdits      = [];
-            $this->bulkApplyMarkup = false;
-        }
+        $batch = Batch::findOrFail($batchId);
+
+        $this->editingBatchId    = $batch->id;
+        $this->edit_batch_number = (string) $batch->batch_number;
+        $this->edit_cost_price   = (string) $batch->cost_price;
+        $this->edit_expiry_date  = Carbon::parse($batch->expiry_date)->format('Y-m-d');
+        $this->resetValidation();
     }
 
-    public function updatedBulkApplyMarkup(): void
+    public function cancelBatchEdit(): void
     {
-        if (!$this->bulkApplyMarkup) return;
-
-        foreach ($this->bulkEdits as $id => $data) {
-            $cost = (float) ($data['cost_price'] ?? 0);
-            if ($cost > 0) {
-                $this->bulkEdits[$id]['selling_price'] = (string) (ceil($cost * 1.4 / 100) * 100);
-            }
-        }
+        $this->editingBatchId = null;
+        $this->resetValidation();
     }
 
-    public function saveBulkEdits(): void
+    public function updateBatch(): void
     {
         if ($this->blockedFromCatalogue()) return;
 
-        if (empty($this->bulkEdits)) {
-            $this->bulkEditMode = false;
-            return;
-        }
+        $this->validate([
+            'edit_batch_number' => 'required|string|max:100',
+            'edit_cost_price'   => 'required|numeric|min:0',
+            'edit_expiry_date'  => 'required|date',
+        ], [], [
+            'edit_batch_number' => 'batch number',
+            'edit_cost_price'   => 'cost price',
+            'edit_expiry_date'  => 'expiry date',
+        ]);
 
-        $saved = 0;
+        $batch = Batch::findOrFail($this->editingBatchId);
 
-        foreach ($this->bulkEdits as $productId => $data) {
-            $product = Product::with('batches')->find($productId);
-            if (!$product) continue;
+        // Quantity is untouched by design; the audit trail on Batch records
+        // the cost change against whoever made it.
+        $batch->update([
+            'batch_number' => $this->edit_batch_number,
+            'cost_price'   => (float) $this->edit_cost_price,
+            'expiry_date'  => $this->edit_expiry_date,
+        ]);
 
-            $update = [
-                // Casing is normalised by Product::setNameAttribute().
-                'name'        => $data['name'],
-                'category_id' => $data['category_id'] ?: $product->category_id,
-            ];
-
-            if ($this->canSetPrices()) {
-                $update['selling_price'] = (float) $data['selling_price'];
-            }
-
-            $product->update($update);
-
-            $newQty     = (int) ($data['qty'] ?? 0);
-            $newCost    = (float) ($data['cost_price'] ?? 0);
-            $currentQty = $product->batches->sum('quantity');
-            $diff       = $newQty - $currentQty;
-            $batch      = $product->batches->first();
-
-            $expiryRaw = trim($data['expiry_date'] ?? '');
-            $newExpiry = $expiryRaw
-                ? Carbon::createFromFormat('Y-m', $expiryRaw)->endOfMonth()->toDateString()
-                : null;
-
-            if ($batch) {
-                $batchUpdate = ['cost_price' => $newCost];
-                if ($newExpiry) $batchUpdate['expiry_date'] = $newExpiry;
-                if ($diff !== 0) $batchUpdate['quantity'] = max(0, $batch->quantity + $diff);
-                $batch->update($batchUpdate);
-
-                if ($diff !== 0) {
-                    StockMovement::create([
-                        'batch_id'  => $batch->id,
-                        'quantity'  => abs($diff),
-                        'type'      => 'adjustment',
-                        'reference' => 'Bulk stock adjustment',
-                    ]);
-                }
-            } elseif ($newQty > 0 || $newCost > 0) {
-                $batch = Batch::create([
-                    'product_id'   => $product->id,
-                    'batch_number' => 'INIT-' . now()->format('Ymd'),
-                    'expiry_date'  => $newExpiry ?? now()->addYears(2)->endOfMonth()->toDateString(),
-                    'cost_price'   => $newCost,
-                    'quantity'     => $newQty,
-                ]);
-                if ($newQty > 0) {
-                    StockMovement::create([
-                        'batch_id'  => $batch->id,
-                        'quantity'  => $newQty,
-                        'type'      => 'adjustment',
-                        'reference' => 'Bulk stock adjustment',
-                    ]);
-                }
-            }
-
-            $saved++;
-        }
-
-        $this->bulkEditMode = false;
-        $this->bulkEdits    = [];
-        $this->success("{$saved} " . str('product')->plural($saved) . " updated.");
+        $this->editingBatchId = null;
+        $this->success('Batch ' . $batch->batch_number . ' corrected.');
     }
 
     public function openImport(): void
@@ -540,28 +498,9 @@ class Index extends Component
                   ->whereRaw('(SELECT COALESCE(SUM(quantity),0) FROM batches WHERE batches.product_id = products.id) <= products.reorder_level')
             )
             ->latest()
-            ->paginate($this->bulkEditMode ? 50 : 15);
+            ->paginate(15);
 
         $categories = Category::orderBy('name')->get();
-
-        // Populate bulkEdits for current page (preserves edits across page navigation)
-        if ($this->bulkEditMode) {
-            foreach ($products as $product) {
-                if (!isset($this->bulkEdits[$product->id])) {
-                    $firstBatch = $product->batches->first();
-                    $this->bulkEdits[$product->id] = [
-                        'name'          => $product->name,
-                        'category_id'   => $product->category_id,
-                        'selling_price' => (string) $product->selling_price,
-                        'cost_price'    => (string) ($firstBatch?->cost_price ?? ''),
-                        'qty'           => (string) $product->batches->sum('quantity'),
-                        'expiry_date'   => $firstBatch?->expiry_date
-                            ? Carbon::parse($firstBatch->expiry_date)->format('Y-m')
-                            : '',
-                    ];
-                }
-            }
-        }
 
         $viewProduct = $this->viewBatchesProductId
             ? Product::with(['batches' => fn($q) => $q->orderBy('expiry_date')])->find($this->viewBatchesProductId)

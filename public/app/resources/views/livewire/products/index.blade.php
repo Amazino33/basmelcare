@@ -6,153 +6,12 @@
         <x-slot:actions>
             @if($this->canEditCatalogue())
             <x-button label="Import" wire:click="openImport" icon="o-arrow-up-tray" class="btn-outline btn-sm" />
-            <x-button
-                :label="$bulkEditMode ? 'Exit Bulk Edit' : 'Bulk Edit'"
-                wire:click="toggleBulkEdit"
-                icon="{{ $bulkEditMode ? 'o-x-mark' : 'o-pencil-square' }}"
-                class="{{ $bulkEditMode ? 'btn-warning' : 'btn-outline' }} btn-sm"
-            />
-            @if(!$bulkEditMode)
-                <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
-                <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
-            @endif
+            <x-button label="Quick Add" wire:click="openQuickAdd" icon="o-bolt" class="btn-secondary" />
+            <x-button label="Add Product" wire:click="createProduct" icon="o-plus" class="btn-primary" />
             @endif
         </x-slot:actions>
     </x-header>
 
-    @if($bulkEditMode)
-        {{-- Bulk Edit Mode --}}
-        <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 space-y-2">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="flex items-center gap-2 flex-1">
-                    <x-icon name="o-pencil-square" class="w-4 h-4 text-warning shrink-0" />
-                    <span class="text-sm font-semibold">Bulk Edit Mode — {{ count($bulkEdits) }} {{ Str::plural('product', count($bulkEdits)) }} loaded</span>
-                    <span class="text-xs text-base-content/50 hidden sm:inline">Changes save across all pages</span>
-                </div>
-                <div class="flex gap-2">
-                    <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-sm btn-ghost" />
-                    <x-button
-                        label="Save All ({{ count($bulkEdits) }})"
-                        wire:click="saveBulkEdits"
-                        class="btn-sm btn-success"
-                        icon="o-check"
-                        wire:loading.attr="disabled"
-                        wire:target="saveBulkEdits"
-                    />
-                </div>
-            </div>
-            <label class="flex items-center gap-2 cursor-pointer w-fit">
-                <input
-                    type="checkbox"
-                    id="bulk-markup-toggle"
-                    wire:model.live="bulkApplyMarkup"
-                    class="checkbox checkbox-warning checkbox-sm"
-                />
-                <span class="text-xs font-medium">
-                    Auto-apply markup formula <span class="text-base-content/50">(cost × 1.4 → nearest ₦100)</span>
-                    @if($bulkApplyMarkup)
-                        <span class="text-warning font-semibold ml-1">— ON: overwrites all selling prices</span>
-                    @endif
-                </span>
-            </label>
-        </div>
-
-        <div class="overflow-x-auto rounded-lg border border-base-300">
-            <table class="table table-sm w-full">
-                <thead class="bg-base-200 text-xs uppercase tracking-wide">
-                    <tr>
-                        <th class="w-8">#</th>
-                        <th class="min-w-52">Name</th>
-                        <th class="min-w-40">Category</th>
-                        <th class="min-w-32">Cost Price (₦)</th>
-                        <th class="min-w-32">Selling Price (₦)</th>
-                        <th class="min-w-28">Stock Qty</th>
-                        <th class="min-w-32">Expiry Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($products as $product)
-                        <tr wire:key="bulk-{{ $product->id }}" class="hover:bg-base-100 border-b border-base-200">
-                            <td class="text-base-content/40 text-xs">{{ $product->id }}</td>
-                            <td>
-                                <input
-                                    type="text"
-                                    wire:model="bulkEdits.{{ $product->id }}.name"
-                                    class="input input-sm input-bordered w-full min-w-48 uppercase"
-                                />
-                            </td>
-                            <td>
-                                <select
-                                    wire:model="bulkEdits.{{ $product->id }}.category_id"
-                                    class="select select-sm select-bordered w-full uppercase"
-                                >
-                                    <option value="">— Select —</option>
-                                    @foreach($categories as $cat)
-                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                    @endforeach
-                                </select>
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    wire:model="bulkEdits.{{ $product->id }}.cost_price"
-                                    data-bulk-cost
-                                    class="input input-sm input-bordered w-full"
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    wire:model="bulkEdits.{{ $product->id }}.selling_price"
-                                    data-bulk-sell
-                                    @disabled(! $this->canSetPrices())
-                                    class="input input-sm input-bordered w-full disabled:opacity-60"
-                                    @if(! $this->canSetPrices()) title="Only an admin or branch manager can change prices" @endif
-                                />
-                                <div class="bulk-price-warn text-warning text-xs mt-0.5 items-center gap-1" style="display:none">
-                                    ⚠ Below cost
-                                </div>
-                            </td>
-                            <td>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    wire:model="bulkEdits.{{ $product->id }}.qty"
-                                    class="input input-sm input-bordered w-24"
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="month"
-                                    wire:model="bulkEdits.{{ $product->id }}.expiry_date"
-                                    class="input input-sm input-bordered w-full"
-                                />
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-
-        <div class="mt-3">{{ $products->links() }}</div>
-
-        <div class="mt-3 flex justify-end gap-2">
-            <x-button label="Cancel" wire:click="toggleBulkEdit" class="btn-ghost" />
-            <x-button
-                label="Save All Changes ({{ count($bulkEdits) }})"
-                wire:click="saveBulkEdits"
-                class="btn-success"
-                icon="o-check"
-                wire:loading.attr="disabled"
-                wire:target="saveBulkEdits"
-            />
-        </div>
-
-    @else
         {{-- Normal table --}}
         <x-table :headers="$headers" :rows="$products" with-pagination>
             @scope('cell_image', $product)
@@ -207,7 +66,6 @@
                 </div>
             @endscope
         </x-table>
-    @endif
 
     <!-- Quick Add Modal -->
     <x-modal wire:model="quickModal" title="Quick Add Product" box-class="max-w-lg">
@@ -510,21 +368,49 @@
         @if($viewProduct && $viewProduct->batches->count())
             <div class="space-y-3">
                 @foreach($viewProduct->batches as $batch)
-                    <x-card>
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <div class="font-semibold">{{ $batch->batch_number }}</div>
-                                <div class="text-sm text-base-content/60">Cost: ₦{{ number_format($batch->cost_price, 2) }}</div>
-                                <div class="text-sm text-base-content/60">Qty: {{ $batch->quantity }}</div>
+                    <x-card wire:key="batch-{{ $batch->id }}">
+                        @if($editingBatchId === $batch->id)
+                            {{-- Correcting a mistyped delivery. Quantity is not here:
+                                 changing how much stock exists is a physical claim
+                                 that needs a reason, which Stock Adjustments asks for. --}}
+                            <div class="space-y-2">
+                                <x-input label="Batch number" wire:model="edit_batch_number" />
+                                <x-input label="Cost price" wire:model="edit_cost_price" prefix="₦" type="number" step="0.01"
+                                         hint="Drives profit and the wholesale price" />
+                                <x-input label="Expiry" wire:model="edit_expiry_date" type="date" />
+
+                                <div class="text-xs text-base-content/50">
+                                    Quantity ({{ $batch->quantity }}) is changed in Stock Adjustments, where it needs a reason.
+                                </div>
+
+                                <div class="flex gap-2 pt-1">
+                                    <x-button label="Save" wire:click="updateBatch" class="btn-primary btn-sm" spinner="updateBatch" />
+                                    <x-button label="Cancel" wire:click="cancelBatchEdit" class="btn-ghost btn-sm" />
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <x-badge :value="$batch->expiry_date->format('M d, Y')" @class([
-                                    'badge-error' => $batch->expiry_date->isPast(),
-                                    'badge-warning' => $batch->expiry_date->isBetween(now(), now()->addDays(90)),
-                                    'badge-success' => $batch->expiry_date->isAfter(now()->addDays(90)),
-                                ]) />
+                        @else
+                            <div class="flex justify-between items-start gap-2">
+                                <div class="min-w-0">
+                                    <div class="font-semibold">{{ $batch->batch_number }}</div>
+                                    <div class="text-sm text-base-content/60">Cost: ₦{{ number_format($batch->cost_price, 2) }}</div>
+                                    <div class="text-sm text-base-content/60">Qty: {{ $batch->quantity }}</div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <x-badge :value="$batch->expiry_date->format('M d, Y')" @class([
+                                        'badge-error' => $batch->expiry_date->isPast(),
+                                        'badge-warning' => $batch->expiry_date->isBetween(now(), now()->addDays(90)),
+                                        'badge-success' => $batch->expiry_date->isAfter(now()->addDays(90)),
+                                    ]) />
+                                    @if($this->canEditCatalogue())
+                                        <div class="mt-2">
+                                            <x-button label="Correct" icon="o-pencil-square"
+                                                      wire:click="editBatch({{ $batch->id }})"
+                                                      class="btn-xs btn-ghost" />
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
+                        @endif
                     </x-card>
                 @endforeach
             </div>
@@ -565,39 +451,6 @@
         const sellInput = document.querySelector('input[wire\\:model="quick_selling_price"]');
         if (sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
     });
-
-    // Bulk Edit: auto-fill selling price from cost when markup toggle is ON
-    document.addEventListener('input', function (e) {
-        if (!e.target.dataset.bulkCost) return;
-        const row = e.target.closest('tr');
-        const sellInput = row?.querySelector('[data-bulk-sell]');
-        const toggle = document.getElementById('bulk-markup-toggle');
-        if (toggle?.checked) {
-            const cost = parseFloat(e.target.value) || 0;
-            if (cost > 0 && sellInput) sellInput.value = Math.ceil(cost * 1.4 / 100) * 100;
-        }
-        // Update below-cost warning for this row
-        const warnEl = row?.querySelector('.bulk-price-warn');
-        if (warnEl && sellInput) {
-            const cost = parseFloat(e.target.value) || 0;
-            const sell = parseFloat(sellInput.value) || 0;
-            warnEl.style.display = (cost > 0 && sell > 0 && sell < cost) ? 'flex' : 'none';
-        }
-    });
-
-    // Bulk Edit: warn when selling price is edited below cost
-    document.addEventListener('input', function (e) {
-        if (!e.target.dataset.bulkSell) return;
-        const row = e.target.closest('tr');
-        const costInput = row?.querySelector('[data-bulk-cost]');
-        const warnEl = row?.querySelector('.bulk-price-warn');
-        if (warnEl && costInput) {
-            const cost = parseFloat(costInput.value) || 0;
-            const sell = parseFloat(e.target.value) || 0;
-            warnEl.style.display = (cost > 0 && sell > 0 && sell < cost) ? 'flex' : 'none';
-        }
-    });
-
 
     let barcodeStream = null;
 
