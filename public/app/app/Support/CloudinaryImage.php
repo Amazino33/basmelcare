@@ -33,8 +33,14 @@ class CloudinaryImage
      * connections most customers are on.
      */
     public const PRESETS = [
-        'thumb' => 'w_100,h_100,c_fill,g_auto,q_auto,f_auto',
-        'card'  => 'w_400,h_400,c_fill,g_auto,q_auto,f_auto',
+        // c_pad, not c_fill. Product photography is portrait - bottles, boxes,
+        // tall containers - and cropping one to a square cuts off the top and
+        // bottom of the packaging, which is the part a customer recognises.
+        // Padding onto white keeps the whole product visible and gives a grid
+        // of mismatched supplier photos one consistent ground.
+        'thumb' => 'w_100,h_100,c_pad,b_white,q_auto,f_auto',
+        'card'  => 'w_400,h_400,c_pad,b_white,q_auto,f_auto',
+        // No crop at all: the product page shows the photo as taken.
         'zoom'  => 'w_1200,c_limit,q_auto,f_auto',
     ];
 

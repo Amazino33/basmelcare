@@ -87,9 +87,9 @@
                 @foreach($featuredProducts as $product)
                     @php $stock = $product->batches->sum('quantity'); @endphp
                     <a href="/shop/{{ $product->id }}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
-                        <figure class="bg-base-200 h-32 md:h-40 flex items-center justify-center">
+                        <figure class="{{ $product->image ? 'bg-white' : 'bg-base-200' }} aspect-square flex items-center justify-center">
                             @if($product->image)
-                                <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
+                                <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-contain p-2" />
                             @else
                                 <x-icon name="o-cube" class="w-12 h-12 text-base-content/20" />
                             @endif

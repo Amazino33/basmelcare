@@ -43,9 +43,9 @@
             @php $stock = $product->batches->sum('quantity'); @endphp
             <a href="{{ route('shop.show', $product->id) }}" class="card bg-base-100 border border-base-200 hover:shadow-md transition-all active:scale-[0.98]">
                 <!-- Image -->
-                <figure class="bg-base-200 h-32 md:h-44 relative overflow-hidden">
+                <figure class="{{ $product->image ? 'bg-white' : 'bg-base-200' }} aspect-square relative overflow-hidden">
                     @if($product->image)
-                        <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-cover" loading="lazy" />
+                        <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-contain p-2" loading="lazy" />
                     @else
                         <div class="w-full h-full flex items-center justify-center">
                             <x-icon name="o-cube" class="w-10 h-10 text-base-content/15" />
