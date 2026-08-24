@@ -3,6 +3,11 @@
 namespace App\Livewire\Settings;
 
 use App\Models\AppSetting;
+use App\Models\Product;
+use App\Support\CloudinaryImage;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Services\KudiSmsService;
 use App\Services\WhatsAppService;
 use Livewire\Component;
@@ -56,6 +61,13 @@ class Index extends Component
     public string $hifastlink_url = '';
     public int    $voucher_validity_hours = 24;
 
+    // Cloudinary (product images)
+    public bool   $cloudinary_enabled    = false;
+    public string $cloudinary_cloud_name = '';
+    public string $cloudinary_api_key    = '';
+    public string $cloudinary_api_secret = '';
+    public string $cloudinary_folder     = 'basmelcare';
+
     // Test message
     public string $test_phone = '';
     public string $test_message = 'Hello from BasmelCare Pharmacy!';
@@ -90,6 +102,12 @@ class Index extends Component
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
         $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');
+
+        $this->cloudinary_enabled    = AppSetting::bool('cloudinary_enabled', false);
+        $this->cloudinary_cloud_name = AppSetting::get('cloudinary_cloud_name', '');
+        $this->cloudinary_api_key    = AppSetting::get('cloudinary_api_key', '');
+        $this->cloudinary_api_secret = AppSetting::get('cloudinary_api_secret', '');
+        $this->cloudinary_folder     = AppSetting::get('cloudinary_folder', 'basmelcare');
 
         $this->hifastlink_api_key = AppSetting::get('hifastlink_api_key', '');
         $this->hifastlink_url = AppSetting::get('hifastlink_url', '');
@@ -154,6 +172,98 @@ class Index extends Component
         AppSetting::set('wawp_enabled', $this->wawp_enabled ? '1' : '0');
 
         $this->success('WhatsApp settings saved.');
+    }
+
+    /** Product images with a file recorded against them. */
+    public function imageCount(): int
+    {
+        return Product::whereNotNull('image')->where('image', '!=', '')->count();
+    }
+
+    /** When the last sync ran, for the status panel. */
+    public function lastSyncedAt(): ?string
+    {
+        $at = AppSetting::get('cloudinary_synced_at');
+
+        return $at ? \Carbon\Carbon::parse($at)->diffForHumans() : null;
+    }
+
+    /** How many of those the last sync confirmed were in Cloudinary. */
+    public function syncedCount(): int
+    {
+        return (int) AppSetting::get('cloudinary_synced_count', 0);
+    }
+
+    /**
+     * Switching Cloudinary on redirects every image URL at once. Images that
+     * were never uploaded do not fail quietly - they all break together, on
+     * the customer-facing shop. So the switch stays locked until a sync has
+     * accounted for every image.
+     */
+    public function canEnableCloudinary(): bool
+    {
+        $config = CloudinaryImage::config();
+
+        if ($config['cloud_name'] === '' || $config['api_key'] === '' || $config['api_secret'] === '') {
+            return false;
+        }
+
+        return $this->syncedCount() >= $this->imageCount();
+    }
+
+    public function saveCloudinary(): void
+    {
+        $this->validate([
+            'cloudinary_cloud_name' => 'nullable|string|max:100',
+            'cloudinary_api_key'    => 'nullable|string|max:100',
+            'cloudinary_api_secret' => 'nullable|string|max:200',
+            'cloudinary_folder'     => 'nullable|string|max:100',
+        ]);
+
+        AppSetting::set('cloudinary_cloud_name', trim($this->cloudinary_cloud_name));
+        AppSetting::set('cloudinary_api_key', trim($this->cloudinary_api_key));
+        AppSetting::set('cloudinary_api_secret', trim($this->cloudinary_api_secret));
+        AppSetting::set('cloudinary_folder', trim($this->cloudinary_folder) ?: 'basmelcare');
+
+        CloudinaryImage::forget();
+
+        // Refuse rather than let the operator switch on a half-migrated
+        // catalogue and discover it from customers.
+        if ($this->cloudinary_enabled && ! $this->canEnableCloudinary()) {
+            $this->cloudinary_enabled = false;
+            AppSetting::set('cloudinary_enabled', '0');
+            CloudinaryImage::forget();
+
+            $this->error('Upload the images to Cloudinary first - ' . $this->syncedCount() . ' of ' . $this->imageCount() . ' are there.');
+
+            return;
+        }
+
+        AppSetting::set('cloudinary_enabled', $this->cloudinary_enabled ? '1' : '0');
+        CloudinaryImage::forget();
+        Storage::forgetDisk('product_images');
+
+        $this->success('Cloudinary settings saved.');
+    }
+
+    /**
+     * Runs the upload in-request. Fine for a catalogue this size; if it ever
+     * grows past a few hundred images this wants to become a queued job.
+     */
+    public function uploadImagesToCloud(): void
+    {
+        $exitCode = Artisan::call('products:upload-to-cloud');
+
+        if ($exitCode !== 0) {
+            // The per-image reasons matter and are too long for a toast.
+            Log::warning('Cloudinary upload reported failures', ['output' => Artisan::output()]);
+
+            $this->error('Some images failed to upload. See the log for which ones.');
+
+            return;
+        }
+
+        $this->success('Images uploaded: ' . $this->syncedCount() . ' of ' . $this->imageCount() . ' now in Cloudinary.');
     }
 
     public function saveKudiSms(): void

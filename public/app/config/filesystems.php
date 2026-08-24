@@ -54,6 +54,19 @@ return [
          * staff subdomain, so patient files are never served from the
          * customer-facing site.
          */
+        /*
+         * Product images. Cloudinary when switched on in Settings, the
+         * public site's storage when not - decided in AppServiceProvider,
+         * which is why this carries only a driver name.
+         *
+         * Everything that touches a product image uses this one disk, so
+         * upload, delete and URL cannot disagree about where files live.
+         */
+        'product_images' => [
+            'driver' => 'product_images',
+            'throw'  => false,
+        ],
+
         'public_site' => [
             'driver'     => 'local',
             'root'       => env('PUBLIC_SITE_STORAGE', base_path('../../storage/app/public')),

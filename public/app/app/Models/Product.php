@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\NormalisesName;
 use App\Models\Concerns\RecordsAudit;
+use App\Support\CloudinaryImage;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -51,13 +52,9 @@ class Product extends Model
      * be built from that site's address — asset() here would point at the staff
      * subdomain, where the file does not exist.
      */
-    public function imageUrl(): ?string
+    public function imageUrl(?string $preset = null): ?string
     {
-        if (! $this->image) {
-            return null;
-        }
-
-        return rtrim((string) config('filesystems.disks.public_site.url'), '/') . '/' . ltrim($this->image, '/');
+        return CloudinaryImage::deliver($this->image, $preset);
     }
     public function category()
     {

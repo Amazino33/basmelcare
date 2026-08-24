@@ -8,7 +8,7 @@
         <!-- Image -->
         <div class="bg-base-200 rounded-xl h-64 md:h-80 flex items-center justify-center overflow-hidden">
             @if($product->image)
-                <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
+                <img src="{{ $product->imageUrl('zoom') }}" alt="{{ $product->name }}" class="w-full h-full object-cover" />
             @else
                 <x-icon name="o-cube" class="w-20 h-20 text-base-content/15" />
             @endif
@@ -100,7 +100,7 @@
                     <a href="{{ route('shop.show', $related->id) }}" class="card bg-base-100 border border-base-200 hover:shadow-md transition-all">
                         <figure class="bg-base-200 h-28 md:h-36 relative overflow-hidden">
                             @if($related->image)
-                                <img src="{{ asset('storage/' . $related->image) }}" alt="{{ $related->name }}" class="w-full h-full object-cover" loading="lazy" />
+                                <img src="{{ $related->imageUrl('card') }}" alt="{{ $related->name }}" class="w-full h-full object-cover" loading="lazy" />
                             @else
                                 <div class="w-full h-full flex items-center justify-center">
                                     <x-icon name="o-cube" class="w-8 h-8 text-base-content/15" />

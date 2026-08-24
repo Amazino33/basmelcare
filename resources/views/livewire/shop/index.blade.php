@@ -45,7 +45,7 @@
                 <!-- Image -->
                 <figure class="bg-base-200 h-32 md:h-44 relative overflow-hidden">
                     @if($product->image)
-                        <img src="{{ $product->imageUrl() }}" alt="{{ $product->name }}" class="w-full h-full object-cover" loading="lazy" />
+                        <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-cover" loading="lazy" />
                     @else
                         <div class="w-full h-full flex items-center justify-center">
                             <x-icon name="o-cube" class="w-10 h-10 text-base-content/15" />

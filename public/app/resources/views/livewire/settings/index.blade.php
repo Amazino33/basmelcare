@@ -84,6 +84,102 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="images" label="Product Images" icon="o-photo">
+            @php
+                $imageCount  = $this->imageCount();
+                $syncedCount = $this->syncedCount();
+                $outstanding = max(0, $imageCount - $syncedCount);
+                $canEnable   = $this->canEnableCloudinary();
+            @endphp
+
+            <x-card title="Cloudinary" subtitle="Serve product images from a CDN, resized for each screen" class="mt-4">
+                {{-- Migration status first: it decides whether the switch below is usable --}}
+                <div class="rounded-lg border p-4 mb-4 {{ $outstanding > 0 ? 'border-warning bg-warning/5' : 'border-success bg-success/5' }}">
+                    <div class="flex items-start gap-3">
+                        <x-icon name="{{ $outstanding > 0 ? 'o-exclamation-triangle' : 'o-check-circle' }}"
+                                class="w-5 h-5 shrink-0 mt-0.5 {{ $outstanding > 0 ? 'text-warning' : 'text-success' }}" />
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-sm">
+                                {{ $syncedCount }} of {{ $imageCount }} product images are in Cloudinary
+                            </p>
+                            @if($outstanding > 0)
+                                <p class="text-sm text-base-content/70 mt-1">
+                                    Turning Cloudinary on points every image link at it. The
+                                    {{ $outstanding }} that {{ $outstanding === 1 ? 'has' : 'have' }} not been
+                                    uploaded would show as broken on the shop, so the switch stays locked
+                                    until they are all there.
+                                </p>
+                            @else
+                                <p class="text-sm text-base-content/70 mt-1">
+                                    Everything is uploaded. Safe to switch on.
+                                </p>
+                            @endif
+
+                            @if($lastSynced = $this->lastSyncedAt())
+                                <p class="text-xs text-base-content/50 mt-1">Last checked {{ $lastSynced }}</p>
+                            @endif
+
+                            <x-button label="Upload images to Cloudinary"
+                                      icon="o-cloud-arrow-up"
+                                      wire:click="uploadImagesToCloud"
+                                      spinner="uploadImagesToCloud"
+                                      class="btn-sm btn-outline mt-3"
+                                      :disabled="$cloudinary_cloud_name === '' || $cloudinary_api_key === ''" />
+                            <p class="text-xs text-base-content/50 mt-2">
+                                Save your credentials first. This may take a moment for a large catalogue.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <x-form wire:submit="saveCloudinary">
+                    <x-input label="Cloud name" wire:model="cloudinary_cloud_name" placeholder="your-cloud-name"
+                             hint="From your Cloudinary dashboard" />
+                    <x-input label="API key" wire:model="cloudinary_api_key" placeholder="123456789012345" />
+                    <x-input label="API secret" wire:model="cloudinary_api_secret" type="password" placeholder="••••••••" />
+                    <x-input label="Folder" wire:model="cloudinary_folder" placeholder="basmelcare"
+                             hint="Keeps this pharmacy's images separate inside your Cloudinary account" />
+
+                    <x-checkbox label="Serve product images from Cloudinary"
+                                wire:model="cloudinary_enabled"
+                                :disabled="! $canEnable"
+                                hint="{{ $canEnable ? 'Switch off at any time to go back to local images.' : 'Upload the outstanding images first.' }}" />
+
+                    <x-slot:actions>
+                        <x-button label="Save Cloudinary Settings" type="submit" class="btn-primary" spinner="saveCloudinary" />
+                    </x-slot:actions>
+                </x-form>
+
+                <x-slot:menu>
+                    <span class="badge {{ $canEnable && $cloudinary_enabled ? 'badge-success' : 'badge-ghost' }}">
+                        {{ $cloudinary_enabled ? 'Live' : 'Off' }}
+                    </span>
+                </x-slot:menu>
+            </x-card>
+
+            <x-card title="How images are sized" class="mt-4">
+                <p class="text-sm text-base-content/70 mb-3">
+                    With Cloudinary on, each screen asks for the size it needs and the image is
+                    resized and cached on first request. Nothing is generated in advance, so a new
+                    size can be added later without re-uploading anything.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Used on</th><th>Size</th></tr></thead>
+                        <tbody>
+                            <tr><td>Lists and upload previews</td><td>100 &times; 100</td></tr>
+                            <tr><td>Shop grid and featured products</td><td>400 &times; 400</td></tr>
+                            <tr><td>Product page</td><td>up to 1200 wide</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-base-content/50 mt-3">
+                    Images are also converted to WebP or AVIF for browsers that accept them, which
+                    is usually a large saving on mobile data.
+                </p>
+            </x-card>
+        </x-tab>
+
         <x-tab name="incentives" label="Incentives" icon="o-gift">
             <x-card title="HifastLink Voucher Integration" class="mt-4">
                 <p class="text-sm text-base-content/60 mb-4">

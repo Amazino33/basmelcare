@@ -55,12 +55,12 @@ class Index extends Component
         $product = Product::findOrFail($this->uploadingId);
 
         if ($product->image) {
-            Storage::disk('public_site')->delete($product->image);
+            Storage::disk('product_images')->delete($product->image);
         }
 
         // 'products' disk points at the public site's storage — the shop cannot
         // serve a file written into this app's own storage.
-        $product->update(['image' => $this->photo->store('products', 'public_site')]);
+        $product->update(['image' => $this->photo->store('products', 'product_images')]);
 
         $name = $product->name;
         $this->uploadingId = null;

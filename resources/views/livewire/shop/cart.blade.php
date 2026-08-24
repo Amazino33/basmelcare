@@ -9,7 +9,7 @@
                         <!-- Image -->
                         <div class="w-16 h-16 bg-base-200 rounded-lg overflow-hidden shrink-0">
                             @if($item['image'])
-                                <img src="{{ asset('storage/' . $item['image']) }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover" />
+                                <img src="{{ \App\Support\CloudinaryImage::deliver($item['image'], 'thumb') }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover" />
                             @else
                                 <div class="w-full h-full flex items-center justify-center">
                                     <x-icon name="o-cube" class="w-6 h-6 text-base-content/15" />

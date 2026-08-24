@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CloudinaryImage;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -46,9 +47,9 @@ class Product extends Model
      * Images are uploaded through the staff app but written into THIS site's
      * storage, so they are served from here.
      */
-    public function imageUrl(): ?string
+    public function imageUrl(?string $preset = null): ?string
     {
-        return $this->image ? asset('storage/' . ltrim($this->image, '/')) : null;
+        return CloudinaryImage::deliver($this->image, $preset);
     }
     public function category()
     {

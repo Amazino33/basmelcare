@@ -370,10 +370,10 @@ class Index extends Component
             // this app's own storage exists only on the staff subdomain, so the
             // shop renders a broken image for every customer.
             if ($this->existingImage) {
-                Storage::disk('public_site')->delete($this->existingImage);
+                Storage::disk('product_images')->delete($this->existingImage);
             }
 
-            $data['image'] = $this->photo->store('products', 'public_site');
+            $data['image'] = $this->photo->store('products', 'product_images');
         }
 
         Product::updateOrCreate(
@@ -420,7 +420,7 @@ class Index extends Component
         $this->photo = null;
 
         if ($this->existingImage) {
-            Storage::disk('public_site')->delete($this->existingImage);
+            Storage::disk('product_images')->delete($this->existingImage);
         }
 
         $this->existingImage = null;
