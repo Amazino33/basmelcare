@@ -67,6 +67,25 @@ before="$(git rev-parse HEAD)"
 git pull
 after="$(git rev-parse HEAD)"
 
+# public/build is committed and never rebuilt here, so a pull that brings new
+# Blade markup without new CSS means any utility class used for the first time
+# has no styles behind it. That fails silently and shows up only as a broken
+# page - which is exactly how aspect-square shipped with no rule attached.
+if [ "$before" != "$after" ] && [ -z "${DEPLOY_REEXECED:-}" ]; then
+    changed="$(git diff --name-only "$before" "$after" || true)"
+    markup_changed=no
+    build_changed=no
+    case "$changed" in
+        *.blade.php*|*resources/css/*) markup_changed=yes ;;
+    esac
+    case "$changed" in
+        *public/build/*) build_changed=yes ;;
+    esac
+    if [ "$markup_changed" = yes ] && [ "$build_changed" = no ]; then
+        export DEPLOY_ASSETS_WARNING=1
+    fi
+fi
+
 # Bash reads a script incrementally, so `git pull` above can rewrite THIS FILE
 # while it is still executing. Any step added below the pull is then read from
 # a stale byte offset, or skipped entirely - which is how a deploy can report
@@ -145,3 +164,17 @@ for app in "${APPS[@]}"; do
 done
 
 printf '\n✅ BasmelCare deployed — public site and staff app.\n'
+
+if [ -n "${DEPLOY_ASSETS_WARNING:-}" ]; then
+    cat <<'WARN'
+
+!!  Markup changed in this pull but public/build did not.
+    public/build is committed, not built here, so any CSS class used for
+    the first time has no styles behind it. The page will look broken in a
+    way nothing reports.
+
+    On your machine, in each app you changed:  npm run build
+    then commit public/build and deploy again.
+
+WARN
+fi
