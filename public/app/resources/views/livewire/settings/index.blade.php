@@ -22,6 +22,37 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="pricing" label="Wholesale" icon="o-tag">
+            <x-card title="Wholesale Pricing" subtitle="What customers tagged as wholesale pay" class="mt-4">
+                <x-form wire:submit="saveWholesalePricing">
+                    <x-input label="Markup over cost" wire:model="wholesale_markup_percent"
+                             type="number" step="0.01" min="0" max="100" suffix="%"
+                             hint="Applied to the dearest batch still in stock" />
+
+                    <div class="rounded-lg border border-base-300 bg-base-200/40 p-4 text-sm space-y-2">
+                        <p class="font-semibold">How a wholesale price is decided</p>
+                        <ol class="list-decimal list-inside space-y-1 text-base-content/70">
+                            <li>A price typed into the product wins, if one is set.</li>
+                            <li>Otherwise the dearest batch still in stock, plus this markup.</li>
+                            <li>If nothing is in stock, the normal retail price is used.</li>
+                        </ol>
+                        <p class="text-base-content/60 pt-1">
+                            The dearest batch is used on purpose. Pricing off older, cheaper stock
+                            sells goods for less than it costs to replace them &mdash; a profit on
+                            paper and a loss in the drawer.
+                        </p>
+                        <p class="text-base-content/60">
+                            Individual products can override this figure on the product form.
+                        </p>
+                    </div>
+
+                    <x-slot:actions>
+                        <x-button label="Save Wholesale Pricing" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
         <x-tab name="whatsapp" label="WhatsApp" icon="o-chat-bubble-left-right">
             <x-card title="WhatsApp Integration (WAWP)" class="mt-4">
                 <x-form wire:submit="saveWhatsApp">

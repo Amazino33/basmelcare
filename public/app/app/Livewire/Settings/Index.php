@@ -61,6 +61,9 @@ class Index extends Component
     public string $hifastlink_url = '';
     public int    $voucher_validity_hours = 24;
 
+    // Wholesale pricing
+    public float $wholesale_markup_percent = 5;
+
     // Cloudinary (product images)
     public bool   $cloudinary_enabled    = false;
     public string $cloudinary_cloud_name = '';
@@ -102,6 +105,8 @@ class Index extends Component
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
         $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');
+
+        $this->wholesale_markup_percent = (float) AppSetting::get('wholesale_markup_percent', 5);
 
         $this->cloudinary_enabled    = AppSetting::bool('cloudinary_enabled', false);
         $this->cloudinary_cloud_name = AppSetting::get('cloudinary_cloud_name', '');
@@ -158,6 +163,25 @@ class Index extends Component
         AppSetting::set('currency_symbol', $this->currency_symbol);
 
         $this->success('General settings saved.');
+    }
+
+    /**
+     * The default margin on wholesale lines, applied over what the stock cost.
+     *
+     * Capped at 100% not because more is impossible but because a three-digit
+     * figure here is almost always a typo, and it would quietly reprice the
+     * whole catalogue for every wholesale customer.
+     */
+    public function saveWholesalePricing(): void
+    {
+        $this->validate([
+            'wholesale_markup_percent' => 'required|numeric|min:0|max:100',
+        ]);
+
+        AppSetting::set('wholesale_markup_percent', $this->wholesale_markup_percent);
+        Product::forgetDefaultMarkup();
+
+        $this->success('Wholesale markup saved.');
     }
 
     public function saveWhatsApp()

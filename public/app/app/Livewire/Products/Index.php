@@ -45,6 +45,7 @@ class Index extends Component
     public string $cost_price_hint = '';
     public ?string $wholesale_price = null;
     public ?int $wholesale_min_qty = null;
+    public ?string $wholesale_markup_percent = null;
     public int $reorder_level = 0;
     public string $description = '';
     public ?string $barcode = null;
@@ -315,7 +316,7 @@ class Index extends Component
     {
         if ($this->blockedFromCatalogue()) return;
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
@@ -338,6 +339,7 @@ class Index extends Component
             'selling_price' => $this->canSetPrices() ? 'required|numeric|min:0' : 'nullable',
             'wholesale_price' => 'nullable|numeric|min:0',
             'wholesale_min_qty' => 'nullable|integer|min:1',
+            'wholesale_markup_percent' => 'nullable|numeric|min:0|max:100',
             'reorder_level' => 'required|integer|min:0',
             'description' => 'nullable|string',
             'barcode' => 'nullable|string|max:100',
@@ -351,6 +353,10 @@ class Index extends Component
             'sku' => $this->sku,
             'category_id' => $this->category_id,
             'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
+            // '' means "use the pharmacy default"; 0 means "sell at cost".
+            'wholesale_markup_percent' => $this->wholesale_markup_percent === null || $this->wholesale_markup_percent === ''
+                ? null
+                : (float) $this->wholesale_markup_percent,
             'reorder_level' => $this->reorder_level,
             'description' => $this->description,
             'barcode' => $this->barcode,
@@ -381,7 +387,7 @@ class Index extends Component
             $data
         );
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
 
         if ($isNew) {
             $this->success('Product saved. Add another or click Done.');
@@ -404,6 +410,7 @@ class Index extends Component
         $this->selling_price = $product->selling_price;
         $this->wholesale_price = $product->wholesale_price;
         $this->wholesale_min_qty = $product->wholesale_min_qty;
+        $this->wholesale_markup_percent = $product->wholesale_markup_percent;
         $this->reorder_level = $product->reorder_level;
         $this->description = $product->description ?? '';
         $this->barcode = $product->barcode;

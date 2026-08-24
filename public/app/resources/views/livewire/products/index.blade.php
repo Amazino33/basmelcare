@@ -175,6 +175,12 @@
                 ₦{{ number_format($product->selling_price, 2) }}
                     @if($product->wholesale_price)
                         <div class="text-xs text-info">W/S: ₦{{ number_format($product->wholesale_price, 2) }}{{ $product->wholesale_min_qty ? ' ('.$product->wholesale_min_qty.'+)' : '' }}</div>
+                    @elseif($calculated = $product->calculatedWholesalePrice())
+                        {{-- Calculated from stock cost, so it is worth showing: nobody typed it in --}}
+                        <div class="text-xs text-info/70">
+                            W/S: ₦{{ number_format($calculated, 2) }}
+                            <span class="opacity-60">calc. +{{ rtrim(rtrim(number_format($product->wholesaleMarkupPercent(), 2), '0'), '.') }}%</span>
+                        </div>
                     @endif
                 @endif
             @endscope
@@ -329,6 +335,9 @@
                     </div>
                 @endif
                 <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
+
+                <x-input label="Wholesale Markup" wire:model="wholesale_markup_percent" type="number" step="0.01" min="0" max="100" suffix="%"
+                         hint="Leave empty to use the pharmacy default. Only applies when no wholesale price is set above." />
                 <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
                 <div class="md:col-span-2">
                     <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
