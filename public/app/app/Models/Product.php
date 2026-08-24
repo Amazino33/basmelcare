@@ -12,8 +12,15 @@ class Product extends Model
     use NormalisesName;
     use RecordsAudit;
 
-    /** Prices drive revenue and margin, so changes must be attributable. */
-    protected array $audited = ['selling_price', 'wholesale_price', 'wholesale_markup_percent', 'pack_price'];
+    /**
+     * Prices drive revenue, and requires_prescription decides whether a drug
+     * can be handed over without a pharmacist seeing a prescription. Both are
+     * decisions that should be attributable to whoever made them.
+     */
+    protected array $audited = [
+        'selling_price', 'wholesale_price', 'wholesale_markup_percent', 'pack_price',
+        'requires_prescription',
+    ];
 
     private static ?float $defaultMarkup = null;
 

@@ -126,6 +126,10 @@ class Checkout extends Component
                 'delivery_phone' => $this->fulfillment_type === 'delivery' ? $this->delivery_phone : ($this->checkout_mode === 'guest' ? $this->guest_phone : $customer?->phone),
                 'note' => $this->note,
                 'prescription_path' => $prescriptionPath,
+                // A prescription was required, so a pharmacist has to see it
+                // before this order can be prepared. Null where none is
+                // needed, which is not the same as pending.
+                'prescription_status' => $prescriptionPath ? 'pending' : null,
             ]);
 
             foreach ($cart->get() as $item) {

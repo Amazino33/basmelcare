@@ -57,6 +57,24 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('commissions', App\Livewire\Commissions\Index::class)->name('commissions.index');
         });
 
+        // Prescriptions attached to online orders. The pharmacist reviews them;
+        // the staff preparing the order may look but not decide, which is
+        // enforced in the component rather than by the route.
+        Route::middleware('role:admin,pharmacist,branch_manager,sales')->group(function () {
+            Route::get('prescriptions', App\Livewire\Prescriptions\Index::class)->name('prescriptions.index');
+            Route::get('prescriptions/{order}/file', App\Http\Controllers\PrescriptionFileController::class)
+                ->name('prescriptions.file');
+        });
+
+        // Deciding which drugs need a prescription is a clinical judgement, so
+        // it belongs to the pharmacist alone - not to whoever edits the
+        // catalogue, and not to admin. Letting another role change it would let
+        // them route around the review they are meant to be waiting on.
+        Route::middleware('role:pharmacist')->group(function () {
+            Route::get('prescription-medicines', App\Livewire\Prescriptions\Medicines::class)
+                ->name('prescriptions.medicines');
+        });
+
         // Drug catalogue and stock visibility — the pharmacist needs to know what
         // is stocked and what is expiring, so this stays open to them.
         Route::middleware('role:admin,pharmacist,branch_manager,inventory_manager')->group(function () {

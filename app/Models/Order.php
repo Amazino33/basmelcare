@@ -12,6 +12,7 @@ class Order extends Model
         'fulfillment_type', 'payment_method', 'payment_status', 'payment_reference',
         'status', 'claimed_by', 'claimed_at', 'delivery_address', 'delivery_phone', 'note',
         'prescription_path', 'paid_at',
+        'prescription_status',
         'cashier_verified_at', 'verified_by',
         'delivery_person_name', 'delivery_person_phone', 'delivery_user_id', 'dispatched_at',
     ];

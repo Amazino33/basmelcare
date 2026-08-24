@@ -205,9 +205,29 @@
                 </div>
 
                 @if($viewOrder->prescription_path)
-                    <a href="{{ Storage::disk('public_site')->url($viewOrder->prescription_path) }}" class="btn btn-ghost btn-sm btn-block" target="_blank">
+                    {{-- Through a route, not a storage URL: a prescription is a
+                         patient document and the address alone should not be
+                         enough to read it. --}}
+                    <a href="{{ route('prescriptions.file', $viewOrder->id) }}" class="btn btn-ghost btn-sm btn-block" target="_blank">
                         <x-icon name="o-document" class="w-4 h-4" /> View Prescription
                     </a>
+
+                    @if($viewOrder->awaitingPrescriptionReview())
+                        <div class="alert alert-warning py-2 mt-2 text-sm gap-2">
+                            <x-icon name="o-clock" class="w-4 h-4 shrink-0" />
+                            <span>Waiting on a pharmacist. This order cannot be marked ready yet.</span>
+                        </div>
+                    @elseif($viewOrder->prescriptionRejected())
+                        <div class="alert alert-error py-2 mt-2 text-sm gap-2">
+                            <x-icon name="o-x-circle" class="w-4 h-4 shrink-0" />
+                            <span>Prescription rejected{{ $viewOrder->prescription_note ? ': ' . $viewOrder->prescription_note : '' }}</span>
+                        </div>
+                    @elseif($viewOrder->prescriptionApproved())
+                        <div class="text-xs text-success mt-2">
+                            Approved by {{ $viewOrder->prescriptionReviewer->name ?? 'a pharmacist' }}
+                            on {{ $viewOrder->prescription_reviewed_at?->format('d M Y g:i A') }}
+                        </div>
+                    @endif
                 @endif
             </div>
         @endif

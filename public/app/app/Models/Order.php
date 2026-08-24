@@ -12,6 +12,7 @@ class Order extends Model
         'fulfillment_type', 'payment_method', 'payment_status', 'payment_reference',
         'status', 'claimed_by', 'claimed_at', 'delivery_address', 'delivery_phone', 'note',
         'prescription_path', 'paid_at',
+        'prescription_status', 'prescription_reviewed_by', 'prescription_reviewed_at', 'prescription_note',
         'cashier_verified_at', 'verified_by',
         'delivery_person_name', 'delivery_person_phone', 'delivery_user_id', 'dispatched_at',
     ];
@@ -24,6 +25,7 @@ class Order extends Model
         'claimed_at'           => 'datetime',
         'cashier_verified_at'  => 'datetime',
         'dispatched_at'        => 'datetime',
+        'prescription_reviewed_at' => 'datetime',
     ];
 
     public function customer()
@@ -66,5 +68,33 @@ class Order extends Model
         $last = static::latest('id')->first();
         $next = $last ? $last->id + 1 : 1;
         return 'ORD-' . now()->format('Ym') . '-' . str_pad($next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Waiting on a pharmacist.
+     *
+     * Null status means the order contains nothing needing a prescription, so
+     * there is nothing to review - deliberately different from 'pending',
+     * which means a review is required and has not happened.
+     */
+    public function awaitingPrescriptionReview(): bool
+    {
+        return $this->prescription_status === 'pending';
+    }
+
+    public function prescriptionApproved(): bool
+    {
+        return $this->prescription_status === 'approved';
+    }
+
+    public function prescriptionRejected(): bool
+    {
+        return $this->prescription_status === 'rejected';
+    }
+
+    /** The pharmacist who looked at it. */
+    public function prescriptionReviewer()
+    {
+        return $this->belongsTo(User::class, 'prescription_reviewed_by');
     }
 }

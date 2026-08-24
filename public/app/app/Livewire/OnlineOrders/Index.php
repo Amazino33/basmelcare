@@ -57,6 +57,19 @@ class Index extends Component
             return;
         }
 
+        // The gate. Marking ready deducts stock and puts the order in line to
+        // go out, so this is the last point at which a prescription that was
+        // never checked can still be stopped.
+        if ($order->awaitingPrescriptionReview()) {
+            $this->error('A pharmacist has not approved the prescription for this order yet.');
+            return;
+        }
+
+        if ($order->prescriptionRejected()) {
+            $this->error('The pharmacist rejected the prescription for this order. It cannot be dispensed.');
+            return;
+        }
+
         // Check stock availability before deducting
         foreach ($order->items as $item) {
             $product = Product::with('batches')->find($item->product_id);
