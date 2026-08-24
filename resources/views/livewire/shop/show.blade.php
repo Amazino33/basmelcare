@@ -33,7 +33,12 @@
 
             <!-- Price -->
             <div class="mt-4">
-                <span class="text-2xl md:text-3xl font-bold text-primary">₦{{ number_format($product->selling_price, 2) }}</span>
+                <span class="text-2xl md:text-3xl font-bold text-primary">
+                    @if($product->hasWholesaleDiscount())<span class="text-base font-normal text-base-content/40 line-through mr-2">&#8358;{{ number_format($product->selling_price, 2) }}</span>@endif&#8358;{{ number_format($product->shopPrice(), 2) }}
+                </span>
+                @if($product->hasWholesaleDiscount())
+                    <div class="text-xs text-success mt-1">Wholesale price, applied to your account.</div>
+                @endif
             </div>
 
             @if($product->description)
@@ -112,7 +117,7 @@
                         </figure>
                         <div class="p-2">
                             <h3 class="text-xs font-semibold line-clamp-2">{{ $related->name }}</h3>
-                            <span class="text-primary font-bold text-sm">₦{{ number_format($related->selling_price, 0) }}</span>
+                            <span class="text-primary font-bold text-sm">@if($related->hasWholesaleDiscount())<span class="text-xs text-base-content/40 line-through mr-1">&#8358;{{ number_format($related->selling_price, 0) }}</span>@endif&#8358;{{ number_format($related->shopPrice(), 0) }}</span>
                         </div>
                     </a>
                 @endforeach

@@ -36,6 +36,8 @@ class Cart extends Component
             'subtotal' => $cart->subtotal(),
             'itemCount' => $cart->count(),
             'requiresPrescription' => $cart->requiresPrescription(),
+            'retailSubtotal' => $cart->retailSubtotal(),
+            'hasWholesalePricing' => $cart->hasWholesalePricing(),
         ]);
     }
 }

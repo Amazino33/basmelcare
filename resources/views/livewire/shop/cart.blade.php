@@ -65,6 +65,15 @@
                 <span class="text-base-content/60">Subtotal ({{ $itemCount }} items)</span>
                 <span class="font-bold">₦{{ number_format($subtotal, 2) }}</span>
             </div>
+
+            @if($hasWholesalePricing)
+                {{-- Say why the total is lower than the shelf prices --}}
+                <div class="flex justify-between text-sm text-success">
+                    <span>Wholesale saving</span>
+                    <span class="font-bold">−₦{{ number_format($retailSubtotal - $subtotal, 2) }}</span>
+                </div>
+            @endif
+
             <div class="flex justify-between text-sm mb-3">
                 <span class="text-base-content/60">Delivery</span>
                 <span class="text-base-content/60">Calculated at checkout</span>

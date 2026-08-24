@@ -72,7 +72,7 @@
 
                     <!-- Price -->
                     <div class="flex items-center justify-between mt-2">
-                        <span class="text-primary font-bold text-sm md:text-base">₦{{ number_format($product->selling_price, 0) }}</span>
+                        <span class="text-primary font-bold text-sm md:text-base">@if($product->hasWholesaleDiscount())<span class="text-xs text-base-content/40 line-through mr-1">&#8358;{{ number_format($product->selling_price, 0) }}</span>@endif&#8358;{{ number_format($product->shopPrice(), 0) }}</span>
                         @if($stock > 0)
                             <span class="text-xs text-success">In Stock</span>
                         @else
