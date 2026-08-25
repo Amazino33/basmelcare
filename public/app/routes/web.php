@@ -122,6 +122,12 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
         });
 
+        // What came into stock. Read-only, and the auditor is on the list:
+        // they may see stock arrive without being able to move any.
+        Route::middleware('role:admin,branch_manager,auditor,inventory_manager')->group(function () {
+            Route::get('stock/received', App\Livewire\Stock\Received::class)->name('stock.received');
+        });
+
         // The auditor's whole surface: the financial picture and the reports
         // behind it. Individual sales are visible inside Financial Records, so
         // they do not need the operational Sales History page.

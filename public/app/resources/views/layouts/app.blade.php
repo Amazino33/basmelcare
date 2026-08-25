@@ -80,6 +80,22 @@
                     <x-menu-item title="Stock Take" icon="o-clipboard-document-check" link="{{ route('stock-take.index') }}" />
                 @endif
 
+                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales']))
+                    @php
+                        // Badged because an unreviewed prescription holds up an
+                        // order a customer is waiting on.
+                        $awaitingRx = \App\Models\Order::where('prescription_status', 'pending')->count();
+                    @endphp
+                    <x-menu-item title="Prescriptions" icon="o-document-check" link="{{ route('prescriptions.index') }}"
+                                 badge="{{ $awaitingRx ?: '' }}" badge-classes="badge-error badge-xs" />
+                @endif
+
+                @if(in_array('pharmacist', $roles))
+                    {{-- The pharmacist alone decides which drugs need one --}}
+                    <x-menu-item title="Prescription Medicines" icon="o-shield-check"
+                                 link="{{ route('prescriptions.medicines') }}" />
+                @endif
+
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'inventory_manager']))
                     <x-menu-sub title="Inventory" icon="o-archive-box">
                         {{-- Visibility: what is in stock and what is expiring --}}
@@ -90,6 +106,7 @@
                         @if(array_intersect($roles,['admin', 'branch_manager', 'inventory_manager']))
                             <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
                             <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
+                            <x-menu-item title="Stock Received" icon="o-inbox-arrow-down" link="{{ route('stock.received') }}" />
                             <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
                             <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
                         @endif

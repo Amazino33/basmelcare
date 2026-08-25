@@ -260,7 +260,12 @@ class Index extends Component
             'batch_id'  => $batch->id,
             'quantity'  => $this->quick_quantity,
             'type'      => 'purchase',
-            'reference' => 'Initial stock',
+            // Distinguishes a product new to the catalogue from a top-up of
+            // one already stocked, which is the split the auditor asks for.
+            // user_id was missing entirely: stock could be taken in with no
+            // record of who did it.
+            'reference' => 'Opening stock',
+            'user_id'   => auth()->id(),
         ]);
 
         $this->quickAddCount++;
@@ -459,10 +464,11 @@ class Index extends Component
         ]);
 
         StockMovement::create([
-            'batch_id' => $batch->id,
-            'quantity' => $this->quantity,
-            'type' => 'purchase',
-            'reference' => 'Initial stock',
+            'batch_id'  => $batch->id,
+            'quantity'  => $this->quantity,
+            'type'      => 'purchase',
+            'reference' => 'Stock intake',
+            'user_id'   => auth()->id(),
         ]);
 
         $this->batchModal = false;

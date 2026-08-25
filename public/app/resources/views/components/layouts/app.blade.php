@@ -90,25 +90,6 @@
                     </x-menu-sub>
                 @endif
 
-                @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales']))
-                    @php
-                        // Badged because an unreviewed prescription holds up an
-                        // order that a customer is waiting on.
-                        $awaitingRx = \App\Models\Order::where('prescription_status', 'pending')->count();
-                    @endphp
-                    <x-menu-item title="Prescriptions" icon="o-document-check" link="{{ route('prescriptions.index') }}">
-                        @if($awaitingRx > 0)
-                            <x-slot:badge>{{ $awaitingRx }}</x-slot:badge>
-                        @endif
-                    </x-menu-item>
-                @endif
-
-                @if(in_array('pharmacist', $roles))
-                    {{-- The pharmacist alone decides which drugs need one --}}
-                    <x-menu-item title="Prescription Medicines" icon="o-shield-check"
-                                 link="{{ route('prescriptions.medicines') }}" />
-                @endif
-
                 <x-menu-sub title="People" icon="o-users">
                     @if(in_array('admin', $roles))
                         <x-menu-item title="Staff" icon="o-identification" link="{{ route('staff.index') }}" />
