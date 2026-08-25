@@ -222,6 +222,37 @@ class CloudinaryImagesTest extends TestCase
             ->assertSee('Cloudinary');
     }
 
+    // ---- the SDK wiring ----
+
+    public function test_the_adapter_can_build_the_sdk_clients(): void
+    {
+        // This is the test that was missing. The adapter passed the Cloudinary
+        // instance where the SDK wanted a Configuration; PHP accepts that at
+        // the call site and only throws inside the client on the first real
+        // request. Every other test here asserts on URL strings, so nothing
+        // ever constructed these - and the first thing production did was fail
+        // on the whole catalogue.
+        $adapter = new \App\Services\CloudinaryAdapter([
+            'cloud_name' => 'test-cloud',
+            'api_key'    => 'key',
+            'api_secret' => 'secret',
+            'folder'     => 'basmelcare',
+        ]);
+
+        $this->assertInstanceOf(\Cloudinary\Api\Upload\UploadApi::class, $adapter->uploadApi());
+        $this->assertInstanceOf(\Cloudinary\Api\Admin\AdminApi::class, $adapter->adminApi());
+    }
+
+    public function test_the_adapter_never_hands_the_sdk_the_wrong_object(): void
+    {
+        // Belt and braces on the same mistake: building the API objects from
+        // the Cloudinary instance is exactly what broke.
+        $source = file_get_contents(app_path('Services/CloudinaryAdapter.php'));
+
+        $this->assertStringNotContainsString('new UploadApi($this->cloudinary)', $source);
+        $this->assertStringNotContainsString('new AdminApi($this->cloudinary)', $source);
+    }
+
     // ── patient files must not follow ───────────────────────────────────
 
     public function test_medical_records_and_prescriptions_stay_off_the_cdn(): void

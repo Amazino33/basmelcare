@@ -43,6 +43,25 @@ class CloudinaryAdapter implements FilesystemAdapter
         ]);
     }
 
+    /**
+     * The SDK's API objects take a Configuration, NOT the Cloudinary instance.
+     * Passing the wrong one is accepted by PHP at the call site and only fails
+     * inside the client, one frame deeper, on the first real request - which
+     * is how it reached production having passed every test.
+     *
+     * Exposed rather than inlined so the wiring can be asserted without
+     * uploading anything.
+     */
+    public function uploadApi(): UploadApi
+    {
+        return $this->cloudinary->uploadApi();
+    }
+
+    public function adminApi(): AdminApi
+    {
+        return $this->cloudinary->adminApi();
+    }
+
     /** Laravel calls this for Storage::disk(...)->url(). */
     public function getUrl(string $path): string
     {
@@ -83,7 +102,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     private function upload(string $localFile, string $path): void
     {
         try {
-            (new UploadApi($this->cloudinary))->upload($localFile, [
+            $this->uploadApi()->upload($localFile, [
                 'public_id'     => CloudinaryImage::publicId($path),
                 'resource_type' => 'image',
                 'overwrite'     => true,
@@ -119,7 +138,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     public function delete(string $path): void
     {
         try {
-            (new UploadApi($this->cloudinary))->destroy(CloudinaryImage::publicId($path), [
+            $this->uploadApi()->destroy(CloudinaryImage::publicId($path), [
                 'invalidate' => true,
             ]);
         } catch (\Throwable $e) {
@@ -130,7 +149,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     public function deleteDirectory(string $path): void
     {
         try {
-            (new AdminApi($this->cloudinary))->deleteAssetsByPrefix(CloudinaryImage::publicId($path . '/x'));
+            $this->adminApi()->deleteAssetsByPrefix(CloudinaryImage::publicId($path . '/x'));
         } catch (\Throwable) {
             // Nothing to delete, or no permission to. Not worth failing a
             // request over: directories are not a real concept here.
@@ -145,7 +164,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     public function fileExists(string $path): bool
     {
         try {
-            (new AdminApi($this->cloudinary))->asset(CloudinaryImage::publicId($path));
+            $this->adminApi()->asset(CloudinaryImage::publicId($path));
 
             return true;
         } catch (\Throwable) {
