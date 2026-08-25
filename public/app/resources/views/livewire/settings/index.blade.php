@@ -119,7 +119,7 @@
             @php
                 $imageCount  = $this->imageCount();
                 $syncedCount = $this->syncedCount();
-                $outstanding = max(0, $imageCount - $syncedCount);
+                $outstanding = $this->imagesAwaitingUpload();
                 $canEnable   = $this->canEnableCloudinary();
             @endphp
 
@@ -150,15 +150,25 @@
                                 <p class="text-xs text-base-content/50 mt-1">Last checked {{ $lastSynced }}</p>
                             @endif
 
-                            <x-button label="Upload images to Cloudinary"
+                            <x-button label="{{ $syncedCount > 0 && $outstanding > 0 ? 'Continue uploading' : 'Upload images to Cloudinary' }}"
                                       icon="o-cloud-arrow-up"
                                       wire:click="uploadImagesToCloud"
                                       spinner="uploadImagesToCloud"
                                       class="btn-sm btn-outline mt-3"
                                       :disabled="$cloudinary_cloud_name === '' || $cloudinary_api_key === ''" />
+
                             <p class="text-xs text-base-content/50 mt-2">
-                                Save your credentials first. This may take a moment for a large catalogue.
+                                Save your credentials first. Images go up 25 at a time, so a large
+                                catalogue takes a few clicks &mdash; each one carries on from the last.
                             </p>
+
+                            @if($outstanding > 25)
+                                {{-- A few hundred images is a lot of clicking; the command does it in one go --}}
+                                <p class="text-xs text-base-content/50 mt-1">
+                                    For {{ $outstanding }} images it is quicker to run this once on the server:
+                                    <code class="text-[11px]">php artisan products:upload-to-cloud</code>
+                                </p>
+                            @endif
                         </div>
                     </div>
                 </div>

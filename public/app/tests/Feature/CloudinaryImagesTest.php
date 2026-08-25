@@ -195,10 +195,85 @@ class CloudinaryImagesTest extends TestCase
         );
     }
 
-    public function test_the_switch_turns_on_once_every_image_is_accounted_for(): void
+    public function test_the_settings_page_renders(): void
+    {
+        Livewire::actingAs($this->admin())
+            ->test(\App\Livewire\Settings\Index::class)
+            ->assertOk()
+            ->assertSee('Cloudinary');
+    }
+
+    // ---- resuming a large catalogue ----
+
+    public function test_a_new_image_starts_unsynced(): void
+    {
+        // Otherwise the upload command would never pick it up.
+        $product = $this->product();
+
+        $this->assertNull($product->image_synced_at);
+        $this->assertSame(1, Product::awaitingCloudUpload()->count());
+    }
+
+    public function test_an_image_uploaded_while_cloudinary_is_on_counts_as_synced(): void
+    {
+        // It was written straight to Cloudinary, so there is nothing to send.
+        $this->enableCloudinary();
+
+        $product = $this->product();
+
+        $this->assertNotNull($product->image_synced_at);
+        $this->assertSame(0, Product::awaitingCloudUpload()->count());
+    }
+
+    public function test_replacing_an_image_marks_it_unsynced_again(): void
+    {
+        $product = $this->product();
+        $product->forceFill(['image_synced_at' => now()])->save();
+
+        $product->update(['image' => 'products/replacement.jpg']);
+
+        $this->assertNull($product->fresh()->image_synced_at);
+    }
+
+    public function test_a_product_with_no_image_is_never_outstanding(): void
+    {
+        $this->product(null);
+
+        $this->assertSame(0, Product::awaitingCloudUpload()->count());
+    }
+
+    public function test_progress_is_read_from_the_products_not_a_stored_number(): void
+    {
+        // The count used to come from a setting written by the last run, which
+        // drifted the moment anyone uploaded a new image.
+        $this->product();
+        AppSetting::set('cloudinary_synced_count', 999);   // stale and wrong
+
+        $settings = Livewire::actingAs($this->admin())->test(\App\Livewire\Settings\Index::class);
+
+        $this->assertSame(0, $settings->instance()->syncedCount());
+        $this->assertSame(1, $settings->instance()->imagesAwaitingUpload());
+    }
+
+    public function test_the_switch_stays_locked_while_anything_is_outstanding(): void
     {
         $this->product();
-        AppSetting::set('cloudinary_synced_count', 1);
+        AppSetting::set('cloudinary_synced_count', 999);   // must not unlock it
+
+        Livewire::actingAs($this->admin())
+            ->test(\App\Livewire\Settings\Index::class)
+            ->set('cloudinary_cloud_name', 'test-cloud')
+            ->set('cloudinary_api_key', 'key')
+            ->set('cloudinary_api_secret', 'secret')
+            ->set('cloudinary_enabled', true)
+            ->call('saveCloudinary')
+            ->assertSet('cloudinary_enabled', false);
+    }
+
+    public function test_the_switch_unlocks_once_every_image_is_synced(): void
+    {
+        $product = $this->product();
+        $product->forceFill(['image_synced_at' => now()])->save();
 
         Livewire::actingAs($this->admin())
             ->test(\App\Livewire\Settings\Index::class)
@@ -208,18 +283,15 @@ class CloudinaryImagesTest extends TestCase
             ->set('cloudinary_enabled', true)
             ->call('saveCloudinary')
             ->assertSet('cloudinary_enabled', true);
-
-        CloudinaryImage::forget();
-
-        $this->assertTrue(CloudinaryImage::enabled());
     }
 
-    public function test_the_settings_page_renders(): void
+    public function test_the_command_takes_a_limit_so_a_request_can_batch_it(): void
     {
-        Livewire::actingAs($this->admin())
-            ->test(\App\Livewire\Settings\Index::class)
-            ->assertOk()
-            ->assertSee('Cloudinary');
+        // 366 images in one web request is a 504. The limit is what makes the
+        // Settings button able to finish at all.
+        $definition = (new \App\Console\Commands\UploadProductImagesToCloud())->getDefinition();
+
+        $this->assertTrue($definition->hasOption('limit'));
     }
 
     // ---- the SDK wiring ----

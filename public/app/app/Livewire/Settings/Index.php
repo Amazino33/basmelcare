@@ -212,10 +212,10 @@ class Index extends Component
         return $at ? \Carbon\Carbon::parse($at)->diffForHumans() : null;
     }
 
-    /** How many of those the last sync confirmed were in Cloudinary. */
+    /** How many are actually in Cloudinary right now. */
     public function syncedCount(): int
     {
-        return (int) AppSetting::get('cloudinary_synced_count', 0);
+        return max(0, $this->imageCount() - $this->imagesAwaitingUpload());
     }
 
     /**
@@ -232,7 +232,7 @@ class Index extends Component
             return false;
         }
 
-        return $this->syncedCount() >= $this->imageCount();
+        return $this->imagesAwaitingUpload() === 0 && $this->imageCount() > 0;
     }
 
     public function saveCloudinary(): void
@@ -271,23 +271,48 @@ class Index extends Component
     }
 
     /**
-     * Runs the upload in-request. Fine for a catalogue this size; if it ever
-     * grows past a few hundred images this wants to become a queued job.
+     * How many images one click sends.
+     *
+     * The whole catalogue in a single request produced a 504 on a few hundred
+     * images: every upload is a round trip to Cloudinary, and the web server
+     * gives up long before they finish. A batch small enough to return
+     * comfortably, repeated, gets there without needing a queue worker -
+     * which shared hosting does not reliably have.
      */
+    private const UPLOAD_BATCH = 25;
+
+    public function imagesAwaitingUpload(): int
+    {
+        return \App\Console\Commands\UploadProductImagesToCloud::outstandingCount();
+    }
+
     public function uploadImagesToCloud(): void
     {
-        $exitCode = Artisan::call('products:upload-to-cloud');
+        $before = $this->imagesAwaitingUpload();
+
+        $exitCode = Artisan::call('products:upload-to-cloud', ['--limit' => self::UPLOAD_BATCH]);
+
+        $after = $this->imagesAwaitingUpload();
+        $sent  = max(0, $before - $after);
 
         if ($exitCode !== 0) {
             // The per-image reasons matter and are too long for a toast.
             Log::warning('Cloudinary upload reported failures', ['output' => Artisan::output()]);
 
-            $this->error('Some images failed to upload. See the log for which ones.');
+            $this->error('Some images failed. ' . $sent . ' sent, ' . $after . ' still to go. See the log.');
 
             return;
         }
 
-        $this->success('Images uploaded: ' . $this->syncedCount() . ' of ' . $this->imageCount() . ' now in Cloudinary.');
+        if ($after > 0) {
+            // Nothing is lost by stopping here; the next click carries on from
+            // where this one finished.
+            $this->success($sent . ' sent. ' . $after . ' still to go - click again to continue.');
+
+            return;
+        }
+
+        $this->success('Every product image is now in Cloudinary.');
     }
 
     public function saveKudiSms(): void

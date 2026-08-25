@@ -28,7 +28,7 @@ class Product extends Model
         'name', 'sku', 'category_id', 'selling_price', 'wholesale_price',
         'wholesale_min_qty', 'wholesale_markup_percent',
         'has_pack', 'pack_size', 'pack_price',
-        'reorder_level', 'description', 'image', 'barcode',
+        'reorder_level', 'description', 'image', 'image_synced_at', 'barcode',
         'requires_prescription', 'is_featured', 'show_in_shop',
     ];
 
@@ -37,12 +37,37 @@ class Product extends Model
         'wholesale_price' => 'decimal:2',
         'wholesale_markup_percent' => 'decimal:2',
         'has_pack' => 'boolean',
+        'image_synced_at' => 'datetime',
         'pack_price' => 'decimal:2',
         'requires_prescription' => 'boolean',
         'is_featured' => 'boolean',
         'show_in_shop' => 'boolean',
     ];
 
+
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product) {
+            if (! $product->isDirty('image')) {
+                return;
+            }
+
+            // A new file. If Cloudinary is switched on it was written straight
+            // there, so it is already synced; if not, it is sitting in local
+            // storage and the next upload run has to pick it up.
+            $product->image_synced_at = $product->image && CloudinaryImage::enabled()
+                ? now()
+                : null;
+        });
+    }
+
+    /** Has an image that is not in Cloudinary yet. */
+    public function scopeAwaitingCloudUpload($query)
+    {
+        return $query->whereNotNull('image')
+            ->where('image', '!=', '')
+            ->whereNull('image_synced_at');
+    }
 
     public function getPriceFor(?Customer $customer, int $qty = 1): float
     {
