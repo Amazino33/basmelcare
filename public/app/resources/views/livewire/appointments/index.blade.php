@@ -5,6 +5,7 @@
         </x-slot:middle>
         <x-slot:actions>
             <x-select wire:model.live="statusFilter" :options="[
+                ['id' => 'requests', 'name' => 'Requests' . ($requestCount ? ' (' . $requestCount . ')' : '')],
                 ['id' => 'upcoming', 'name' => 'Upcoming'],
                 ['id' => 'scheduled', 'name' => 'Scheduled'],
                 ['id' => 'confirmed', 'name' => 'Confirmed'],
@@ -37,6 +38,22 @@
 
         @scope('cell_duration_minutes', $appt)
             {{ $appt->duration_minutes }} min
+        @endscope
+
+        @scope('cell_status', $appt)
+            @if($appt->status === 'requested')
+                {{-- Booked online: the customer asked for a time, someone has to agree it --}}
+                <span class="badge badge-warning badge-sm">Requested</span>
+                <div class="mt-1">
+                    <x-button label="Confirm time" wire:click="updateStatus({{ $appt->id }}, 'confirmed')"
+                              class="btn-xs btn-primary" spinner />
+                </div>
+            @else
+                <span class="badge badge-sm">{{ ucfirst(str_replace('_', ' ', $appt->status)) }}</span>
+            @endif
+            @if($appt->isSelfBooked())
+                <div class="text-xs text-base-content/40 mt-1">booked online</div>
+            @endif
         @endscope
 
         @scope('cell_mode', $appt)

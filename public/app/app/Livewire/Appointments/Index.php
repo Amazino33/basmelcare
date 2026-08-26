@@ -185,13 +185,33 @@ class Index extends Component
             ->when($this->search, fn($q) => $q->where('title', 'like', "%{$this->search}%")
                 ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%")));
 
-        if ($this->statusFilter === 'upcoming') {
-            $query->where('scheduled_at', '>=', now())->whereIn('status', ['scheduled', 'confirmed']);
+        // A booking the customer made online and never paid for stops counting
+        // as live after the hold window. It is not deleted - the record shows
+        // someone tried and gave up - but staff should not be chasing it.
+        $notLapsed = fn ($q) => $q->where(fn ($inner) => $inner
+            ->where('payment_status', '!=', 'pending')
+            ->orWhereNotNull('booked_by')
+            ->orWhere('created_at', '>=', now()->subMinutes(ConsultationPricing::holdMinutes())));
+
+        if ($this->statusFilter === 'requests') {
+            // Booked online and waiting on someone to agree the time.
+            $query->where('status', 'requested')->where($notLapsed);
+        } elseif ($this->statusFilter === 'upcoming') {
+            $query->where('scheduled_at', '>=', now())
+                ->whereIn('status', ['requested', 'scheduled', 'confirmed'])
+                ->where($notLapsed);
         } elseif ($this->statusFilter !== 'all') {
             $query->where('status', $this->statusFilter);
         }
 
         $appointments = $query->orderBy('scheduled_at')->paginate(20);
+
+        $requestCount = Appointment::where('status', 'requested')
+            ->where(fn ($q) => $q
+                ->where('payment_status', '!=', 'pending')
+                ->orWhereNotNull('booked_by')
+                ->orWhere('created_at', '>=', now()->subMinutes(ConsultationPricing::holdMinutes())))
+            ->count();
 
         $todayCount = Appointment::whereDate('scheduled_at', today())
             ->whereIn('status', ['scheduled', 'confirmed'])->count();
@@ -207,6 +227,7 @@ class Index extends Component
             'appointments' => $appointments,
             'todayCount' => $todayCount,
             'upcomingCount' => $upcomingCount,
+            'requestCount' => $requestCount,
             'customers' => $customers,
             'staff' => $staff,
         ]);

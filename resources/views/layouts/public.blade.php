@@ -30,6 +30,7 @@
                 <div class="hidden md:flex items-center gap-6">
                     <a href="/" class="text-sm font-medium hover:text-primary transition-colors">Home</a>
                     <a href="/shop" class="text-sm font-medium hover:text-primary transition-colors">Shop</a>
+                    <a href="{{ route('consultation.book') }}" class="text-sm font-medium hover:text-primary transition-colors">Consultation</a>
                     <a href="#services" class="text-sm font-medium hover:text-primary transition-colors">Services</a>
                     <a href="#contact" class="text-sm font-medium hover:text-primary transition-colors">Contact</a>
                 </div>

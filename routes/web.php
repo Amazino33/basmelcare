@@ -9,6 +9,14 @@ Route::get('/shop/{product}', App\Livewire\Shop\Show::class)->name('shop.show');
 Route::get('/cart', App\Livewire\Shop\Cart::class)->name('cart');
 Route::get('/paystack/callback', [App\Http\Controllers\PaystackController::class, 'callback'])->name('paystack.callback');
 
+// Consultations. Anyone can book: identity comes from the phone number, which
+// is matched to a customer record or creates one, because the free allowance
+// is per customer and an unattached booking could claim it repeatedly.
+Route::get('/consultation', App\Livewire\Consultations\Book::class)->name('consultation.book');
+Route::get('/consultation/{appointment}/pay', [App\Http\Controllers\ConsultationPaymentController::class, 'pay'])->name('consultation.pay');
+Route::get('/consultation/callback', [App\Http\Controllers\ConsultationPaymentController::class, 'callback'])->name('consultation.callback');
+Route::get('/consultation/{appointment}/confirmed', [App\Http\Controllers\ConsultationPaymentController::class, 'confirmation'])->name('consultation.confirmation');
+
 // Customer auth
 Route::middleware('guest:customer')->group(function () {
     Route::get('/login', App\Livewire\Customer\Login::class)->name('customer.login');
