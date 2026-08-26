@@ -39,6 +39,25 @@
             {{ $appt->duration_minutes }} min
         @endscope
 
+        @scope('cell_mode', $appt)
+            <div class="text-sm">{{ $appt->modeLabel() }}</div>
+            <div class="text-xs text-base-content/50">{{ $appt->providerLabel() }}</div>
+        @endscope
+
+        @scope('cell_price', $appt)
+            @if($appt->was_free)
+                <span class="badge badge-success badge-sm">Free</span>
+            @else
+                <div class="font-semibold tabular-nums">₦{{ number_format($appt->price, 2) }}</div>
+                @if($appt->payment_status === 'paid')
+                    <span class="badge badge-success badge-xs">Paid</span>
+                @else
+                    <x-button label="Mark paid" wire:click="markPaid({{ $appt->id }})"
+                              class="btn-xs btn-outline btn-warning mt-1" spinner />
+                @endif
+            @endif
+        @endscope
+
         @scope('cell_status', $appt)
             <x-badge :value="ucfirst(str_replace('_', ' ', $appt->status))" @class([
                 'badge-info' => $appt->status === 'scheduled',
@@ -74,6 +93,42 @@
                 <x-input label="Time" wire:model="scheduled_time" type="time" />
             </div>
             <x-input label="Duration (minutes)" wire:model="duration_minutes" type="number" min="5" max="480" />
+
+            <div class="grid grid-cols-2 gap-4">
+                <x-select label="How" wire:model.live="mode"
+                          :options="collect(\App\Support\ConsultationPricing::MODES)->map(fn($l, $v) => ['id' => $v, 'name' => $l])->values()"
+                          option-value="id" option-label="name" />
+                <x-select label="With" wire:model.live="provider_type"
+                          :options="collect(\App\Support\ConsultationPricing::PROVIDERS)->map(fn($l, $v) => ['id' => $v, 'name' => $l])->values()"
+                          option-value="id" option-label="name" />
+            </div>
+
+            @if($mode !== 'physical')
+                {{-- A call or a chat needs somewhere to reach them; staff arrange it --}}
+                <x-input label="Reach them on" wire:model="contact"
+                         placeholder="Phone or handle for the {{ $mode === 'video' ? 'call' : 'chat' }}"
+                         hint="The system records the mode; you arrange the {{ $mode === 'video' ? 'call' : 'chat' }} yourself." />
+            @endif
+
+            @if(! $appointmentId && $customer_id)
+                @php
+                    $free      = $this->quotedIsFree();
+                    $quoted    = $this->quotedPrice();
+                    $remaining = $this->freeRemaining();
+                @endphp
+                <div class="rounded-lg border p-3 text-sm {{ $free ? 'border-success bg-success/5' : 'border-base-300 bg-base-200/40' }}">
+                    @if($free)
+                        <span class="font-semibold text-success">No charge</span>
+                        <span class="text-base-content/70">
+                            &mdash; this customer has {{ $remaining }} free
+                            {{ Str::plural('consultation', $remaining) }} left.
+                        </span>
+                    @else
+                        <span class="font-semibold">₦{{ number_format($quoted, 2) }}</span>
+                        <span class="text-base-content/70">&mdash; payable at the counter.</span>
+                    @endif
+                </div>
+            @endif
             <x-textarea label="Description" wire:model="description" placeholder="What is the appointment for?" rows="2" />
             <x-textarea label="Note" wire:model="appt_note" placeholder="Internal notes" rows="2" />
             <x-slot:actions>

@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Models\AppSetting;
 use App\Models\Product;
 use App\Support\CloudinaryImage;
+use App\Support\ConsultationPricing;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -61,6 +62,11 @@ class Index extends Component
     public string $hifastlink_url = '';
     public int    $voucher_validity_hours = 24;
 
+    // Consultations
+    public array $consult_prices = [];
+    public int $consult_free_count = 1;
+    public string $consult_free_period = 'ever';
+
     // Wholesale pricing
     public float $wholesale_markup_percent = 5;
 
@@ -105,6 +111,16 @@ class Index extends Component
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
         $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');
+
+        $this->consult_free_count  = (int) AppSetting::get('consult_free_count', 1);
+        $this->consult_free_period = (string) AppSetting::get('consult_free_period', 'ever');
+
+        foreach (array_keys(ConsultationPricing::PROVIDERS) as $provider) {
+            foreach (array_keys(ConsultationPricing::MODES) as $mode) {
+                $this->consult_prices[$provider][$mode] =
+                    (string) ConsultationPricing::price($provider, $mode);
+            }
+        }
 
         $this->wholesale_markup_percent = (float) AppSetting::get('wholesale_markup_percent', 5);
 
@@ -172,6 +188,32 @@ class Index extends Component
      * figure here is almost always a typo, and it would quietly reprice the
      * whole catalogue for every wholesale customer.
      */
+    /**
+     * What a consultation costs, and how many are free.
+     *
+     * Prices are per provider and per mode because a video call and a text
+     * exchange are not the same amount of anybody's time.
+     */
+    public function saveConsultations(): void
+    {
+        $this->validate([
+            'consult_free_count'    => 'required|integer|min:0|max:20',
+            'consult_free_period'   => 'required|in:' . implode(',', array_keys(ConsultationPricing::FREE_PERIODS)),
+            'consult_prices.*.*'    => 'nullable|numeric|min:0',
+        ]);
+
+        AppSetting::set('consult_free_count', $this->consult_free_count);
+        AppSetting::set('consult_free_period', $this->consult_free_period);
+
+        foreach ($this->consult_prices as $provider => $modes) {
+            foreach ($modes as $mode => $price) {
+                AppSetting::set(ConsultationPricing::priceKey($provider, $mode), (float) $price);
+            }
+        }
+
+        $this->success('Consultation settings saved.');
+    }
+
     public function saveWholesalePricing(): void
     {
         $this->validate([

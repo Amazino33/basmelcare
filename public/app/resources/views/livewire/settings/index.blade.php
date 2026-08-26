@@ -22,6 +22,67 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="consultations" label="Consultations" icon="o-chat-bubble-left-right">
+            <x-card title="What a consultation costs" subtitle="Per provider and per mode" class="mt-4">
+                <x-form wire:submit="saveConsultations">
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    @foreach(\App\Support\ConsultationPricing::MODES as $mode => $modeLabel)
+                                        <th>{{ $modeLabel }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach(\App\Support\ConsultationPricing::PROVIDERS as $provider => $providerLabel)
+                                    <tr>
+                                        <td class="font-semibold whitespace-nowrap">{{ $providerLabel }}</td>
+                                        @foreach(array_keys(\App\Support\ConsultationPricing::MODES) as $mode)
+                                            <td>
+                                                <x-input wire:model="consult_prices.{{ $provider }}.{{ $mode }}"
+                                                         prefix="₦" type="number" step="0.01" min="0" class="input-sm" />
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <x-input label="Free consultations" wire:model="consult_free_count"
+                                 type="number" min="0" max="20"
+                                 hint="How many a customer gets at no charge" />
+
+                        <x-select label="How often" wire:model="consult_free_period"
+                                  :options="collect(\App\Support\ConsultationPricing::FREE_PERIODS)->map(fn($l, $v) => ['id' => $v, 'name' => $l])->values()"
+                                  option-value="id" option-label="name" />
+                    </div>
+
+                    <div class="rounded-lg border border-base-300 bg-base-200/40 p-4 text-sm mt-2">
+                        <p class="font-semibold mb-1">How the free one works</p>
+                        <p class="text-base-content/70">
+                            A customer inside their allowance is charged nothing, and the
+                            consultation is recorded as free. Changing these settings later does
+                            not re-price consultations already given &mdash; what was free stays
+                            free, and the count is of what actually happened.
+                        </p>
+                        <p class="text-base-content/60 mt-2">
+                            The system records whether a consultation is by video, text or in
+                            person so it can be priced and prepared for. It does not host the call
+                            or the chat &mdash; staff arrange those as they do now.
+                        </p>
+                    </div>
+
+                    <x-slot:actions>
+                        <x-button label="Save Consultation Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
         <x-tab name="pricing" label="Wholesale" icon="o-tag">
             <x-card title="Wholesale Pricing" subtitle="What customers tagged as wholesale pay" class="mt-4">
                 <x-form wire:submit="saveWholesalePricing">
