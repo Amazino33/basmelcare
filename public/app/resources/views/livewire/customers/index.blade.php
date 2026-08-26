@@ -293,6 +293,25 @@
                             <div class="text-sm font-semibold">{{ $order->order_number }}</div>
                             <div class="text-xs text-base-content/60">{{ $order->created_at->format('M d, Y') }} | {{ ucfirst($order->fulfillment_type) }}</div>
                             <div class="text-xs text-base-content/60">{{ $order->items->count() }} items</div>
+
+                            @if($order->prescription_path)
+                                {{-- The file the customer uploaded with this order. Their own
+                                     medical records stay pharmacist-only; this is the document
+                                     they attached to a purchase the sales desk already handles. --}}
+                                <a href="{{ route('prescriptions.file', $order->id) }}" target="_blank"
+                                   class="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                                    <x-icon name="o-document-text" class="w-3 h-3" />
+                                    Prescription
+                                </a>
+
+                                @if($order->prescriptionRejected())
+                                    <span class="badge badge-error badge-xs ml-1">Rejected</span>
+                                @elseif($order->awaitingPrescriptionReview())
+                                    <span class="badge badge-warning badge-xs ml-1">Awaiting pharmacist</span>
+                                @elseif($order->prescriptionApproved())
+                                    <span class="badge badge-success badge-xs ml-1">Approved</span>
+                                @endif
+                            @endif
                         </div>
                         <div class="text-right">
                             <span class="font-bold">₦{{ number_format($order->total_amount, 2) }}</span>
