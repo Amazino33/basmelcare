@@ -129,6 +129,12 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         // they may see stock arrive without being able to move any.
         Route::middleware('role:admin,branch_manager,auditor,inventory_manager')->group(function () {
             Route::get('stock/received', App\Livewire\Stock\Received::class)->name('stock.received');
+
+            // What cannot be sold: asked for and never stocked, or run out.
+            // Sales staff hear the requests so they can see the list; only
+            // buying staff may mark something sourced, checked in the component
+            // rather than by hiding the button.
+            Route::get('stock/unavailable', App\Livewire\Stock\Unavailable::class)->name('stock.unavailable');
         });
 
         // The auditor's whole surface: the financial picture and the reports

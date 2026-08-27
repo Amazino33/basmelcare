@@ -28,7 +28,8 @@ class Product extends Model
         'name', 'sku', 'category_id', 'selling_price', 'wholesale_price',
         'wholesale_min_qty', 'wholesale_markup_percent',
         'has_pack', 'pack_size', 'pack_price',
-        'reorder_level', 'description', 'image', 'image_synced_at', 'barcode',
+        'reorder_level', 'sourced_at', 'sourced_by',
+        'description', 'image', 'image_synced_at', 'barcode',
         'requires_prescription', 'is_featured', 'show_in_shop',
     ];
 
@@ -38,6 +39,7 @@ class Product extends Model
         'wholesale_markup_percent' => 'decimal:2',
         'has_pack' => 'boolean',
         'image_synced_at' => 'datetime',
+        'sourced_at' => 'datetime',
         'pack_price' => 'decimal:2',
         'requires_prescription' => 'boolean',
         'is_featured' => 'boolean',
@@ -67,6 +69,18 @@ class Product extends Model
         return $query->whereNotNull('image')
             ->where('image', '!=', '')
             ->whereNull('image_synced_at');
+    }
+
+    /** Nothing on the shelf, and nobody has said it is on the way. */
+    public function scopeUnsellable($query)
+    {
+        return $query->whereNull('sourced_at')
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE batches.product_id = products.id) <= 0');
+    }
+
+    public function sourcedBy()
+    {
+        return $this->belongsTo(User::class, 'sourced_by');
     }
 
     public function getPriceFor(?Customer $customer, int $qty = 1): float

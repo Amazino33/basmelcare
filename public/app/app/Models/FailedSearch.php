@@ -13,9 +13,9 @@ class FailedSearch extends Model
 {
     use BelongsToBranch;
 
-    protected $fillable = ['term', 'times', 'last_user_id', 'branch_id', 'last_searched_at'];
+    protected $fillable = ['term', 'times', 'last_user_id', 'branch_id', 'last_searched_at', 'sourced_at', 'sourced_by'];
 
-    protected $casts = ['last_searched_at' => 'datetime'];
+    protected $casts = ['last_searched_at' => 'datetime', 'sourced_at' => 'datetime'];
 
     public function lastUser(): BelongsTo
     {
@@ -51,6 +51,10 @@ class FailedSearch extends Model
             $row->forceFill([
                 'last_user_id'     => $userId,
                 'last_searched_at' => now(),
+                // Asked for again and still not found, so whatever was sourced
+                // last time did not settle it. Back on the list.
+                'sourced_at'       => null,
+                'sourced_by'       => null,
             ])->save();
 
             return;
@@ -63,5 +67,16 @@ class FailedSearch extends Model
             'branch_id'        => $branchId,
             'last_searched_at' => now(),
         ]);
+    }
+
+    public function sourcedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sourced_by');
+    }
+
+    /** Still wanted: asked for, and nobody has said they got it. */
+    public function scopeOutstanding($query)
+    {
+        return $query->whereNull('sourced_at');
     }
 }

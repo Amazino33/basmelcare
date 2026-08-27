@@ -107,6 +107,13 @@
                             <x-menu-item title="Transfers" icon="o-arrows-right-left" link="{{ route('stock.transfers') }}" />
                             <x-menu-item title="Adjustments" icon="o-adjustments-horizontal" link="{{ route('stock.adjustments') }}" />
                             <x-menu-item title="Stock Received" icon="o-inbox-arrow-down" link="{{ route('stock.received') }}" />
+                            @php
+                                // Badged: an unmet request is a sale that walked out.
+                                $cantSell = \App\Models\FailedSearch::outstanding()->count()
+                                    + \App\Models\Product::unsellable()->count();
+                            @endphp
+                            <x-menu-item title="Can't Sell" icon="o-no-symbol" link="{{ route('stock.unavailable') }}"
+                                         badge="{{ $cantSell ?: '' }}" badge-classes="badge-warning badge-xs" />
                             <x-menu-item title="Movement History" icon="o-clock" link="{{ route('stock.history') }}" />
                             <x-menu-item title="Locations" icon="o-map-pin" link="{{ route('locations.index') }}" />
                         @endif

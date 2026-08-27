@@ -36,4 +36,16 @@ class Batch extends Model
     {
         return $this->hasMany(StockMovement::class);
     }
+
+    protected static function booted(): void
+    {
+        static::created(function (Batch $batch) {
+            // Stock has actually arrived, so the sourcing is finished. Cleared
+            // rather than kept, or the next time this runs out it would stay
+            // off the buying list with nothing to explain why.
+            Product::where('id', $batch->product_id)
+                ->whereNotNull('sourced_at')
+                ->update(['sourced_at' => null, 'sourced_by' => null]);
+        });
+    }
 }
