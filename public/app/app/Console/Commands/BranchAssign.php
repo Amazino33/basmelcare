@@ -31,6 +31,9 @@ class BranchAssign extends Command
 
     protected $description = 'Report records saved with no branch, and optionally assign them';
 
+    /** Roles that legitimately have no branch: they record nothing scoped to one. */
+    private const SPANS_BRANCHES = ['admin', 'auditor', 'content', 'promoter'];
+
     /** Every model the branch scope applies to. */
     private function models(): array
     {
@@ -45,6 +48,7 @@ class BranchAssign extends Command
 
     public function handle(): int
     {
+        $this->warnIfNoMainBranch();
         $this->reportUsers();
 
         $models = $this->models();
@@ -136,8 +140,26 @@ class BranchAssign extends Command
     }
 
     /**
-     * The cause, not just the symptom. A user with no branch records nothing
-     * anyone else can see, which is rarely what was intended.
+     * The fallback prefers the branch marked main and settles for the lowest
+     * id otherwise. With one branch that lands correctly either way, but it is
+     * luck rather than intent, and stops being true the moment a second branch
+     * is added.
+     */
+    private function warnIfNoMainBranch(): void
+    {
+        if (Branch::count() === 0 || Branch::where('is_main', true)->exists()) {
+            return;
+        }
+
+        $this->warn('No branch is marked as the main one.');
+        $this->line('  Records saved without a branch fall back to the lowest id instead.');
+        $this->line('  Set one in Branches so that stays deliberate.');
+        $this->newLine();
+    }
+
+    /**
+     * The cause, not just the symptom. Someone who records branch-scoped work
+     * without a branch produces records nobody else can see.
      */
     private function reportUsers(): void
     {
@@ -154,9 +176,16 @@ class BranchAssign extends Command
         foreach ($branchless as $user) {
             $roles = is_array($user->role) ? implode(', ', $user->role) : (string) $user->role;
 
-            // An admin sees every branch by design, so being branchless is
-            // normal for them; for anyone else it is almost always a mistake.
-            $note = str_contains($roles, 'admin') ? '' : '   <- records nothing others can see';
+            // Only flag those who actually record branch-scoped work. An admin
+            // oversees all branches, an auditor only reads, content uploads
+            // images and a promoter registers customers - none of that is
+            // branch-scoped, so having no branch is correct for them.
+            $recordsBranchWork = (bool) array_diff(
+                is_array($user->role) ? $user->role : [],
+                self::SPANS_BRANCHES,
+            );
+
+            $note = $recordsBranchWork ? '   <- their records fall back to the main branch' : '';
 
             $this->line(sprintf('  %-24s %-30s%s', $user->name, $roles, $note));
         }

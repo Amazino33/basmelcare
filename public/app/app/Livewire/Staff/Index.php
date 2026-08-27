@@ -55,12 +55,26 @@ class Index extends Component
             'phone' => 'nullable|string|max:20',
             'role' => 'required|array|min:1',
             'role.*' => 'in:admin,pharmacist,branch_manager,sales,cashier,inventory_manager,promoter,content,auditor',
-            // Required for everyone but an admin. A non-admin with no branch
-            // sees every branch AND records nothing anyone with a branch can
-            // see - their expenses and sales become invisible to colleagues,
-            // which is never what anybody intends by leaving it blank.
+            // Required only of people who record branch-scoped work: expenses,
+            // sales, purchase orders, locations, searches. Without a branch
+            // those records inherit none, and become invisible to every
+            // colleague who has one.
+            //
+            // Exempt roles genuinely span branches or record none of it: an
+            // admin oversees all, an auditor only reads, content uploads
+            // images, a promoter registers customers. Forcing a branch on
+            // them would be a fiction.
             'branch_id' => [
-                \Illuminate\Validation\Rule::requiredIf(fn () => ! in_array('admin', $this->role ?? [], true)),
+                \Illuminate\Validation\Rule::requiredIf(function () {
+                    $roles = $this->role ?? [];
+
+                    // An admin oversees every branch, whatever else they hold.
+                    if (in_array('admin', $roles, true)) {
+                        return false;
+                    }
+
+                    return (bool) array_diff($roles, ['auditor', 'content', 'promoter']);
+                }),
                 'nullable',
                 'exists:branches,id',
             ],

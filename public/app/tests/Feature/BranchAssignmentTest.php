@@ -135,31 +135,65 @@ class BranchAssignmentTest extends TestCase
             ->test(\App\Livewire\Staff\Index::class);
     }
 
-    public function test_a_cashier_cannot_be_created_without_a_branch(): void
+    public static function branchlessRoles(): array
     {
-        $this->branches();
-
-        $this->staffForm()
-            ->set('name', 'VIVIANE')
-            ->set('email', 'viviane@example.com')
-            ->set('role', ['cashier'])
-            ->set('branch_id', null)
-            ->call('save')
-            ->assertHasErrors('branch_id');
+        return [
+            // Oversees every branch.
+            'admin'    => [['admin']],
+            // Reads only; records nothing at all.
+            'auditor'  => [['auditor']],
+            // Uploads product images, which carry no branch.
+            'content'  => [['content']],
+            // Registers customers, which carry no branch.
+            'promoter' => [['promoter']],
+            // A real combination in production.
+            'content and promoter' => [['content', 'promoter']],
+            // An admin oversees every branch whatever else they hold.
+            'admin who is also a branch manager' => [['admin', 'branch_manager']],
+        ];
     }
 
-    public function test_an_admin_may_be_left_without_one(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('branchlessRoles')]
+    public function test_roles_that_record_no_branch_scoped_work_may_be_left_without_one(array $roles): void
     {
-        // An admin sees every branch by design, so branchless is correct there.
+        // Forcing a branch on them would be a fiction: an auditor only reads,
+        // and content and promoters record nothing the branch scope touches.
         $this->branches();
 
         $this->staffForm()
-            ->set('name', 'DR BASMEL')
-            ->set('email', 'basmel@example.com')
-            ->set('role', ['admin'])
+            ->set('name', 'SOMEBODY')
+            ->set('email', strtolower(implode('-', $roles)) . '@example.com')
+            ->set('role', $roles)
             ->set('branch_id', null)
             ->call('save')
             ->assertHasNoErrors('branch_id');
+    }
+
+    public static function branchedRoles(): array
+    {
+        return [
+            'cashier'           => [['cashier']],
+            'sales'             => [['sales']],
+            'branch manager'    => [['branch_manager']],
+            'inventory manager' => [['inventory_manager']],
+            // One role that needs a branch is enough to require one.
+            'auditor who is also a cashier' => [['auditor', 'cashier']],
+            'pharmacist'        => [['pharmacist']],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('branchedRoles')]
+    public function test_roles_that_record_branch_scoped_work_must_have_one(array $roles): void
+    {
+        $this->branches();
+
+        $this->staffForm()
+            ->set('name', 'SOMEBODY')
+            ->set('email', strtolower(implode('-', $roles)) . '@example.com')
+            ->set('role', $roles)
+            ->set('branch_id', null)
+            ->call('save')
+            ->assertHasErrors('branch_id');
     }
 
     // ── the clean-up command ────────────────────────────────────────────
