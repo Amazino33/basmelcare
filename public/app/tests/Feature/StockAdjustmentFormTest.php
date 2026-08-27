@@ -74,6 +74,30 @@ class StockAdjustmentFormTest extends TestCase
         $this->assertStringContainsString('wire:model.live="product_id"', $view);
     }
 
+    public function test_the_product_picker_is_searchable(): void
+    {
+        // A plain select of several hundred drugs is unusable at a counter.
+        $view = file_get_contents(resource_path('views/livewire/stock/adjustments.blade.php'));
+
+        $this->assertStringContainsString('x-choices-offline', $view);
+        $this->assertStringContainsString('searchable', $view);
+        $this->assertStringContainsString('wire:model.live="product_id"', $view);
+    }
+
+    public function test_every_product_is_offered_to_search_through(): void
+    {
+        foreach (['PARACETAMOL 500MG', 'AMOXIL 500MG', 'ARBITEL 80H'] as $name) {
+            Product::create([
+                'name'          => $name,
+                'category_id'   => Category::firstOrCreate(['name' => 'General'])->id,
+                'selling_price' => 200,
+                'reorder_level' => 1,
+            ]);
+        }
+
+        $this->assertCount(3, $this->page()->viewData('products'));
+    }
+
     // ── the form fills in as you go ─────────────────────────────────────
 
     public function test_the_batch_list_appears_once_a_product_is_chosen(): void

@@ -19,7 +19,10 @@
 
     <x-modal wire:model="modal" title="Stock Adjustment" box-class="max-w-lg">
         <x-form wire:submit="adjust">
-            <x-select label="Product" wire:model.live="product_id" :options="$products" option-value="id" option-label="name" placeholder="Select product" />
+            {{-- Searchable: a plain select of several hundred drugs is unusable --}}
+            <x-choices-offline label="Product" wire:model.live="product_id" :options="$products"
+                               option-value="id" option-label="name"
+                               placeholder="Search for a product..." single searchable />
 
             @if($product_id)
                 {{-- .live, or nothing below ever appears: the quantity, type and

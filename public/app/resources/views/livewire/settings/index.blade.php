@@ -117,7 +117,7 @@
         <x-tab name="whatsapp" label="WhatsApp" icon="o-chat-bubble-left-right">
             <x-card title="WhatsApp Integration (WAWP)" class="mt-4">
                 <x-form wire:submit="saveWhatsApp">
-                    <x-toggle label="Enable WhatsApp" wire:model="wawp_enabled" hint="Send notifications via WhatsApp" />
+                    <x-toggle label="Enable WhatsApp" wire:model.live="wawp_enabled" hint="Send notifications via WhatsApp" />
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <x-input label="WAWP Instance ID" wire:model="wawp_instance_id" />
                         <x-input label="WAWP Access Token" wire:model="wawp_access_token" type="password" />
