@@ -42,6 +42,17 @@ class Index extends Component
     #[Url]
     public string $statusFilter = 'all';
 
+    /**
+     * all | cash | card | transfer
+     *
+     * Matches any invoice where that method contributed, including its share
+     * of a split payment. The figures above sum every naira of each method
+     * across every sale, so a filter that excluded splits would list invoices
+     * that do not add up to the number being checked.
+     */
+    #[Url]
+    public string $methodFilter = 'all';
+
     /** Invoice opened in the detail drawer. */
     public ?int $viewSaleId = null;
     public bool $saleDrawer = false;
@@ -75,17 +86,21 @@ class Index extends Component
 
     public function updatedSearch(): void       { $this->resetPage(); }
     public function updatedStatusFilter(): void { $this->resetPage(); }
+    public function updatedMethodFilter(): void { $this->resetPage(); }
 
     public function clearFilters(): void
     {
         $this->search       = '';
         $this->statusFilter = 'all';
+        $this->methodFilter = 'all';
         $this->resetPage();
     }
 
     public function hasFilters(): bool
     {
-        return trim($this->search) !== '' || $this->statusFilter !== 'all';
+        return trim($this->search) !== ''
+            || $this->statusFilter !== 'all'
+            || $this->methodFilter !== 'all';
     }
 
     public function viewSale(int $saleId): void
@@ -135,7 +150,14 @@ class Index extends Component
             })
             ->when($this->statusFilter === 'settled', fn($q) => $q->whereIn('status', ['paid', 'completed']))
             ->when($this->statusFilter === 'cancelled', fn($q) => $q->where('status', 'cancelled'))
-            ->when($this->statusFilter === 'pending', fn($q) => $q->where('status', 'pending'));
+            ->when($this->statusFilter === 'pending', fn($q) => $q->where('status', 'pending'))
+            // The method keys are written as a number when used and null when
+            // not, so "was any taken" is simply "is it not null". Done in SQL
+            // rather than in PHP so the pager still works.
+            ->when(
+                in_array($this->methodFilter, ['cash', 'card', 'transfer'], true),
+                fn($q) => $q->whereNotNull('payment_details->' . $this->methodFilter)
+            );
     }
 
     /** Only settled sales count — pending invoices are not income. */

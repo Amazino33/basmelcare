@@ -195,6 +195,103 @@ class AuditorFinanceTest extends TestCase
         $this->actingAs($this->auditor())->get($this->url($path))->assertOk();
     }
 
+    // ---- filtering by how it was paid ----
+
+    /** A settled sale paid across the given methods. */
+    private function sellPaidBy(array $methods, float $price = 1000): \App\Models\Sale
+    {
+        $sale = $this->sell(price: $price, cost: 400);
+
+        $sale->update([
+            'payment_details' => array_merge(
+                ['cash' => null, 'card' => null, 'transfer' => null],
+                $methods,
+            ),
+        ]);
+
+        return $sale->fresh();
+    }
+
+    private function listedInvoices(string $method): \Illuminate\Support\Collection
+    {
+        return Livewire::actingAs($this->auditor())
+            ->test(\App\Livewire\Finance\Index::class)
+            ->set('methodFilter', $method)
+            ->viewData('sales')
+            ->getCollection();
+    }
+
+    public function test_it_lists_only_invoices_where_that_method_was_taken(): void
+    {
+        $cashSale     = $this->sellPaidBy(['cash' => 1000]);
+        $transferSale = $this->sellPaidBy(['transfer' => 1000]);
+
+        $cash = $this->listedInvoices('cash')->pluck('id');
+
+        $this->assertTrue($cash->contains($cashSale->id));
+        $this->assertFalse($cash->contains($transferSale->id));
+    }
+
+    public function test_a_split_payment_appears_under_both_methods(): void
+    {
+        // The panel figures sum every naira of each method, split payments
+        // included. A filter that hid splits would list invoices that do not
+        // add up to the number being checked.
+        $split = $this->sellPaidBy(['cash' => 600, 'transfer' => 400]);
+
+        $this->assertTrue($this->listedInvoices('cash')->pluck('id')->contains($split->id));
+        $this->assertTrue($this->listedInvoices('transfer')->pluck('id')->contains($split->id));
+    }
+
+    public function test_card_is_filtered_too(): void
+    {
+        $card = $this->sellPaidBy(['card' => 1000]);
+        $cash = $this->sellPaidBy(['cash' => 1000]);
+
+        $listed = $this->listedInvoices('card')->pluck('id');
+
+        $this->assertTrue($listed->contains($card->id));
+        $this->assertFalse($listed->contains($cash->id));
+    }
+
+    public function test_all_shows_everything_including_unpaid(): void
+    {
+        $this->sellPaidBy(['cash' => 1000]);
+        $this->sellPaidBy(['transfer' => 1000]);
+
+        $this->assertCount(2, $this->listedInvoices('all'));
+    }
+
+    public function test_the_listed_cash_adds_up_to_the_figure_above_it(): void
+    {
+        // The whole point of matching on "any cash" rather than "cash only".
+        $this->sellPaidBy(['cash' => 1000]);
+        $this->sellPaidBy(['cash' => 600, 'transfer' => 400]);
+
+        $listedCash = $this->listedInvoices('cash')->sum(function ($sale) {
+            $pd = is_string($sale->payment_details)
+                ? json_decode($sale->payment_details, true)
+                : $sale->payment_details;
+
+            return (float) ($pd['cash'] ?? 0);
+        });
+
+        $this->assertEquals(1600, $listedCash);
+
+        // The panel deducts change handed back, so the two agree exactly only
+        // when none was given - which is the case here.
+        $this->assertEquals(1600, $this->figures()['methods']['byMethod']['cash']);
+    }
+
+    public function test_clearing_resets_the_method_filter_too(): void
+    {
+        Livewire::actingAs($this->auditor())
+            ->test(\App\Livewire\Finance\Index::class)
+            ->set('methodFilter', 'cash')
+            ->call('clearFilters')
+            ->assertSet('methodFilter', 'all');
+    }
+
     public static function forbiddenPaths(): array
     {
         return [

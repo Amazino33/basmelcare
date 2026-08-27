@@ -274,6 +274,14 @@
                         ['id'=>'pending',  'name'=>'Unpaid only'],
                     ]" option-value="id" option-label="name" />
 
+                <x-select wire:model.live="methodFilter" class="select-sm"
+                    :options="[
+                        ['id'=>'all',      'name'=>'Any payment method'],
+                        ['id'=>'cash',     'name'=>'Cash taken'],
+                        ['id'=>'card',     'name'=>'Card taken'],
+                        ['id'=>'transfer', 'name'=>'Transfer taken'],
+                    ]" option-value="id" option-label="name" />
+
                 @if($filtered)
                     <x-button label="Clear" wire:click="clearFilters" icon="o-x-mark" class="btn-sm btn-ghost" />
                 @endif
@@ -300,6 +308,11 @@
                         <th>Status</th>
                         <th>Customer</th>
                         <th>Sold by</th>
+                        @if($methodFilter !== 'all')
+                            {{-- The chosen method's share of each invoice, so these
+                                 add up to the figure in the panel above. --}}
+                            <th class="text-right">{{ ucfirst($methodFilter) }}</th>
+                        @endif
                         <th class="text-right">Sold for</th>
                         <th class="text-right">Cost</th>
                         <th class="text-right">Profit</th>
@@ -333,6 +346,23 @@
                             <td class="text-sm">{{ $sale->customer?->name ?? 'Walk-in' }}</td>
                             <td class="text-sm">{{ $sale->user?->name ?? '—' }}</td>
 
+                            @if($methodFilter !== 'all')
+                                @php
+                                    // Read from the same place the panel figures
+                                    // come from, so a split sale shows only its
+                                    // share of the chosen method.
+                                    $pd = is_string($sale->payment_details)
+                                        ? json_decode($sale->payment_details, true)
+                                        : $sale->payment_details;
+                                    $share = is_array($pd) && is_numeric($pd[$methodFilter] ?? null)
+                                        ? (float) $pd[$methodFilter]
+                                        : 0.0;
+                                @endphp
+                                <td class="text-right tabular-nums font-semibold">
+                                    ₦{{ number_format($share, 2) }}
+                                </td>
+                            @endif
+
                             @if($settled)
                                 <td class="text-right tabular-nums">₦{{ number_format($net, 2) }}</td>
                                 <td class="text-right tabular-nums text-base-content/60">₦{{ number_format($cost, 2) }}</td>
@@ -354,7 +384,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-base-content/40 py-10">
+                            <td colspan="{{ $methodFilter === 'all' ? 9 : 10 }}" class="text-center text-base-content/40 py-10">
                                 No invoices in this period.
                             </td>
                         </tr>
