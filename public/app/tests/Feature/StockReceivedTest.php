@@ -197,6 +197,95 @@ class StockReceivedTest extends TestCase
         $this->assertCount(1, $page->viewData('intakes')[0]['lines']);
     }
 
+    // ---- opening stock ----
+
+    public function test_it_shows_the_first_time_each_product_was_stocked(): void
+    {
+        $ibrahim = $this->user(['inventory_manager']);
+
+        // The startup load, then a top-up months later.
+        $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim, on: now()->subMonths(6)->toDateTimeString());
+        $this->received('PARACETAMOL 500MG', 50, 90, $ibrahim);
+
+        $opening = $this->page($ibrahim)->set('view', 'opening')->viewData('opening')->flatten();
+
+        $this->assertCount(1, $opening, 'A product should appear once, at its first stocking.');
+        $this->assertSame(100, (int) $opening->first()->quantity);
+    }
+
+    public function test_the_opening_quantity_is_what_went_in_not_what_is_left(): void
+    {
+        // batches.quantity is eaten into by sales; the movement that created
+        // the batch still carries the number that went in.
+        $ibrahim  = $this->user(['inventory_manager']);
+        $movement = $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim);
+
+        $movement->batch->update(['quantity' => 12]);   // 88 sold since
+
+        $opening = $this->page($ibrahim)->set('view', 'opening')->viewData('opening')->flatten();
+
+        $this->assertSame(100, (int) $opening->first()->quantity);
+        $this->assertSame(12, (int) $opening->first()->batch->quantity);
+    }
+
+    public function test_it_reaches_past_the_date_filter(): void
+    {
+        // The question is what the pharmacy started with, which is older than
+        // whatever range someone happens to be looking at.
+        $ibrahim = $this->user(['inventory_manager']);
+
+        $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim, on: now()->subYear()->toDateTimeString());
+
+        $page = $this->page($ibrahim)->set('view', 'opening');
+
+        $this->assertSame(1, $page->viewData('openingCount'));
+        $this->assertSame(100, $page->viewData('openingUnits'));
+    }
+
+    public function test_it_totals_the_startup_load_at_cost(): void
+    {
+        $ibrahim = $this->user(['inventory_manager']);
+
+        $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim);    // 8,500
+        $this->received('AMOXIL 500MG', 50, 260, $ibrahim);         // 13,000
+
+        $page = $this->page($ibrahim)->set('view', 'opening');
+
+        $this->assertSame(2, $page->viewData('openingCount'));
+        $this->assertEquals(21500, $page->viewData('openingValue'));
+    }
+
+    public function test_products_first_stocked_later_appear_under_their_own_date(): void
+    {
+        // So the original startup load reads as one block.
+        $ibrahim = $this->user(['inventory_manager']);
+
+        $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim, on: now()->subMonths(6)->toDateTimeString());
+        $this->received('ARBITEL 80H', 20, 1100, $ibrahim);
+
+        $this->assertCount(2, $this->page($ibrahim)->set('view', 'opening')->viewData('opening'));
+    }
+
+    public function test_sales_are_never_treated_as_opening_stock(): void
+    {
+        $ibrahim  = $this->user(['inventory_manager']);
+        $movement = $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim);
+        $movement->update(['type' => 'sale', 'quantity' => -5]);
+
+        $this->assertSame(0, $this->page($ibrahim)->set('view', 'opening')->viewData('openingCount'));
+    }
+
+    public function test_the_auditor_can_see_opening_stock(): void
+    {
+        $this->received('PARACETAMOL 500MG', 100, 85, $this->user(['inventory_manager']));
+
+        $this->page($this->user(['auditor']))
+            ->set('view', 'opening')
+            ->assertOk()
+            ->assertSee('PARACETAMOL 500MG')
+            ->assertSee('Opening qty');
+    }
+
     // ── who may look ────────────────────────────────────────────────────
 
     public function test_the_auditor_can_open_it(): void

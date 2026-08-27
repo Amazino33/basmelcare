@@ -9,20 +9,29 @@ use Livewire\Component;
 use Mary\Traits\Toast;
 
 /**
- * Everything taken into stock, grouped as it actually happened.
+ * Everything taken into stock, read two ways.
  *
- * The auditor asked to see a particular delivery - some products new to the
- * catalogue, some already stocked. Stock movements record each line, but a
- * delivery is not one row: it is however many rows one person entered in one
- * sitting. So they are grouped by the day and the person, which is the
- * closest thing to a delivery the system honestly knows.
+ * "Deliveries" groups intake by the day and the person, because a delivery is
+ * not one row: it is however many lines one person entered in one sitting,
+ * and that is the closest thing to a delivery the data honestly supports.
  *
- * Read-only by design. The auditor is on the list of who may open it, and the
- * auditor may not move stock.
+ * "Opening stock" answers a different question - what the pharmacy started
+ * with. One line per product, the first time it was ever stocked, at the
+ * quantity and cost it came in at.
+ *
+ * That figure is exact rather than reconstructed. batches.quantity is what is
+ * left after sales, but the stock movement that created the batch still
+ * carries the number that went in.
+ *
+ * Read-only. The auditor may open it and may not move stock.
  */
 class Received extends Component
 {
     use Toast;
+
+    /** deliveries | opening */
+    #[Url]
+    public string $view = 'deliveries';
 
     #[Url]
     public string $dateFrom = '';
@@ -40,27 +49,65 @@ class Received extends Component
 
     /**
      * Intake only. Sales and returns move stock too, but they are not
-     * deliveries and would drown what the auditor is looking for.
+     * deliveries and would drown what is being looked for.
      */
-    private function movements()
+    private function movements(bool $withinDates = true)
     {
         return StockMovement::query()
-            ->with(['batch.product.category', 'user', 'toLocation'])
+            ->with(['batch.product.category', 'user'])
             ->where('type', 'purchase')
-            ->whereBetween('created_at', [
+            ->when($withinDates, fn ($q) => $q->whereBetween('created_at', [
                 Carbon::parse($this->dateFrom)->startOfDay(),
                 Carbon::parse($this->dateTo)->endOfDay(),
-            ])
+            ]))
             ->when($this->search, fn ($q) => $q->whereHas(
                 'batch.product',
                 fn ($p) => $p->where('name', 'like', '%' . $this->search . '%')
             ))
-            ->orderByDesc('created_at')
+            ->orderBy('created_at')
             ->get();
+    }
+
+    /**
+     * The first time each product was ever stocked.
+     *
+     * Deliberately not limited by the date filter: the question is what the
+     * pharmacy started with, and answering it requires reaching back past
+     * whatever range someone happens to be looking at.
+     */
+    private function openingStock()
+    {
+        return $this->movements(withinDates: false)
+            ->filter(fn ($m) => $m->batch?->product)
+            ->groupBy(fn ($m) => $m->batch->product_id)
+            // Movements come back oldest first, so the first of each group is
+            // the first time that product was stocked.
+            ->map(fn ($lines) => $lines->first())
+            ->sortBy([
+                fn ($m) => $m->created_at->timestamp,
+                fn ($m) => $m->batch->product->name,
+            ])
+            ->values();
     }
 
     public function render()
     {
+        if ($this->view === 'opening') {
+            $opening = $this->openingStock();
+
+            return view('livewire.stock.received', [
+                'view'         => 'opening',
+                'opening'      => $opening->groupBy(fn ($m) => $m->created_at->format('Y-m-d')),
+                'openingCount' => $opening->count(),
+                'openingUnits' => $opening->sum('quantity'),
+                'openingValue' => $opening->sum(fn ($m) => $m->quantity * (float) ($m->batch->cost_price ?? 0)),
+                'intakes'      => collect(),
+                'totalUnits'   => 0,
+                'totalValue'   => 0,
+                'unattributed' => 0,
+            ]);
+        }
+
         $movements = $this->movements();
 
         // Grouped by day and by who entered it. Anything without a user is
@@ -72,25 +119,27 @@ class Received extends Component
                 $first = $lines->first();
 
                 return [
-                    'date'      => $first->created_at,
-                    'by'        => $first->user?->name,
-                    'lines'     => $lines,
-                    'units'     => $lines->sum('quantity'),
-                    'value'     => $lines->sum(fn ($m) => $m->quantity * (float) ($m->batch->cost_price ?? 0)),
-                    // "New" means this batch was the product's first, which is
-                    // what distinguishes a product added to the catalogue from
-                    // a top-up of one already stocked.
-                    'newCount'  => $lines->filter(fn ($m) => $m->reference === 'Opening stock')->count(),
+                    'date'     => $first->created_at,
+                    'by'       => $first->user?->name,
+                    'lines'    => $lines,
+                    'units'    => $lines->sum('quantity'),
+                    'value'    => $lines->sum(fn ($m) => $m->quantity * (float) ($m->batch->cost_price ?? 0)),
+                    'newCount' => $lines->filter(fn ($m) => $m->reference === 'Opening stock')->count(),
                 ];
             })
             ->sortByDesc(fn ($intake) => $intake['date'])
             ->values();
 
         return view('livewire.stock.received', [
-            'intakes'        => $intakes,
-            'totalUnits'     => $movements->sum('quantity'),
-            'totalValue'     => $movements->sum(fn ($m) => $m->quantity * (float) ($m->batch->cost_price ?? 0)),
-            'unattributed'   => $movements->whereNull('user_id')->count(),
+            'view'         => 'deliveries',
+            'intakes'      => $intakes,
+            'totalUnits'   => $movements->sum('quantity'),
+            'totalValue'   => $movements->sum(fn ($m) => $m->quantity * (float) ($m->batch->cost_price ?? 0)),
+            'unattributed' => $movements->whereNull('user_id')->count(),
+            'opening'      => collect(),
+            'openingCount' => 0,
+            'openingUnits' => 0,
+            'openingValue' => 0,
         ]);
     }
 }
