@@ -72,7 +72,11 @@
                     @error('role') <div class="text-error text-xs mt-1">{{ $message }}</div> @enderror
                     @error('role.*') <div class="text-error text-xs mt-1">{{ $message }}</div> @enderror
                 </div>
-                <x-select label="Branch" wire:model="branch_id" :options="$branches" option-value="id" option-label="name" placeholder="All branches (admin)" />
+                {{-- "All branches" is only true for an admin. For anyone else, blank means
+                     their records carry no branch and colleagues cannot see them. --}}
+                <x-select label="Branch" wire:model="branch_id" :options="$branches" option-value="id" option-label="name"
+                          placeholder="Select a branch"
+                          hint="Only an admin may be left without one" />
                 <x-input label="Position/Title" wire:model="position" placeholder="e.g. Senior Pharmacist" />
                 <x-input label="Employment Date" wire:model="employment_date" type="date" />
                 <x-input label="Salary" wire:model="salary" prefix="₦" type="number" step="0.01" />

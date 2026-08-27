@@ -55,7 +55,15 @@ class Index extends Component
             'phone' => 'nullable|string|max:20',
             'role' => 'required|array|min:1',
             'role.*' => 'in:admin,pharmacist,branch_manager,sales,cashier,inventory_manager,promoter,content,auditor',
-            'branch_id' => 'nullable|exists:branches,id',
+            // Required for everyone but an admin. A non-admin with no branch
+            // sees every branch AND records nothing anyone with a branch can
+            // see - their expenses and sales become invisible to colleagues,
+            // which is never what anybody intends by leaving it blank.
+            'branch_id' => [
+                \Illuminate\Validation\Rule::requiredIf(fn () => ! in_array('admin', $this->role ?? [], true)),
+                'nullable',
+                'exists:branches,id',
+            ],
             'position' => 'nullable|string|max:255',
             'employment_date' => 'nullable|date',
             'salary' => 'nullable|numeric|min:0',
