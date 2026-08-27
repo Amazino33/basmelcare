@@ -130,7 +130,7 @@
                     @endif
                 </x-menu-sub>
 
-                @if(array_intersect($roles, ['admin', 'branch_manager', 'cashier']))
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'cashier', 'auditor']))
                     <x-menu-item title="Expenses" icon="o-banknotes" link="{{ route('expenses.index') }}" />
                 @endif
 

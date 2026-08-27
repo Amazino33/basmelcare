@@ -185,6 +185,7 @@ class AuditorFinanceTest extends TestCase
             'debt book'         => ['debt-book'],
             'change owed'       => ['credits'],
             'dashboard'         => ['dashboard'],
+            'expenses'          => ['expenses'],
         ];
     }
 
@@ -198,8 +199,10 @@ class AuditorFinanceTest extends TestCase
     {
         return [
             // Deliberately removed from the auditor's scope.
+            // Expenses came back: money going out is half of working out what
+            // the pharmacy made, and an auditor who sees only revenue cannot
+            // finish the calculation. Read-only, guarded on the component.
             'sales history'   => ['sales'],
-            'expenses'        => ['expenses'],
             'purchase orders' => ['purchase-orders'],
             'suppliers'       => ['suppliers'],
             'money trail'     => ['money-trail'],

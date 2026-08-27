@@ -4,7 +4,11 @@
             <x-input icon="o-magnifying-glass" placeholder="Search description..." wire:model.live.debounce="search" clearable />
         </x-slot:middle>
         <x-slot:actions>
-            <x-button label="Record Expense" icon="o-plus" wire:click="openCreate" class="btn-primary" />
+            {{-- Shown only to those who can actually record one. A cashier or an
+                 auditor clicking this got no modal and no message. --}}
+            @if($canManage)
+                <x-button label="Record Expense" icon="o-plus" wire:click="openCreate" class="btn-primary" />
+            @endif
         </x-slot:actions>
     </x-header>
 

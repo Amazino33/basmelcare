@@ -40,6 +40,10 @@ class Index extends Component
 
     public function openCreate(): void
     {
+        // openEdit already refused; this one opened the form to anybody and
+        // only failed at save, which is a worse way to be told no.
+        if (! $this->canManage) return;
+
         $this->reset(['editId', 'category', 'description', 'amount']);
         $this->expense_date = today()->toDateString();
         $this->modal = true;
@@ -100,7 +104,12 @@ class Index extends Component
         $query = Expense::with(['user', 'branch'])
             ->when($this->search, fn($q) => $q->where('description', 'like', "%{$this->search}%"))
             ->when($this->categoryFilter, fn($q) => $q->where('category', $this->categoryFilter))
-            ->whereBetween('expense_date', [$this->dateFrom ?: '2000-01-01', $this->dateTo ?: today()->toDateString()]);
+            // whereDate rather than whereBetween: a bare upper bound excludes any
+            // row stored with a time component, which is how SQLite keeps a
+            // 'date' cast. MySQL happens not to, but the query should not
+            // depend on which database it is running against.
+            ->whereDate('expense_date', '>=', $this->dateFrom ?: '2000-01-01')
+            ->whereDate('expense_date', '<=', $this->dateTo ?: today()->toDateString());
 
         $expenses = $query->clone()->latest('expense_date')->paginate(20);
 

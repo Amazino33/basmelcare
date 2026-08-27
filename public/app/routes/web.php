@@ -112,8 +112,11 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
                 ->name('reports.top-products.print');
         });
 
-        // Expenses (admin, branch_manager, cashier)
-        Route::middleware('role:admin,branch_manager,cashier')->group(function () {
+        // Expenses. The auditor is here to work out what the pharmacy actually
+        // made, and money going out is half of that - so they can read it.
+        // Writing is refused by DeniesAuditorWrites on the component itself,
+        // not by hiding buttons.
+        Route::middleware('role:admin,branch_manager,cashier,auditor')->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');
         });
 
