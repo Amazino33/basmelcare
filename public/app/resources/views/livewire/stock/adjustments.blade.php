@@ -22,7 +22,10 @@
             <x-select label="Product" wire:model.live="product_id" :options="$products" option-value="id" option-label="name" placeholder="Select product" />
 
             @if($product_id)
-                <x-select label="Batch" wire:model="batch_id" :options="$batches" option-value="id" option-label="name" placeholder="Select batch" />
+                {{-- .live, or nothing below ever appears: the quantity, type and
+                     reason are gated on $batch_id, and a plain wire:model does
+                     not reach the server until the next request. --}}
+                <x-select label="Batch" wire:model.live="batch_id" :options="$batches" option-value="id" option-label="name" placeholder="Select batch" />
             @endif
 
             @if($batch_id)
