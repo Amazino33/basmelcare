@@ -22,6 +22,45 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="alerts" label="Counter Alerts" icon="o-bell-alert">
+            <x-card title="Calling the pharmacist" subtitle="What happens when nobody answers on screen" class="mt-4">
+                <x-form wire:submit="savePharmacistAlerts">
+                    <x-toggle label="Also ring their phones"
+                              wire:model.live="pharmacist_call_alert_enabled"
+                              hint="Sends a WhatsApp, falling back to SMS, if the call goes unanswered" />
+
+                    @if($pharmacist_call_alert_enabled)
+                        <x-input label="Wait this long first" wire:model="pharmacist_call_alert_after_seconds"
+                                 type="number" min="15" max="600" suffix="seconds"
+                                 hint="A pharmacist at a screen sees the banner within five seconds" />
+                    @endif
+
+                    <div class="rounded-lg border border-base-300 bg-base-200/40 p-4 text-sm">
+                        <p class="font-semibold mb-1">What happens when the counter calls</p>
+                        <ol class="list-decimal list-inside space-y-1 text-base-content/70">
+                            <li>A banner appears for any pharmacist with the app open, and it chimes.</li>
+                            <li>If nobody taps &ldquo;On my way&rdquo; within the wait above, their phones ring
+                                &mdash; but only if this is switched on.</li>
+                            <li>The call goes quiet on its own after fifteen minutes.</li>
+                        </ol>
+                        <p class="text-base-content/60 mt-2">
+                            Every active pharmacist at that branch with a number on file is messaged, once
+                            per call. There is no rota in the system, so it cannot tell who is actually on
+                            duty &mdash; everyone who could answer is told.
+                        </p>
+                        <p class="text-base-content/60 mt-2">
+                            It goes through the same WhatsApp gateway as your receipts, which is why this
+                            is off unless you turn it on.
+                        </p>
+                    </div>
+
+                    <x-slot:actions>
+                        <x-button label="Save Alert Settings" type="submit" class="btn-primary" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
         <x-tab name="consultations" label="Consultations" icon="o-chat-bubble-left-right">
             <x-card title="What a consultation costs" subtitle="Per provider and per mode" class="mt-4">
                 <x-form wire:submit="saveConsultations">

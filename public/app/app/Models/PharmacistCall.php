@@ -15,9 +15,9 @@ class PharmacistCall extends Model
 {
     use BelongsToBranch;
 
-    protected $fillable = ['called_by', 'branch_id', 'acknowledged_by', 'acknowledged_at'];
+    protected $fillable = ['called_by', 'branch_id', 'acknowledged_by', 'acknowledged_at', 'notified_at'];
 
-    protected $casts = ['acknowledged_at' => 'datetime'];
+    protected $casts = ['acknowledged_at' => 'datetime', 'notified_at' => 'datetime'];
 
     /**
      * How long an unanswered call keeps showing.
@@ -64,5 +64,48 @@ class PharmacistCall extends Model
             'called_by' => $caller->id,
             'branch_id' => $caller->branch_id,
         ]);
+    }
+
+    /**
+     * Unanswered on screen for long enough that phones should ring.
+     *
+     * The delay matters: if a pharmacist is at a screen they see the banner in
+     * five seconds, and messaging them as well would be noise through the same
+     * gateway that sends receipts.
+     */
+    public function shouldNotify(): bool
+    {
+        if (! AppSetting::bool('pharmacist_call_alert_enabled', false)) {
+            return false;
+        }
+
+        if ($this->acknowledged_at || $this->notified_at) {
+            return false;
+        }
+
+        $after = max(15, (int) AppSetting::get('pharmacist_call_alert_after_seconds', 60));
+
+        return $this->created_at?->lt(now()->subSeconds($after)) ?? false;
+    }
+
+    /**
+     * The people to ring: active pharmacists at that counter who have a
+     * number on file.
+     *
+     * There is no rota in the system, so "who is on duty" cannot be answered -
+     * everyone who could answer is told, which for a pharmacy is one or two
+     * people.
+     */
+    public function notifiable()
+    {
+        return User::query()
+            ->where('status', 'active')
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->when($this->branch_id, fn ($q) => $q->where(fn ($w) => $w
+                ->where('branch_id', $this->branch_id)
+                ->orWhereNull('branch_id')))
+            ->get()
+            ->filter(fn ($user) => in_array('pharmacist', $user->role ?? [], true));
     }
 }

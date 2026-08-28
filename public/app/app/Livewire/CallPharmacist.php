@@ -69,6 +69,52 @@ class CallPharmacist extends Component
         $this->success('The counter has been told you are coming.');
     }
 
+    /**
+     * Ring the pharmacists' phones for a call nobody answered on screen.
+     *
+     * Driven by the counter's own polling because there is no scheduler here.
+     * That is a real constraint, not a preference: shared hosting has no cron
+     * we can rely on, and a queue worker is not running either.
+     *
+     * The claim is atomic. This runs on every poll from every user, so two
+     * browsers refreshing at the same moment would otherwise both send. The
+     * update only succeeds for whoever gets there first.
+     */
+    private function escalate(?PharmacistCall $call): void
+    {
+        if (! $call || ! $call->shouldNotify()) {
+            return;
+        }
+
+        $claimed = PharmacistCall::whereKey($call->id)
+            ->whereNull('notified_at')
+            ->whereNull('acknowledged_at')
+            ->update(['notified_at' => now()]);
+
+        if (! $claimed) {
+            return;   // somebody else's poll got there first
+        }
+
+        $branch  = $call->branch?->name;
+        $message = 'A customer is waiting'
+            . ($branch ? ' at ' . $branch : '')
+            . '. The counter asked for a pharmacist '
+            . $call->created_at->diffForHumans() . '.';
+
+        // Sent inline rather than queued: no worker runs on this host, so a
+        // queued job would simply never fire. Recipients are one or two
+        // people, which is slow but tolerable inside a poll.
+        foreach ($call->notifiable() as $pharmacist) {
+            try {
+                app(\App\Services\WhatsAppService::class)->send($pharmacist->phone, $message);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'Pharmacist call alert failed for ' . $pharmacist->phone . ': ' . $e->getMessage()
+                );
+            }
+        }
+    }
+
     public function render()
     {
         $user = auth()->user();
@@ -80,6 +126,8 @@ class CallPharmacist extends Component
             ? PharmacistCall::waiting()->with('caller')->oldest()->first()
             : null;
 
+        // The counter's browser is the one reliably open while somebody waits,
+        // so the escalation check rides on its poll.
         $mine = $this->canCall()
             ? PharmacistCall::where('called_by', $user->id)
                 ->where('created_at', '>=', now()->subMinutes(PharmacistCall::EXPIRES_AFTER_MINUTES))
@@ -87,6 +135,8 @@ class CallPharmacist extends Component
                 ->latest()
                 ->first()
             : null;
+
+        $this->escalate($mine ?? $waiting);
 
         return view('livewire.call-pharmacist', [
             'waiting' => $waiting,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppSetting;
 use App\Models\Branch;
 use App\Models\PharmacistCall;
 use App\Models\User;
@@ -186,6 +187,155 @@ class CallPharmacistTest extends TestCase
 
         $this->assertStringContainsString('lastAnnounced', $view);
         $this->assertStringContainsString('id === this.lastAnnounced', $view);
+    }
+
+    // ---- ringing their phones when nobody is at a screen ----
+
+    private function pharmacistWithPhone(?int $branchId = null): User
+    {
+        return User::factory()->create([
+            'role'      => ['pharmacist'],
+            'status'    => 'active',
+            'branch_id' => $branchId,
+            'phone'     => '0803' . random_int(1000000, 9999999),
+        ]);
+    }
+
+    /** A call made long enough ago that the phones should ring. */
+    private function staleCall(User $caller): PharmacistCall
+    {
+        $this->bar($caller)->call('call');
+
+        $call = PharmacistCall::first();
+        $call->forceFill(['created_at' => now()->subMinutes(2)])->save();
+
+        return $call->fresh();
+    }
+
+    public function test_phones_are_not_rung_while_the_setting_is_off(): void
+    {
+        // Off by default: it costs a message per call through the same gateway
+        // that sends receipts.
+        $this->pharmacistWithPhone();
+        $call = $this->staleCall($this->user(['sales']));
+
+        $this->assertFalse($call->shouldNotify());
+    }
+
+    public function test_phones_are_rung_once_it_is_switched_on(): void
+    {
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+
+        $this->pharmacistWithPhone();
+        $call = $this->staleCall($this->user(['sales']));
+
+        $this->assertTrue($call->shouldNotify());
+    }
+
+    public function test_a_call_answered_in_time_never_rings_a_phone(): void
+    {
+        // The whole point of waiting: somebody at a screen handles it first.
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+
+        $pharmacist = $this->pharmacistWithPhone();
+        $call       = $this->staleCall($this->user(['sales']));
+
+        $this->bar($pharmacist)->call('acknowledge', $call->id);
+
+        $this->assertFalse($call->fresh()->shouldNotify());
+    }
+
+    public function test_a_fresh_call_waits_before_ringing(): void
+    {
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+        AppSetting::set('pharmacist_call_alert_after_seconds', 60);
+
+        $this->pharmacistWithPhone();
+        $this->bar($this->user(['sales']))->call('call');
+
+        $this->assertFalse(PharmacistCall::first()->shouldNotify());
+    }
+
+    public function test_the_delay_is_configurable(): void
+    {
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+        AppSetting::set('pharmacist_call_alert_after_seconds', 15);
+
+        $this->pharmacistWithPhone();
+        $this->bar($this->user(['sales']))->call('call');
+
+        PharmacistCall::first()->forceFill(['created_at' => now()->subSeconds(20)])->save();
+
+        $this->assertTrue(PharmacistCall::first()->shouldNotify());
+    }
+
+    public function test_the_phones_ring_only_once_per_call(): void
+    {
+        // The check rides on a poll that fires every five seconds; without the
+        // mark it would message twelve times a minute until somebody came.
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+
+        $this->pharmacistWithPhone();
+        $caller = $this->user(['sales']);
+        $call   = $this->staleCall($caller);
+
+        $this->bar($caller)->call('$refresh');
+
+        $this->assertNotNull($call->fresh()->notified_at);
+        $this->assertFalse($call->fresh()->shouldNotify());
+    }
+
+    public function test_only_pharmacists_with_a_number_are_rung(): void
+    {
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+
+        $withPhone = $this->pharmacistWithPhone();
+        User::factory()->create(['role' => ['pharmacist'], 'status' => 'active', 'phone' => null]);
+        User::factory()->create(['role' => ['cashier'], 'status' => 'active', 'phone' => '08030000000']);
+
+        $call = $this->staleCall($this->user(['sales']));
+
+        $this->assertSame([$withPhone->id], $call->notifiable()->pluck('id')->all());
+    }
+
+    public function test_a_pharmacist_at_another_branch_is_not_rung(): void
+    {
+        AppSetting::set('pharmacist_call_alert_enabled', '1');
+
+        $uyo   = Branch::create(['name' => 'UYO CITY BRANCH', 'is_main' => true]);
+        $ikeja = Branch::create(['name' => 'IKEJA BRANCH', 'is_main' => false]);
+
+        $here      = $this->pharmacistWithPhone($uyo->id);
+        $elsewhere = $this->pharmacistWithPhone($ikeja->id);
+
+        $call = $this->staleCall($this->user(['sales'], $uyo->id));
+
+        $ids = $call->notifiable()->pluck('id')->all();
+
+        $this->assertContains($here->id, $ids);
+        $this->assertNotContains($elsewhere->id, $ids);
+    }
+
+    public function test_the_toggle_can_be_changed_in_settings(): void
+    {
+        Livewire::actingAs($this->user(['admin']))
+            ->test(\App\Livewire\Settings\Index::class)
+            ->set('pharmacist_call_alert_enabled', true)
+            ->set('pharmacist_call_alert_after_seconds', 45)
+            ->call('savePharmacistAlerts')
+            ->assertHasNoErrors();
+
+        $this->assertTrue(AppSetting::bool('pharmacist_call_alert_enabled'));
+        $this->assertSame('45', (string) AppSetting::get('pharmacist_call_alert_after_seconds'));
+    }
+
+    public function test_an_absurd_delay_is_rejected(): void
+    {
+        Livewire::actingAs($this->user(['admin']))
+            ->test(\App\Livewire\Settings\Index::class)
+            ->set('pharmacist_call_alert_after_seconds', 99999)
+            ->call('savePharmacistAlerts')
+            ->assertHasErrors('pharmacist_call_alert_after_seconds');
     }
 
     // ── it stops ringing ────────────────────────────────────────────────

@@ -62,6 +62,10 @@ class Index extends Component
     public string $hifastlink_url = '';
     public int    $voucher_validity_hours = 24;
 
+    // Calling the pharmacist to the counter
+    public bool $pharmacist_call_alert_enabled = false;
+    public int  $pharmacist_call_alert_after_seconds = 60;
+
     // Consultations
     public array $consult_prices = [];
     public int $consult_free_count = 1;
@@ -111,6 +115,9 @@ class Index extends Component
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
         $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');
+
+        $this->pharmacist_call_alert_enabled       = AppSetting::bool('pharmacist_call_alert_enabled', false);
+        $this->pharmacist_call_alert_after_seconds = (int) AppSetting::get('pharmacist_call_alert_after_seconds', 60);
 
         $this->consult_free_count  = (int) AppSetting::get('consult_free_count', 1);
         $this->consult_free_period = (string) AppSetting::get('consult_free_period', 'ever');
@@ -194,6 +201,25 @@ class Index extends Component
      * Prices are per provider and per mode because a video call and a text
      * exchange are not the same amount of anybody's time.
      */
+    /**
+     * Whether an unanswered call reaches the pharmacists' phones.
+     *
+     * Off by default. It costs a message per call through the same gateway
+     * that sends receipts, so it should be a decision rather than something
+     * that starts happening.
+     */
+    public function savePharmacistAlerts(): void
+    {
+        $this->validate([
+            'pharmacist_call_alert_after_seconds' => 'required|integer|min:15|max:600',
+        ], [], ['pharmacist_call_alert_after_seconds' => 'delay']);
+
+        AppSetting::set('pharmacist_call_alert_enabled', $this->pharmacist_call_alert_enabled ? '1' : '0');
+        AppSetting::set('pharmacist_call_alert_after_seconds', $this->pharmacist_call_alert_after_seconds);
+
+        $this->success('Pharmacist alert settings saved.');
+    }
+
     public function saveConsultations(): void
     {
         $this->validate([
