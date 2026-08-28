@@ -209,6 +209,12 @@
             </div>
 
             <div class="p-5">
+                {{-- Above the page content so a waiting customer is seen
+                     wherever the pharmacist happens to be, and so the counter
+                     can call from any screen. Renders nothing for roles that
+                     neither call nor answer. --}}
+                @livewire('call-pharmacist')
+
                 {{ $slot }}
             </div>
         </x-slot:content>
