@@ -141,6 +141,10 @@
                     <x-menu-item title="Expenses" icon="o-banknotes" link="{{ route('expenses.index') }}" />
                 @endif
 
+                @if(array_intersect($roles, ['admin', 'branch_manager']))
+                    <x-menu-item title="Messages" icon="o-megaphone" link="{{ route('messages.index') }}" />
+                @endif
+
                 @if(array_intersect($roles, ['admin', 'branch_manager', 'promoter', 'cashier', 'sales']))
                     <x-menu-item title="Commissions" icon="o-currency-dollar" link="{{ route('commissions.index') }}" />
                 @endif

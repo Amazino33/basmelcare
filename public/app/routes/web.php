@@ -120,6 +120,13 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('expenses', App\Livewire\Expenses\Index::class)->name('expenses.index');
         });
 
+        // Messaging customers. Each person gets their own message; nobody is
+        // put in a group, which for a pharmacy would tell everyone in it who
+        // else buys medicine here.
+        Route::middleware('role:admin,branch_manager')->group(function () {
+            Route::get('messages', App\Livewire\Messages\Index::class)->name('messages.index');
+        });
+
         // Coupons (admin, branch_manager)
         Route::middleware('role:admin,branch_manager')->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');

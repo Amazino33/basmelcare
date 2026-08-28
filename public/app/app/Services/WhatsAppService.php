@@ -72,17 +72,11 @@ class WhatsAppService
             return self::VIA_SMS_DEGRADED;
         }
 
-        $number = preg_replace('/\D/', '', $phone);
-
-        if (strlen($number) === 11 && str_starts_with($number, '0')) {
-            $number = '234' . substr($number, 1);
-        }
-
         try {
             $response = Http::timeout(15)->get('https://api.wawp.net/v2/send/text', [
                 'instance_id'  => $instanceId,
                 'access_token' => $token,
-                'chatId'       => $number . '@c.us',
+                'chatId'       => $this->chatId($phone),
                 'message'      => $message,
             ]);
 
@@ -108,5 +102,88 @@ class WhatsAppService
             Log::error("[WhatsApp] Exception sending to {$phone}: " . $e->getMessage());
             return self::VIA_SMS_DEGRADED;
         }
+    }
+
+    /**
+     * Send with a picture, falling back to the words alone.
+     *
+     * The gateway fetches the image from a URL rather than receiving an
+     * upload, so it has to be publicly reachable.
+     *
+     * SMS cannot carry a picture. A customer on a feature phone therefore gets
+     * the message and not the image, which is why the caller is told whether
+     * the image actually went - and why the words have to stand on their own.
+     *
+     * @return array{via: string, image_sent: bool}
+     */
+    public function deliverWithImage(string $phone, string $message, ?string $imageUrl): array
+    {
+        if (! $imageUrl) {
+            return ['via' => $this->deliver($phone, $message), 'image_sent' => false];
+        }
+
+        if ($this->attemptWhatsAppMedia($phone, $message, $imageUrl) === self::VIA_WHATSAPP) {
+            return ['via' => self::VIA_WHATSAPP, 'image_sent' => true];
+        }
+
+        // The picture could not go. Send the words the ordinary way rather
+        // than dropping the message entirely.
+        return ['via' => $this->deliver($phone, $message), 'image_sent' => false];
+    }
+
+    private function attemptWhatsAppMedia(string $phone, string $message, string $imageUrl): string
+    {
+        $enabled    = AppSetting::bool('wawp_enabled', false);
+        $instanceId = AppSetting::get('wawp_instance_id', '');
+        $token      = AppSetting::get('wawp_access_token', '');
+
+        if (! $enabled || empty($instanceId) || empty($token)) {
+            Log::info("[WhatsApp] Not configured. Would send image to {$phone}");
+
+            return self::VIA_SMS_DEGRADED;
+        }
+
+        try {
+            $response = Http::timeout(30)->get('https://api.wawp.net/v2/send/media', [
+                'instance_id'  => $instanceId,
+                'access_token' => $token,
+                'chatId'       => $this->chatId($phone),
+                'media_url'    => $imageUrl,
+                'caption'      => $message,
+                'type'         => 'image',
+            ]);
+
+            if (! $response->successful()) {
+                Log::warning("[WhatsApp] media HTTP {$response->status()} for {$phone}: " . $response->body());
+
+                return self::VIA_SMS_DEGRADED;
+            }
+
+            $status = strtolower((string) ($response->json()['status'] ?? 'success'));
+
+            if ($status === 'success' || $status === 'ok') {
+                return self::VIA_WHATSAPP;
+            }
+
+            Log::info("[WhatsApp] media declined for {$phone}: " . $response->body());
+
+            return self::VIA_SMS;
+        } catch (\Throwable $e) {
+            Log::error("[WhatsApp] media exception for {$phone}: " . $e->getMessage());
+
+            return self::VIA_SMS_DEGRADED;
+        }
+    }
+
+    /** Nigerian numbers arrive as 0803..., the gateway wants 234803...@c.us. */
+    private function chatId(string $phone): string
+    {
+        $number = preg_replace('/\D/', '', $phone);
+
+        if (strlen($number) === 11 && str_starts_with($number, '0')) {
+            $number = '234' . substr($number, 1);
+        }
+
+        return $number . '@c.us';
     }
 }
