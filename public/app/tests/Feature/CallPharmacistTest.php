@@ -152,6 +152,42 @@ class CallPharmacistTest extends TestCase
         $this->assertNull(PharmacistCall::first()->acknowledged_at);
     }
 
+    // ---- being noticed when not looking at the screen ----
+
+    public function test_the_pharmacist_is_offered_the_alert(): void
+    {
+        // Browsers refuse to make noise or show a notification for a page
+        // nobody has interacted with, so it has to be a button.
+        $this->bar($this->user(['pharmacist']))->assertSee('Turn on the alert');
+    }
+
+    public function test_the_counter_is_not_offered_it(): void
+    {
+        // They are the one calling; nothing rings for them.
+        $this->bar($this->user(['sales']))->assertDontSee('Turn on the alert');
+    }
+
+    public function test_the_chime_needs_no_audio_file(): void
+    {
+        // Built in the browser: nothing to host, nothing to load, and it still
+        // works on a slow connection.
+        $view = file_get_contents(resource_path('views/livewire/call-pharmacist.blade.php'));
+
+        $this->assertStringContainsString('AudioContext', $view);
+        $this->assertStringNotContainsString('.mp3', $view);
+        $this->assertStringNotContainsString('.wav', $view);
+    }
+
+    public function test_a_call_already_on_screen_does_not_sound_again(): void
+    {
+        // The component polls every five seconds. Announcing on every render
+        // would chime continuously until somebody answered.
+        $view = file_get_contents(resource_path('views/livewire/call-pharmacist.blade.php'));
+
+        $this->assertStringContainsString('lastAnnounced', $view);
+        $this->assertStringContainsString('id === this.lastAnnounced', $view);
+    }
+
     // ── it stops ringing ────────────────────────────────────────────────
 
     public function test_an_unanswered_call_goes_quiet_eventually(): void
