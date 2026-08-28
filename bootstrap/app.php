@@ -16,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
         ]);
+
+        // Laravel sends unauthenticated visitors to route('login'), which does
+        // not exist here - the shop's sign-in is customer.login. Without this,
+        // a customer following a bookmark to their account while signed out
+        // met a 500 instead of the login page.
+        $middleware->redirectGuestsTo(fn () => route('customer.login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

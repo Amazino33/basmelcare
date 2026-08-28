@@ -39,7 +39,7 @@ class Register extends Component
 
         $otp = $customer->generateOtp();
 
-        $whatsapp = new WhatsAppService();
+        $whatsapp = app(WhatsAppService::class);
         $whatsapp->send($this->phone, "Welcome to BasmelCare! Your verification code is: {$otp}\n\nThis code expires in 10 minutes.");
 
         Auth::guard('customer')->login($customer, true);

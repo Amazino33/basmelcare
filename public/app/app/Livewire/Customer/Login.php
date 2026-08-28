@@ -45,7 +45,7 @@ class Login extends Component
         $otp = $customer->generateOtp();
 
         if ($customer->phone) {
-            $whatsapp = new WhatsAppService();
+            $whatsapp = app(WhatsAppService::class);
             $whatsapp->send($customer->phone, "Your BasmelCare login code is: {$otp}\n\nThis code expires in 10 minutes.");
         }
 
