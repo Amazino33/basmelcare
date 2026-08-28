@@ -107,47 +107,29 @@ class PriceLockdownTest extends TestCase
     }
 
     #[DataProvider('nonPricingRoles')]
-    public function test_bulk_edit_cannot_change_prices(array $roles): void
+    public function test_correcting_a_batch_is_not_a_way_round_the_price_lock(array $roles): void
     {
+        // Batch correction replaced bulk edit as the route for fixing a
+        // mistyped delivery. It touches cost, never the selling price, so a
+        // non-pricing role keeps it - but it must not become a side door.
         $this->actAs($roles);
         $product = $this->product(850);
 
-        Livewire::test(\App\Livewire\Products\Index::class)
-            ->set('bulkEdits', [
-                $product->id => [
-                    'name'          => 'Paracetamol',
-                    'category_id'   => $product->category_id,
-                    'selling_price' => 5,
-                    'qty'           => 0,
-                    'cost_price'    => 0,
-                    'expiry_date'   => '',
-                ],
-            ])
-            ->call('saveBulkEdits');
-
-        $this->assertEquals(850, $product->fresh()->selling_price);
-    }
-
-    #[DataProvider('pricingRoles')]
-    public function test_bulk_edit_still_works_for_pricing_roles(array $roles): void
-    {
-        $this->actAs($roles);
-        $product = $this->product(850);
+        $batch = \App\Models\Batch::create([
+            'product_id'   => $product->id,
+            'batch_number' => 'B1',
+            'expiry_date'  => now()->addYear(),
+            'cost_price'   => 500,
+            'quantity'     => 10,
+        ]);
 
         Livewire::test(\App\Livewire\Products\Index::class)
-            ->set('bulkEdits', [
-                $product->id => [
-                    'name'          => 'Paracetamol',
-                    'category_id'   => $product->category_id,
-                    'selling_price' => 999,
-                    'qty'           => 0,
-                    'cost_price'    => 0,
-                    'expiry_date'   => '',
-                ],
-            ])
-            ->call('saveBulkEdits');
+            ->call('editBatch', $batch->id)
+            ->set('edit_cost_price', 600)
+            ->call('updateBatch');
 
-        $this->assertEquals(999, $product->fresh()->selling_price);
+        $this->assertEquals(600, $batch->fresh()->cost_price, 'A delivery cost could not be corrected.');
+        $this->assertEquals(850, $product->fresh()->selling_price, 'The selling price moved with the cost.');
     }
 
     public function test_a_blocked_price_change_leaves_no_audit_entry(): void

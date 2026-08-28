@@ -87,8 +87,10 @@ class ProductNameCasingTest extends TestCase
         $this->assertSame('VITAMIN C 1000MG', $this->storedName($product->id));
     }
 
-    public function test_bulk_edit_still_normalises_after_removing_its_own_strtoupper(): void
+    public function test_renaming_an_existing_product_normalises_too(): void
     {
+        // Creating is not the only way a name gets in. A rename typed in lower
+        // case would otherwise sit next to shouting neighbours on the till.
         $this->actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']));
 
         $product = Product::create([
@@ -99,17 +101,9 @@ class ProductNameCasingTest extends TestCase
         ]);
 
         Livewire::test(\App\Livewire\Products\Index::class)
-            ->set('bulkEdits', [
-                $product->id => [
-                    'name'          => 'aspirin dispersible',
-                    'category_id'   => $product->category_id,
-                    'selling_price' => 400,
-                    'qty'           => 0,
-                    'cost_price'    => 0,
-                    'expiry_date'   => '',
-                ],
-            ])
-            ->call('saveBulkEdits');
+            ->call('editProduct', $product->id)
+            ->set('name', 'aspirin dispersible')
+            ->call('saveProduct');
 
         $this->assertSame('ASPIRIN DISPERSIBLE', $this->storedName($product->id));
     }

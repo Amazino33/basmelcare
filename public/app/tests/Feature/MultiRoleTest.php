@@ -71,7 +71,7 @@ class MultiRoleTest extends TestCase
 
         $passed = false;
         (new CheckRole())->handle(
-            Request::create('/desk/pos'),
+            Request::create(route('pos.index')),
             function () use (&$passed) { $passed = true; return response('ok'); },
             'admin', 'pharmacist', 'branch_manager', 'sales'
         );
@@ -87,7 +87,7 @@ class MultiRoleTest extends TestCase
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 
         (new CheckRole())->handle(
-            Request::create('/desk/staff'),
+            Request::create(route('staff.index')),
             fn() => response('ok'),
             'admin'
         );
@@ -103,7 +103,7 @@ class MultiRoleTest extends TestCase
 
             $passed = false;
             (new CheckRole())->handle(
-                Request::create('/desk/some-route'),
+                Request::create('/anything'),   // the middleware does not care which page
                 function () use (&$passed) { $passed = true; return response('ok'); },
                 ...$roles  // all roles allowed
             );
@@ -118,62 +118,72 @@ class MultiRoleTest extends TestCase
     {
         $cashier = User::factory()->create(['role' => ['cashier']]);
 
-        $this->actingAs($cashier)->get('/desk/staff')->assertForbidden();
+        $this->actingAs($cashier)->get(route('staff.index'))->assertForbidden();
     }
 
     public function test_sales_role_is_denied_the_cashier_route(): void
     {
         $sales = User::factory()->create(['role' => ['sales']]);
 
-        $this->actingAs($sales)->get('/desk/cashier')->assertForbidden();
+        $this->actingAs($sales)->get(route('cashier.index'))->assertForbidden();
     }
 
     public function test_cashier_is_denied_inventory_routes(): void
     {
         $cashier = User::factory()->create(['role' => ['cashier']]);
 
-        $this->actingAs($cashier)->get('/desk/categories')->assertForbidden();
-        $this->actingAs($cashier)->get('/desk/inventory')->assertForbidden();
+        $this->actingAs($cashier)->get(route('categories.index'))->assertForbidden();
+        $this->actingAs($cashier)->get(route('inventory.index'))->assertForbidden();
     }
 
     public function test_pharmacist_is_denied_admin_only_routes(): void
     {
         $pharmacist = User::factory()->create(['role' => ['pharmacist']]);
 
-        $this->actingAs($pharmacist)->get('/desk/staff')->assertForbidden();
-        $this->actingAs($pharmacist)->get('/desk/branches')->assertForbidden();
-        $this->actingAs($pharmacist)->get('/desk/settings')->assertForbidden();
+        $this->actingAs($pharmacist)->get(route('staff.index'))->assertForbidden();
+        $this->actingAs($pharmacist)->get(route('branches.index'))->assertForbidden();
+        $this->actingAs($pharmacist)->get(route('settings.index'))->assertForbidden();
     }
 
     public function test_admin_can_access_admin_only_routes(): void
     {
         $admin = User::factory()->create(['role' => ['admin']]);
 
-        $this->actingAs($admin)->get('/desk/staff')->assertOk();
+        $this->actingAs($admin)->get(route('staff.index'))->assertOk();
     }
 
     public function test_inventory_manager_can_access_inventory_routes(): void
     {
         $invManager = User::factory()->create(['role' => ['inventory_manager']]);
 
-        $this->actingAs($invManager)->get('/desk/inventory')->assertOk();
-        $this->actingAs($invManager)->get('/desk/categories')->assertOk();
+        $this->actingAs($invManager)->get(route('inventory.index'))->assertOk();
+        $this->actingAs($invManager)->get(route('categories.index'))->assertOk();
     }
 
     public function test_inventory_manager_is_denied_sales_routes(): void
     {
         $invManager = User::factory()->create(['role' => ['inventory_manager']]);
 
-        $this->actingAs($invManager)->get('/desk/cashier')->assertForbidden();
+        $this->actingAs($invManager)->get(route('cashier.index'))->assertForbidden();
     }
 
-    public function test_user_with_multiple_roles_can_access_all_permitted_sections(): void
+    public function test_two_roles_open_the_union_of_both(): void
     {
-        // pharmacist can access POS (sales group) AND inventory group
-        $user = User::factory()->create(['role' => ['pharmacist']]);
+        // A pharmacist who also covers the till on quiet afternoons. Neither
+        // role alone reaches both pages: pharmacist has no POS, sales has no
+        // inventory.
+        $both = User::factory()->create(['role' => ['pharmacist', 'sales']]);
 
-        $this->actingAs($user)->get('/desk/pos')->assertOk();
-        $this->actingAs($user)->get('/desk/inventory')->assertOk();
-        $this->actingAs($user)->get('/desk/reports')->assertOk();
+        $this->actingAs($both)->get(route('pos.index'))->assertOk();
+        $this->actingAs($both)->get(route('inventory.index'))->assertOk();
+    }
+
+    public function test_two_roles_do_not_add_up_to_a_third(): void
+    {
+        // Holding several roles must not quietly grant something no single one
+        // of them allows - reports carry margin and belong to management.
+        $both = User::factory()->create(['role' => ['pharmacist', 'sales']]);
+
+        $this->actingAs($both)->get(route('reports.index'))->assertForbidden();
     }
 }

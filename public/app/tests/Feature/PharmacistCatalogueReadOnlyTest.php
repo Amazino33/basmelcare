@@ -112,19 +112,20 @@ class PharmacistCatalogueReadOnlyTest extends TestCase
             ->assertSet('productModal', false);
     }
 
-    public function test_pharmacist_cannot_change_prices_in_bulk(): void
+    public function test_pharmacist_cannot_save_a_product_even_by_calling_it_directly(): void
     {
+        // The form never opens for them, but a closed form is not a lock -
+        // nothing stops the action being called from the console.
         $product = $this->product();
         $this->actingAs($this->pharmacist());
 
         Livewire::test(\App\Livewire\Products\Index::class)
-            ->set('bulkEdits', [
-                $product->id => [
-                    'name' => 'RENAMED', 'category_id' => $product->category_id,
-                    'selling_price' => 1, 'qty' => 0, 'cost_price' => 0, 'expiry_date' => '',
-                ],
-            ])
-            ->call('saveBulkEdits');
+            ->set('productId', $product->id)
+            ->set('name', 'RENAMED')
+            ->set('category_id', $product->category_id)
+            ->set('selling_price', 1)
+            ->set('reorder_level', 1)
+            ->call('saveProduct');
 
         $this->assertSame('PARACETAMOL 500MG', $product->fresh()->name);
         $this->assertEquals(850, $product->fresh()->selling_price);
@@ -158,13 +159,31 @@ class PharmacistCatalogueReadOnlyTest extends TestCase
             ->assertSet('quickModal', false);
     }
 
-    public function test_pharmacist_cannot_enter_bulk_edit_mode(): void
+    public function test_pharmacist_cannot_correct_a_batch(): void
     {
+        // Cost and expiry are inventory's record of what was bought. A
+        // pharmacist reads them; changing one would rewrite the money trail.
+        $product = $this->product();
+        $batch   = \App\Models\Batch::create([
+            'product_id'   => $product->id,
+            'batch_number' => 'B1',
+            'expiry_date'  => now()->addYear(),
+            'cost_price'   => 500,
+            'quantity'     => 10,
+        ]);
+
         $this->actingAs($this->pharmacist());
 
         Livewire::test(\App\Livewire\Products\Index::class)
-            ->call('toggleBulkEdit')
-            ->assertSet('bulkEditMode', false);
+            ->call('editBatch', $batch->id)
+            ->assertSet('editingBatchId', null)
+            ->set('editingBatchId', $batch->id)
+            ->set('edit_batch_number', 'B1')
+            ->set('edit_cost_price', 9)
+            ->set('edit_expiry_date', now()->addYear()->format('Y-m-d'))
+            ->call('updateBatch');
+
+        $this->assertEquals(500, $batch->fresh()->cost_price);
     }
 
     public function test_pharmacist_cannot_create_or_delete_a_category(): void
@@ -192,7 +211,7 @@ class PharmacistCatalogueReadOnlyTest extends TestCase
         // are always present in the DOM (merely closed), so their titles match
         // even when no button can open them.
         foreach ([
-            'createProduct', 'openQuickAdd', 'toggleBulkEdit', 'openImport',
+            'createProduct', 'openQuickAdd', 'editBatch', 'openImport',
             'editProduct', 'deleteProduct', 'openBatchModal',
         ] as $writeAction) {
             $this->assertStringNotContainsString($writeAction, $html,

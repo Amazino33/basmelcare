@@ -21,7 +21,10 @@ class ProfileTest extends TestCase
             ->assertOk()
             ->assertSeeVolt('profile.update-profile-information-form')
             ->assertSeeVolt('profile.update-password-form')
-            ->assertSeeVolt('profile.delete-user-form');
+            // No delete-account form: a member of staff cannot remove
+            // themselves. Their sales, stock movements and audit entries all
+            // point back at this row.
+            ->assertDontSeeVolt('profile.delete-user-form');
     }
 
     public function test_profile_information_can_be_updated(): void

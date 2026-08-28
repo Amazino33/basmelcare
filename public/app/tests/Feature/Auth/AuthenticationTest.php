@@ -54,17 +54,14 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_navigation_menu_can_be_rendered(): void
+    public function test_a_signed_in_user_can_reach_the_dashboard(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['status' => 'active']);
 
-        $this->actingAs($user);
-
-        $response = $this->get('/dashboard');
-
-        $response
+        $this->actingAs($user)
+            ->get(route('dashboard'))
             ->assertOk()
-            ->assertSeeVolt('layout.navigation');
+            ->assertSeeLivewire(\App\Livewire\Dashboard::class);
     }
 
     public function test_users_can_logout(): void
