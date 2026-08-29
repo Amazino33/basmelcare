@@ -71,12 +71,18 @@
         @endscope
 
         @scope('actions', $expense)
-            @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('branch_manager'))
-                <div class="flex gap-1">
+            {{-- Correcting and deleting are different powers. A cashier who
+                 typed the wrong figure fixes it; removing the record that money
+                 left the till stays with management. --}}
+            <div class="flex gap-1">
+                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('branch_manager') || auth()->user()->hasRole('cashier'))
                     <x-button icon="o-pencil" wire:click="openEdit({{ $expense->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                @endif
+
+                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('branch_manager'))
                     <x-button icon="o-trash" wire:click="delete({{ $expense->id }})" wire:confirm="Delete this expense?" class="btn-xs btn-ghost text-error" tooltip="Delete" />
-                </div>
-            @endif
+                @endif
+            </div>
         @endscope
     </x-table>
 

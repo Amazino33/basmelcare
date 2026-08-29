@@ -118,12 +118,107 @@ class AuditorExpensesTest extends TestCase
         $page->call('openCreate')->assertSet('modal', false);
     }
 
-    public function test_a_cashier_is_not_offered_it_either(): void
+    public function test_a_cashier_is_offered_it(): void
+    {
+        // She is the one handing over the money for transport, diesel or a
+        // repair, and this page has always been on her route. She was left off
+        // canManage by accident: the button did nothing when she clicked it,
+        // and hiding a dead control was mistaken for deciding she should not
+        // have one.
+        $page = Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class);
+
+        $this->assertTrue($page->instance()->canManage);
+
+        $page->call('openCreate')->assertSet('modal', true);
+    }
+
+    public function test_a_cashier_can_actually_record_one(): void
+    {
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openCreate')
+            ->set('category', 'Transport')
+            ->set('description', 'KEKE TO WHOLESALER')
+            ->set('amount', 2500)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, Expense::where('description', 'KEKE TO WHOLESALER')->count());
+    }
+
+    public function test_a_cashier_can_correct_a_figure_she_mistyped(): void
+    {
+        $expense = $this->expense(15000);
+
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openEdit', $expense->id)
+            ->assertSet('modal', true)
+            ->set('amount', 1500)
+            ->call('save');
+
+        $this->assertEquals(1500, $expense->fresh()->amount);
+    }
+
+    public function test_a_cashier_cannot_delete_an_expense(): void
+    {
+        // Recording and deleting are different powers. An expense is the record
+        // that money left the till; removing one removes the evidence, so it
+        // stays with management.
+        $expense = $this->expense();
+
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('delete', $expense->id);
+
+        $this->assertDatabaseHas('expenses', ['id' => $expense->id]);
+    }
+
+    public function test_the_delete_control_is_not_offered_to_a_cashier(): void
     {
         $page = Livewire::actingAs($this->user(['cashier']))
             ->test(\App\Livewire\Expenses\Index::class);
 
-        $this->assertFalse($page->instance()->canManage);
+        $this->assertFalse($page->instance()->canDelete);
+    }
+
+    public function test_saving_is_governed_by_the_same_rule_as_opening(): void
+    {
+        // These were two different lists: the open guards checked canManage and
+        // save checked only the auditor trait, so whoever called save directly
+        // was judged by a different rule from whoever clicked the button.
+        $expense = $this->expense(15000);
+
+        Livewire::actingAs($this->user(['auditor']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->set('editId', $expense->id)
+            ->set('category', 'Utilities')
+            ->set('description', 'CHANGED')
+            ->set('amount', 1)
+            ->set('expense_date', now()->toDateString())
+            ->call('save');
+
+        $this->assertEquals(15000, $expense->fresh()->amount);
+    }
+
+    public function test_a_changed_figure_leaves_a_trail(): void
+    {
+        // Widening who can edit a money record is only safe if the edit is
+        // traceable. Nothing recorded who changed an expense before.
+        $expense = $this->expense(15000);
+
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openEdit', $expense->id)
+            ->set('amount', 40000)
+            ->call('save');
+
+        $entry = \App\Models\AuditLog::where('field', 'amount')->latest('id')->first();
+
+        $this->assertNotNull($entry, 'An expense was edited with nothing recording it.');
+        $this->assertEquals(15000, $entry->old_value);
+        $this->assertEquals(40000, $entry->new_value);
     }
 
     public function test_a_branch_manager_still_can(): void

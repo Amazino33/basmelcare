@@ -19,7 +19,26 @@ class Index extends Component
     public string $dateFrom = '';
     public string $dateTo = '';
 
+    /**
+     * Who may record and correct an expense.
+     *
+     * The cashier is on this list because she is the one handing over the
+     * money — transport, diesel, a repair — and the route has always put this
+     * page on her path. She was left off by accident: the Record button did
+     * nothing when she clicked it, and the fix at the time was to hide the
+     * button rather than to make it work.
+     */
     public bool $canManage = false;
+
+    /**
+     * Deleting is narrower than recording.
+     *
+     * An expense is the record that money left the till. Removing one removes
+     * the evidence, so it stays with management; a cashier who typed the wrong
+     * figure edits it, which leaves a trail.
+     */
+    public bool $canDelete = false;
+
     public bool $modal = false;
     public ?int $editId = null;
     public string $category = '';
@@ -32,7 +51,10 @@ class Index extends Component
         $this->dateFrom = today()->startOfMonth()->toDateString();
         $this->dateTo = today()->toDateString();
         $this->expense_date = today()->toDateString();
-        $this->canManage = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
+        $roles = auth()->user()->role ?? [];
+
+        $this->canManage = (bool) array_intersect($roles, ['admin', 'branch_manager', 'cashier']);
+        $this->canDelete = (bool) array_intersect($roles, ['admin', 'branch_manager']);
     }
 
     public function updatedSearch(): void { $this->resetPage(); }
@@ -65,6 +87,11 @@ class Index extends Component
     {
         if ($this->blockedAsAuditor()) return;
 
+        // The open guards checked canManage and this one did not, so the rule
+        // for reaching the form differed from the rule for saving it. Whoever
+        // could call this directly was governed by a different list.
+        if (! $this->canManage) return;
+
         $this->validate([
             'category'     => 'required|string',
             'description'  => 'required|string|max:500',
@@ -94,7 +121,7 @@ class Index extends Component
     {
         if ($this->blockedAsAuditor()) return;
 
-        if (!$this->canManage) return;
+        if (! $this->canDelete) return;
         Expense::findOrFail($id)->delete();
         $this->success('Expense deleted.');
     }
