@@ -153,6 +153,13 @@
                     <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
                 @endif
 
+                {{-- Everyone who works here can see what came back. It carries no
+                     margin, and the roles that need it - pharmacist, inventory,
+                     auditor - do not all have a Sales menu to hide it under. --}}
+                @if(array_intersect($roles, ['admin', 'branch_manager', 'pharmacist', 'sales', 'cashier', 'inventory_manager', 'auditor']))
+                    <x-menu-item title="Returns" icon="o-arrow-uturn-left" link="{{ route('returns.index') }}" />
+                @endif
+
                 {{-- Monthly cover. Hidden entirely until the pharmacy switches it
                      on, so a till that does not sell insurance never sees it.
                      Plans stay reachable for whoever is setting it up. --}}

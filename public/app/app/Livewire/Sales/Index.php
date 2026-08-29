@@ -558,41 +558,12 @@ class Index extends Component
             : null;
 
         // --- Returns ---
-        // Recorded since the feature was built, but with nowhere to look at
-        // them: the only trace was the printed slip. A return moves stock and
-        // money, so it belongs in the same history as the sale it undoes.
-        $returnsQuery = SaleReturn::with(['sale.customer', 'processor', 'items.product'])
-            ->when($this->search, fn ($q) => $q
-                ->where('id', $this->search)
-                ->orWhereHas('sale', fn ($sa) => $sa->where('id', $this->search)
-                    ->orWhere('invoice_number', 'like', "%{$this->search}%"))
-                ->orWhereHas('sale.customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%")));
-
-        $periodReturns = $this->periodQuery(clone $returnsQuery);
-
-        $returns = (clone $periodReturns)->latest('id')->paginate(15, ['*'], 'returnsPage');
-
-        // Split by how the money went back, because the two are not the same
-        // thing: cash left the drawer, credit is owed and leaves it later.
-        $returnsTotal = (float) (clone $periodReturns)->sum('total_credit');
-        $returnsCash  = (float) (clone $periodReturns)
-            ->where('refund_method', SaleReturn::CASH)->sum('total_credit');
-
-        $returnsCount = (clone $periodReturns)->count();
-
-        // Units back on the shelf, which is the stock question rather than the
-        // money one.
-        $returnedUnits = (int) SaleReturnItem::whereIn(
-            'sale_return_id', (clone $periodReturns)->select('sale_returns.id')
-        )->sum('quantity_returned');
+        // The listing itself lives in Sales\Returns, which the whole pharmacy
+        // can reach. Only the tab's badge is needed here.
+        $returnsCount = $this->periodQuery(SaleReturn::query())->count();
 
         return view('livewire.sales.index', [
-            'returns'              => $returns,
-            'returnsTotal'         => $returnsTotal,
-            'returnsCash'          => $returnsCash,
-            'returnsCredit'        => round($returnsTotal - $returnsCash, 2),
             'returnsCount'         => $returnsCount,
-            'returnedUnits'        => $returnedUnits,
             'returnableSale'       => $returnableSale,
             'returnWindowHours'    => $returnWindowHours,
             'elevated'             => $elevated,

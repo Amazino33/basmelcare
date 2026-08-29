@@ -13,6 +13,22 @@ class History extends Component
     public string $search = '';
     public string $typeFilter = '';
 
+    /** The row opened for detail. */
+    public ?int $viewId = null;
+    public bool $detailDrawer = false;
+
+    public function viewMovement(int $id): void
+    {
+        $this->viewId       = $id;
+        $this->detailDrawer = true;
+    }
+
+    public function closeDetail(): void
+    {
+        $this->detailDrawer = false;
+        $this->viewId       = null;
+    }
+
     public function render()
     {
         $headers = [
@@ -47,6 +63,9 @@ class History extends Component
             'headers' => $headers,
             'movements' => $movements,
             'typeOptions' => $typeOptions,
+            'viewMovement' => $this->viewId
+                ? StockMovement::with('batch.product', 'fromLocation', 'toLocation', 'user')->find($this->viewId)
+                : null,
         ]);
     }
 }

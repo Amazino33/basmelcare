@@ -248,11 +248,14 @@ class WalkInReturnTest extends TestCase
 
     // ── they have to be traceable afterwards ────────────────────────────
 
+    /**
+     * The returns listing, which is its own page now - the whole pharmacy can
+     * reach it, and Sales History renders the same component in its tab.
+     */
     private function historyTab(?User $as = null)
     {
         return Livewire::actingAs($as ?? $this->staff())
-            ->test(\App\Livewire\Sales\Index::class)
-            ->set('tab', 'returns');
+            ->test(\App\Livewire\Sales\Returns::class);
     }
 
     public function test_a_return_shows_up_in_sales_history(): void
@@ -263,7 +266,7 @@ class WalkInReturnTest extends TestCase
 
         $page = $this->historyTab();
 
-        $this->assertSame(1, $page->viewData('returnsCount'));
+        $this->assertSame(1, $page->viewData('count'));
         $this->assertCount(1, $page->viewData('returns'));
     }
 
@@ -291,16 +294,16 @@ class WalkInReturnTest extends TestCase
 
         $page = $this->historyTab();
 
-        $this->assertEquals(8000, $page->viewData('returnsTotal'));
-        $this->assertEquals(4000, $page->viewData('returnsCash'));
-        $this->assertEquals(4000, $page->viewData('returnsCredit'));
+        $this->assertEquals(8000, $page->viewData('total'));
+        $this->assertEquals(4000, $page->viewData('cash'));
+        $this->assertEquals(4000, $page->viewData('credit'));
     }
 
     public function test_it_counts_the_units_that_went_back_on_the_shelf(): void
     {
         $this->returnOne($this->sale());
 
-        $this->assertSame(1, $this->historyTab()->viewData('returnedUnits'));
+        $this->assertSame(1, $this->historyTab()->viewData('units'));
     }
 
     public function test_it_shows_who_processed_it(): void
@@ -325,15 +328,15 @@ class WalkInReturnTest extends TestCase
 
         SaleReturn::sole()->forceFill(['created_at' => now()->subMonths(3)])->save();
 
-        $this->assertSame(0, $this->historyTab()->set('period', 'today')->viewData('returnsCount'));
+        $this->assertSame(0, $this->historyTab()->set('period', 'today')->viewData('count'));
     }
 
     public function test_a_period_with_no_returns_reports_nothing_rather_than_breaking(): void
     {
         $page = $this->historyTab();
 
-        $this->assertSame(0, $page->viewData('returnsCount'));
-        $this->assertEquals(0, $page->viewData('returnsTotal'));
+        $this->assertSame(0, $page->viewData('count'));
+        $this->assertEquals(0, $page->viewData('total'));
         $page->assertSee('Nothing was returned in this period.');
     }
 
@@ -345,5 +348,116 @@ class WalkInReturnTest extends TestCase
 
         $this->historyTab(User::factory()->create(['role' => ['cashier'], 'status' => 'active']))
             ->assertSee('Walk-in customer');
+    }
+
+    // ── everyone can see what came back ─────────────────────────────────
+
+    public static function everyWorkingRole(): array
+    {
+        return [
+            'admin'             => [['admin']],
+            'branch manager'    => [['branch_manager']],
+            'pharmacist'        => [['pharmacist']],
+            'sales'             => [['sales']],
+            'cashier'           => [['cashier']],
+            'inventory manager' => [['inventory_manager']],
+            'auditor'           => [['auditor']],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('everyWorkingRole')]
+    public function test_the_returns_page_opens_for_everyone(array $roles): void
+    {
+        // A pharmacist wants to know a drug came back, inventory that it is on
+        // the shelf again, the auditor to check both. None of it is margin.
+        $this->actingAs(User::factory()->create(['role' => $roles, 'status' => 'active']))
+            ->get(route('returns.index'))
+            ->assertOk();
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('everyWorkingRole')]
+    public function test_nobody_can_process_a_return_from_that_page(array $roles): void
+    {
+        // Seeing is not doing. The page offers no way to give money back -
+        // that stays with a manager, on the sale it belongs to.
+        $this->returnOne($this->sale());
+
+        $page = Livewire::actingAs(User::factory()->create(['role' => $roles, 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Returns::class);
+
+        $this->assertFalse(method_exists($page->instance(), 'processReturn'));
+    }
+
+    public function test_the_auditor_sees_it_in_their_menu(): void
+    {
+        // They have no Sales menu, so it needs its own place.
+        $auditor = User::factory()->create(['role' => ['auditor'], 'status' => 'active']);
+
+        $this->actingAs($auditor)
+            ->get(route('dashboard'))
+            ->assertSee(route('returns.index'));
+    }
+
+    public function test_the_page_shows_no_margin(): void
+    {
+        // Why it can be open this wide when Sales History cannot. Asserted on
+        // what the page actually renders, not on the words in its source - a
+        // comment explaining the rule is not a leak of it.
+        //
+        // The sale below costs 2,500 a unit and sells for 4,000. The refund
+        // figure may appear; what the pharmacy paid may not.
+        $sale = $this->sale();
+        $this->returnOne($sale);
+
+        $html = Livewire::actingAs(User::factory()->create(['role' => ['pharmacist'], 'status' => 'active']))
+            ->test(\App\Livewire\Sales\Returns::class)
+            ->call('viewReturn', SaleReturn::sole()->id)
+            ->html();
+
+        $this->assertStringNotContainsString('2,500', $html, 'The cost of the goods was shown.');
+        $this->assertStringNotContainsString('2500', $html);
+        $this->assertStringContainsString('4,000', $html, 'The refund itself should be shown.');
+    }
+
+    public function test_a_return_can_be_filtered_to_cash_only(): void
+    {
+        $this->returnOne($this->sale());                                       // cash
+        $this->returnOne($this->sale($this->customer()), SaleReturn::CREDIT);  // credit
+
+        $page = Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Sales\Returns::class)
+            ->set('methodFilter', 'cash');
+
+        $this->assertSame(1, $page->viewData('count'));
+    }
+
+    public function test_a_return_can_be_found_by_product(): void
+    {
+        $sale    = $this->sale();
+        $product = $sale->saleItems->first()->product;
+
+        $this->returnOne($sale);
+
+        $page = Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Sales\Returns::class)
+            ->set('search', $product->name);
+
+        $this->assertSame(1, $page->viewData('count'));
+    }
+
+    public function test_the_detail_shows_which_batch_the_stock_went_back_to(): void
+    {
+        // The question behind "the stock did not change": which shelf did it
+        // land on, and what does that batch hold now.
+        $sale  = $this->sale();
+        $batch = $sale->saleItems->first()->batch;
+
+        $this->returnOne($sale);
+
+        Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Sales\Returns::class)
+            ->call('viewReturn', SaleReturn::sole()->id)
+            ->assertSet('detailDrawer', true)
+            ->assertSee($batch->batch_number);
     }
 }

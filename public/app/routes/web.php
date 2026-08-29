@@ -127,6 +127,16 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('messages', App\Livewire\Messages\Index::class)->name('messages.index');
         });
 
+        // What came back. Open to everyone who works here: the pharmacist wants
+        // to know a drug was returned, the inventory manager that it is back on
+        // the shelf, and the auditor has to be able to check both. It carries
+        // no margin, which is why it can be this wide when Sales History cannot.
+        // Read-only for all of them - processing a return stays with a manager,
+        // on the sale it belongs to.
+        Route::middleware('role:admin,branch_manager,pharmacist,sales,cashier,inventory_manager,auditor')->group(function () {
+            Route::get('returns', App\Livewire\Sales\Returns::class)->name('returns.index');
+        });
+
         // Coupons (admin, branch_manager)
         Route::middleware('role:admin,branch_manager')->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
