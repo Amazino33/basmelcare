@@ -193,14 +193,37 @@
                                 <span class="text-base-content/60">Subtotal</span>
                                 <span>₦{{ number_format($subtotal, 2) }}</span>
                             </div>
+                            {{-- Monthly cover. Shown only to a signed-in customer
+                                 who has some, so the page is unchanged for
+                                 everybody else. --}}
+                            @if($coverQuote && $coverQuote['covered'] > 0)
+                                <div class="flex justify-between text-success">
+                                    <span>Your cover pays</span>
+                                    <span class="font-medium">−₦{{ number_format($coverQuote['covered'], 2) }}</span>
+                                </div>
+                            @endif
+
                             <div class="flex justify-between">
                                 <span class="text-base-content/60">Delivery</span>
                                 <span>{{ $deliveryFee > 0 ? '₦' . number_format($deliveryFee, 2) : 'Free' }}</span>
                             </div>
                             <div class="flex justify-between font-bold text-base border-t border-base-200 pt-2">
                                 <span>Total</span>
-                                <span class="text-primary">₦{{ number_format($total, 2) }}</span>
+                                <span class="text-primary">
+                                    ₦{{ number_format(max(0, $subtotal - ($coverQuote['covered'] ?? 0)) + $deliveryFee, 2) }}
+                                </span>
                             </div>
+
+                            @if($coverQuote && $coverQuote['covered'] > 0)
+                                <p class="text-xs text-base-content/60">
+                                    ₦{{ number_format($coverQuote['remaining'] - $coverQuote['covered'], 2) }}
+                                    of your cover is left this month. Delivery is not covered.
+                                </p>
+                            @elseif($coverQuote && $coverQuote['reason'])
+                                {{-- Better to say why than to leave them wondering
+                                     where their cover went. --}}
+                                <p class="text-xs text-warning">{{ $coverQuote['reason'] }}</p>
+                            @endif
                         </div>
 
                         <button wire:click="placeOrder" class="btn btn-primary btn-block mt-4" wire:loading.attr="disabled">

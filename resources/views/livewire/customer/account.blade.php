@@ -35,6 +35,36 @@
         </div>
     </div>
 
+    {{-- Monthly cover. Shown only if they are on it, so nothing changes for
+         anybody who is not. --}}
+    @if($cover)
+        @php
+            $claimable = $cover->isClaimable();
+            $left      = $cover->coverRemaining();
+        @endphp
+        <div class="rounded-lg p-4 mb-6 border {{ $claimable ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5' }}">
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <div class="font-bold">{{ $cover->plan->name }} cover</div>
+                    @if($claimable)
+                        <div class="text-sm text-base-content/70">
+                            Paid up to {{ $cover->period_end->format('j M Y') }}.
+                            Unused cover does not carry into next month.
+                        </div>
+                    @else
+                        <div class="text-sm text-warning">{{ $cover->blockedReason() }}</div>
+                    @endif
+                </div>
+                <div class="text-right shrink-0">
+                    <div class="text-2xl font-bold {{ $claimable && $left > 0 ? 'text-success' : 'text-base-content/40' }}">
+                        ₦{{ number_format($left, 0) }}
+                    </div>
+                    <div class="text-xs text-base-content/60">left this month</div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Tab Navigation -->
     <div class="flex overflow-x-auto gap-1 mb-4 border-b border-base-200 pb-1 scrollbar-hide">
         @foreach(['overview' => 'Overview', 'orders' => 'In-Store', 'online' => 'Online Orders', 'debts' => 'Debts', 'appointments' => 'Appointments', 'records' => 'Records', 'wallet' => 'Wallet'] as $tab => $label)

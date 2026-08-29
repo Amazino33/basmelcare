@@ -48,6 +48,12 @@ class Account extends Component
             'totalSpent' => $totalSpent,
             'totalDebt' => $totalDebt,
             'totalOrders' => $totalOrders,
+            // Their cover, if the pharmacy is running the scheme and they are
+            // on it. Null otherwise, so the page is unchanged for everybody
+            // else.
+            'cover' => \App\Services\InsuranceCover::enabled()
+                ? \App\Models\InsuranceSubscription::forCustomer($customer->id)
+                : null,
         ]);
     }
 }

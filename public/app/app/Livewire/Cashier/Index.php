@@ -7,9 +7,11 @@ use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\Debt;
 use App\Models\DebtPayment;
+use App\Models\InsuranceSubscription;
 use App\Models\Order;
 use App\Models\ReferralCommission;
 use App\Models\Sale;
+use App\Services\InsuranceCover;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -40,6 +42,16 @@ class Index extends Component
     public ?array $appliedCoupon = null;
     public float $couponDiscount = 0;
 
+    /**
+     * What this customer's monthly cover would pay for the sale on screen.
+     *
+     * A quote only - nothing is spent until processPayment, which asks again
+     * rather than trusting this. Null when the customer has no cover, or when
+     * the pharmacy has not switched the scheme on.
+     */
+    public ?array $insuranceQuote = null;
+    public ?int $insuranceSubscriptionId = null;
+
 
     // Attach customer to walk-in sale
     public bool $createCustomerModal    = false;
@@ -69,6 +81,7 @@ class Index extends Component
 
         $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
         $this->autoApplyCoupon();
+        $this->refreshInsuranceQuote();
         $this->payModal = true;
     }
 
@@ -201,6 +214,39 @@ class Index extends Component
         }
     }
 
+    /**
+     * Work out what cover pays for the sale currently open.
+     *
+     * Called whenever the customer or the sale changes, because cover belongs
+     * to a customer: attaching one to a walk-in sale is exactly when it starts
+     * applying.
+     */
+    private function refreshInsuranceQuote(): void
+    {
+        $this->insuranceQuote = null;
+        $this->insuranceSubscriptionId = null;
+
+        if (! InsuranceCover::enabled() || ! $this->payingSaleId) {
+            return;
+        }
+
+        $sale = Sale::with('saleItems.product')->find($this->payingSaleId);
+
+        if (! $sale?->customer_id) {
+            return;
+        }
+
+        $subscription = InsuranceSubscription::forCustomer($sale->customer_id);
+
+        if (! $subscription) {
+            return;
+        }
+
+        $this->insuranceSubscriptionId = $subscription->id;
+        $this->insuranceQuote = app(InsuranceCover::class)
+            ->quote($subscription, InsuranceCover::linesFromSale($sale));
+    }
+
     public function detachCustomer(): void
     {
         $sale = Sale::findOrFail($this->payingSaleId);
@@ -209,6 +255,7 @@ class Index extends Component
         $this->customerSearch = '';
         // Coupons require a registered customer, so any applied one is no longer valid.
         $this->reset(['couponCode', 'appliedCoupon', 'couponDiscount']);
+        $this->refreshInsuranceQuote();
         $this->success('Customer removed from this sale.');
     }
 
@@ -221,6 +268,7 @@ class Index extends Component
         $this->apply_credit = $customer->credit_balance > 0;
         $this->customerSearch = '';
         $this->autoApplyCoupon();
+        $this->refreshInsuranceQuote();
         $this->success($customer->name . ' attached to this sale.');
     }
 
@@ -260,6 +308,41 @@ class Index extends Component
         $this->attachCustomer($customer->id);
     }
 
+    /**
+     * Draw on the customer's cover for this sale, if they have any.
+     *
+     * Returns what was actually covered. A quote can be stale by the time the
+     * cashier presses pay, so this re-checks and may cover less than the screen
+     * promised - which is why the amount is read back into the receipt rather
+     * than assumed.
+     */
+    private function claimInsurance(Sale $sale): array
+    {
+        $none = ['covered' => 0.0, 'subscription_id' => null, 'plan' => null];
+
+        if (! InsuranceCover::enabled() || ! $sale->customer_id) {
+            return $none;
+        }
+
+        $subscription = InsuranceSubscription::forCustomer($sale->customer_id);
+
+        if (! $subscription || ! $subscription->isClaimable()) {
+            return $none;
+        }
+
+        $result = app(InsuranceCover::class)->apply(
+            $subscription,
+            InsuranceCover::linesFromSale($sale),
+            saleId: $sale->id,
+        );
+
+        return [
+            'covered'         => (float) $result['covered'],
+            'subscription_id' => $subscription->id,
+            'plan'            => $subscription->plan->name,
+        ];
+    }
+
     public function processPayment()
     {
         $sale = Sale::with('customer', 'saleItems.product')->findOrFail($this->payingSaleId);
@@ -274,7 +357,12 @@ class Index extends Component
         $transfer = (float) ($this->transfer_amount ?: 0);
         $totalCash = $cash + $card + $transfer;
 
-        $saleTotal = (float) $sale->total_amount - $this->couponDiscount;
+        // Cover is taken here, inside the payment, and asked for again rather
+        // than trusted from the screen: the same customer's cover can have been
+        // spent on an online order since this modal opened.
+        $insurance = $this->claimInsurance($sale);
+
+        $saleTotal = (float) $sale->total_amount - $this->couponDiscount - $insurance['covered'];
 
         // Apply existing store credit if toggled
         $creditUsed = 0;
@@ -346,6 +434,10 @@ class Index extends Component
             'debts_cleared'   => !empty($debtsToClear)
                 ? array_map(fn($d) => ['invoice' => $d['invoice'], 'amount' => round($d['amount'], 2)], $debtsToClear)
                 : null,
+            'insurance'       => $insurance['covered'] > 0.01 ? [
+                'plan'   => $insurance['plan'],
+                'amount' => round($insurance['covered'], 2),
+            ] : null,
             'shortfall'       => $shortfall > 0.01 ? round($shortfall, 2) : null,
             'change_given'    => $changeBack > 0.01 ? round($changeBack, 2) : null,
             'stored_credit'   => $storedCredit > 0.01 ? round($storedCredit, 2) : null,
@@ -645,7 +737,8 @@ class Index extends Component
             $creditBalance  = (float) ($payingSale->customer?->credit_balance ?? 0);
             $creditUsed     = 0;
             $originalTotal  = (float) $payingSale->total_amount;
-            $saleTotal      = $originalTotal - $this->couponDiscount;
+            $insuranceCover = (float) ($this->insuranceQuote['covered'] ?? 0);
+            $saleTotal      = $originalTotal - $this->couponDiscount - $insuranceCover;
 
             if ($this->apply_credit && $payingSale->customer_id && $creditBalance > 0) {
                 $creditUsed = min($creditBalance, max(0, $saleTotal - $totalCash));
@@ -693,6 +786,7 @@ class Index extends Component
                     'total_cash'      => $totalCash,
                     'credit_used'     => $creditUsed,
                     'coupon_discount' => $this->couponDiscount,
+                    'insurance_cover' => $insuranceCover,
                     'original_total'  => $originalTotal,
                     'total_collected' => $totalCollected,
                     'sale_total'      => $saleTotal,

@@ -22,6 +22,45 @@
             </x-card>
         </x-tab>
 
+        <x-tab name="cover" label="Monthly Cover" icon="o-shield-check">
+            <x-card title="Monthly cover" subtitle="Customers who pay a premium and draw medicine against it" class="mt-4">
+                <x-form wire:submit="saveInsurance">
+                    <x-toggle label="Cover is live" wire:model.live="insurance_enabled"
+                              hint="Until this is on, cover pays for nothing at the till or online" />
+
+                    <div class="rounded-lg border border-base-300 bg-base-200/40 p-4 text-sm">
+                        <p class="font-semibold mb-1">What switching this on does</p>
+                        <ul class="list-disc list-inside space-y-1 text-base-content/70">
+                            <li>A subscriber's bill drops by whatever their cover pays, at the
+                                counter and at online checkout.</li>
+                            <li>Each claim comes off that month's cover and is recorded against
+                                their subscription.</li>
+                            <li>Unused cover does not carry into the next month.</li>
+                        </ul>
+                        <p class="text-base-content/60 mt-2">
+                            Switching it off later does not cancel anybody. Their cover simply
+                            stops being applied, and resumes if it is switched back on.
+                        </p>
+                    </div>
+
+                    @if($insurance_enabled)
+                        <div class="alert alert-warning py-2 text-sm gap-2">
+                            <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                            <span>
+                                Cover is medicine given away against a premium already collected.
+                                Check <a href="{{ route('insurance.plans') }}" class="link">Cover Plans</a>
+                                for what each plan could pay out in a month before you sell any.
+                            </span>
+                        </div>
+                    @endif
+
+                    <x-slot:actions>
+                        <x-button label="Save" type="submit" class="btn-primary" spinner="saveInsurance" />
+                    </x-slot:actions>
+                </x-form>
+            </x-card>
+        </x-tab>
+
         <x-tab name="alerts" label="Counter Alerts" icon="o-bell-alert">
             <x-card title="Calling the pharmacist" subtitle="What happens when nobody answers on screen" class="mt-4">
                 <x-form wire:submit="savePharmacistAlerts">

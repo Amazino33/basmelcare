@@ -182,6 +182,22 @@ class Index extends Component
                 }
             }
 
+            // Cover was spent when the order was placed, so cancelling has to
+            // give it back - otherwise a customer loses the month's allowance
+            // to an order the pharmacy could not fill.
+            if ($order->insurance_covered > 0 && $order->insurance_subscription_id) {
+                \App\Models\InsuranceSubscription::with('plan')
+                    ->find($order->insurance_subscription_id)
+                    ?->refund((float) $order->insurance_covered);
+
+                \App\Models\InsuranceClaim::where('order_id', $order->id)->delete();
+
+                $order->update([
+                    'insurance_covered' => 0,
+                    'total_amount'      => (float) $order->subtotal + (float) $order->delivery_fee,
+                ]);
+            }
+
             $order->update(['status' => 'cancelled']);
         });
 

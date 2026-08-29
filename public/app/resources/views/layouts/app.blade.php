@@ -153,11 +153,26 @@
                     <x-menu-item title="Coupons" icon="o-percent-badge" link="{{ route('coupons.index') }}" />
                 @endif
 
+                {{-- Monthly cover. Hidden entirely until the pharmacy switches it
+                     on, so a till that does not sell insurance never sees it.
+                     Plans stay reachable for whoever is setting it up. --}}
+                @if(\App\Services\InsuranceCover::enabled() && array_intersect($roles, ['admin', 'branch_manager', 'cashier', 'sales', 'auditor']))
+                    <x-menu-item title="Cover" icon="o-shield-check" link="{{ route('insurance.subscriptions') }}" />
+                @endif
+
+                @if(array_intersect($roles, ['admin', 'branch_manager']))
+                    <x-menu-item title="Cover Plans" icon="o-shield-exclamation" link="{{ route('insurance.plans') }}" />
+                @endif
+
                 @if(array_intersect($roles, ['admin', 'branch_manager', 'auditor']))
                     <x-menu-separator />
                     <x-menu-sub title="Finance" icon="o-calculator">
                         <x-menu-item title="Financial Records" icon="o-banknotes" link="{{ route('finance.index') }}" />
                         <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
+
+                        @if(\App\Services\InsuranceCover::enabled())
+                            <x-menu-item title="Cover Report" icon="o-shield-check" link="{{ route('insurance.report') }}" />
+                        @endif
 
                         {{-- The auditor has no Sales menu, so surface the money-owed
                              records they can still read here instead. --}}

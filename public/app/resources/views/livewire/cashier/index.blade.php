@@ -272,6 +272,44 @@
                 </div>
             </div>
 
+            {{-- Monthly cover. Absent entirely unless this customer has a plan,
+                 so a till that never sells insurance looks exactly as it did. --}}
+            @if($insuranceQuote)
+                <div class="border rounded-lg p-3 mb-3
+                            {{ $insuranceQuote['covered'] > 0 ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5' }}">
+                    <div class="flex items-start gap-2">
+                        <x-icon name="o-shield-check"
+                                class="w-4 h-4 shrink-0 mt-0.5 {{ $insuranceQuote['covered'] > 0 ? 'text-success' : 'text-warning' }}" />
+                        <div class="flex-1 min-w-0">
+                            @if($insuranceQuote['covered'] > 0)
+                                <div class="font-semibold text-success text-sm">
+                                    Cover pays −₦{{ number_format($insuranceQuote['covered'], 2) }}
+                                </div>
+                                <div class="text-xs text-base-content/60">
+                                    ₦{{ number_format($insuranceQuote['remaining'] - $insuranceQuote['covered'], 2) }}
+                                    left for the rest of the month
+                                    @if($insuranceQuote['copay'] > 0)
+                                        &middot; co-pay ₦{{ number_format($insuranceQuote['copay'], 2) }}
+                                    @endif
+                                </div>
+                                @if(!empty($insuranceQuote['excluded']))
+                                    <div class="text-xs text-warning mt-1">
+                                        Not covered: {{ implode(', ', array_slice($insuranceQuote['excluded'], 0, 3)) }}@if(count($insuranceQuote['excluded']) > 3) and {{ count($insuranceQuote['excluded']) - 3 }} more @endif
+                                    </div>
+                                @endif
+                            @else
+                                {{-- Say why, so the cashier can tell the customer
+                                     rather than guess on their behalf. --}}
+                                <div class="font-semibold text-warning text-sm">Cover cannot be used</div>
+                                <div class="text-xs text-base-content/70">
+                                    {{ $insuranceQuote['reason'] ?? 'Nothing on this sale is covered by their plan.' }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Coupon --}}
             <div class="border border-base-300 rounded-lg p-3 mb-3">
                 @if($appliedCoupon)
@@ -361,6 +399,12 @@
                             <div class="flex justify-between text-success">
                                 <span>Coupon ({{ $appliedCoupon['code'] }})</span>
                                 <span class="font-medium">−₦{{ number_format($breakdown['coupon_discount'], 2) }}</span>
+                            </div>
+                        @endif
+                        @if(($breakdown['insurance_cover'] ?? 0) > 0.01)
+                            <div class="flex justify-between text-success">
+                                <span>Monthly cover</span>
+                                <span class="font-medium">−₦{{ number_format($breakdown['insurance_cover'], 2) }}</span>
                             </div>
                         @endif
                         @if($breakdown['credit_used'] > 0.01)

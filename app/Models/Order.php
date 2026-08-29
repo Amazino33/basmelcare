@@ -9,6 +9,7 @@ class Order extends Model
     protected $fillable = [
         'order_number', 'customer_id', 'guest_name', 'guest_email', 'guest_phone',
         'subtotal', 'delivery_fee', 'total_amount',
+        'insurance_covered', 'insurance_subscription_id',
         'fulfillment_type', 'payment_method', 'payment_status', 'payment_reference',
         'status', 'claimed_by', 'claimed_at', 'delivery_address', 'delivery_phone', 'note',
         'prescription_path', 'paid_at',
@@ -19,6 +20,7 @@ class Order extends Model
 
     protected $casts = [
         'subtotal'             => 'decimal:2',
+        'insurance_covered'    => 'decimal:2',
         'delivery_fee'         => 'decimal:2',
         'total_amount'         => 'decimal:2',
         'paid_at'              => 'datetime',

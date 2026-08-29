@@ -66,6 +66,9 @@ class Index extends Component
     public bool $pharmacist_call_alert_enabled = false;
     public int  $pharmacist_call_alert_after_seconds = 60;
 
+    // Monthly cover
+    public bool $insurance_enabled = false;
+
     // Consultations
     public array $consult_prices = [];
     public int $consult_free_count = 1;
@@ -118,6 +121,8 @@ class Index extends Component
 
         $this->pharmacist_call_alert_enabled       = AppSetting::bool('pharmacist_call_alert_enabled', false);
         $this->pharmacist_call_alert_after_seconds = (int) AppSetting::get('pharmacist_call_alert_after_seconds', 60);
+
+        $this->insurance_enabled = AppSetting::bool('insurance_enabled', false);
 
         $this->consult_free_count  = (int) AppSetting::get('consult_free_count', 1);
         $this->consult_free_period = (string) AppSetting::get('consult_free_period', 'ever');
@@ -218,6 +223,25 @@ class Index extends Component
         AppSetting::set('pharmacist_call_alert_after_seconds', $this->pharmacist_call_alert_after_seconds);
 
         $this->success('Pharmacist alert settings saved.');
+    }
+
+    /**
+     * Switch monthly cover on or off.
+     *
+     * Off until the pharmacy is ready to sell it. While it is off, plans and
+     * subscriptions can be set up and looked at, but nothing pays for anything
+     * at the till - so turning it on later is a decision, not a release.
+     *
+     * Turning it off does not cancel anybody: their cover simply stops being
+     * applied, and picks up again if it is switched back on.
+     */
+    public function saveInsurance(): void
+    {
+        AppSetting::set('insurance_enabled', $this->insurance_enabled ? '1' : '0');
+
+        $this->success($this->insurance_enabled
+            ? 'Cover is now live. Subscribers will be charged less at the till.'
+            : 'Cover is switched off. Nobody will be charged less at the till.');
     }
 
     public function saveConsultations(): void

@@ -3,9 +3,12 @@
 namespace App\Livewire\Shop;
 
 use App\Models\Customer;
+use App\Models\InsuranceSubscription;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use App\Services\CartService;
+use App\Services\InsuranceCover;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -71,6 +74,63 @@ class Checkout extends Component
         }
     }
 
+    /**
+     * The cover this customer could draw on for what is in the basket.
+     *
+     * Only for a signed-in customer: cover belongs to a named person, and a
+     * guest checkout has nobody to charge it to. Returns null when there is
+     * nothing to say, so the page is unchanged for everybody else.
+     */
+    public function coverQuote(): ?array
+    {
+        if (! InsuranceCover::enabled()) {
+            return null;
+        }
+
+        $customer = Auth::guard('customer')->user();
+
+        if (! $customer) {
+            return null;
+        }
+
+        $subscription = InsuranceSubscription::forCustomer($customer->id);
+
+        if (! $subscription) {
+            return null;
+        }
+
+        return app(InsuranceCover::class)->quote($subscription, $this->coverLines());
+    }
+
+    /**
+     * The basket, priced for the cover calculation.
+     *
+     * Cost comes from what the product's stock is currently worth rather than
+     * from the order line, because an online order has no batch allocated to
+     * it until the pharmacy picks it. Booking nothing would flatter the cover
+     * report into showing free medicine as costless.
+     */
+    private function coverLines(): array
+    {
+        $cart = new CartService();
+
+        $products = Product::with(['batches' => fn ($q) => $q->where('quantity', '>', 0)])
+            ->whereIn('id', collect($cart->get())->pluck('product_id'))
+            ->get()
+            ->keyBy('id');
+
+        return collect($cart->get())->map(function ($item) use ($products) {
+            $product = $products->get($item['product_id']);
+            $unitCost = (float) ($product?->batches->max('cost_price') ?? 0);
+
+            return [
+                'product'  => $product,
+                'subtotal' => (float) $item['price'] * (int) $item['quantity'],
+                'cost'     => $unitCost * (int) $item['quantity'],
+            ];
+        })->all();
+    }
+
     public function placeOrder()
     {
         $cart = new CartService();
@@ -108,7 +168,18 @@ class Checkout extends Component
         $subtotal = $cart->subtotal();
         $prescriptionPath = $this->prescription?->store('prescriptions', 'public');
 
-        $order = DB::transaction(function () use ($cart, $customer, $subtotal, $deliveryFee, $prescriptionPath) {
+        $coverLines = $this->coverLines();
+
+        $order = DB::transaction(function () use ($cart, $customer, $subtotal, $deliveryFee, $prescriptionPath, $coverLines) {
+            // Cover is spent as the order is placed, not when it is paid for.
+            // Two orders minutes apart would otherwise each be promised the
+            // same allowance, and the second customer would be undercharged
+            // with nothing left to draw on. Cancelling gives it back.
+            $covered = 0.0;
+            $subscription = ($customer && InsuranceCover::enabled())
+                ? InsuranceSubscription::forCustomer($customer->id)
+                : null;
+
             $order = Order::create([
                 'order_number' => Order::generateOrderNumber(),
                 'customer_id' => $customer?->id,
@@ -117,6 +188,7 @@ class Checkout extends Component
                 'guest_phone' => $this->checkout_mode === 'guest' ? $this->guest_phone : null,
                 'subtotal' => $subtotal,
                 'delivery_fee' => $deliveryFee,
+                // Filled in below, once the cover has actually been taken.
                 'total_amount' => $subtotal + $deliveryFee,
                 'fulfillment_type' => $this->fulfillment_type,
                 'payment_method' => $this->payment_method,
@@ -139,6 +211,21 @@ class Checkout extends Component
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['price'],
                     'subtotal' => $item['price'] * $item['quantity'],
+                ]);
+            }
+
+            if ($subscription && $subscription->isClaimable()) {
+                $result  = app(InsuranceCover::class)->apply($subscription, $coverLines, orderId: $order->id);
+                $covered = (float) $result['covered'];
+            }
+
+            if ($covered > 0) {
+                // Delivery is a service, not medicine, so cover never touches
+                // it - the customer pays the fee whatever their plan.
+                $order->update([
+                    'insurance_covered'         => $covered,
+                    'insurance_subscription_id' => $subscription->id,
+                    'total_amount'              => max(0, $subtotal - $covered) + $deliveryFee,
                 ]);
             }
 
@@ -166,6 +253,7 @@ class Checkout extends Component
             'total' => $cart->subtotal() + $deliveryFee,
             'itemCount' => $cart->count(),
             'requiresPrescription' => $cart->requiresPrescription(),
+            'coverQuote' => $this->coverQuote(),
         ]);
     }
 }

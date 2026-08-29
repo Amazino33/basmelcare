@@ -132,6 +132,25 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
             Route::get('coupons', App\Livewire\Coupons\Index::class)->name('coupons.index');
         });
 
+        // Monthly cover. What a plan promises is a pricing decision, so plans
+        // are limited to the roles that set prices; signing a customer up and
+        // taking their premium happens at the counter, so that page is wider.
+        // Both are reachable while the scheme is switched off, deliberately -
+        // the plans have to be set up before it can be turned on.
+        Route::middleware('role:admin,branch_manager')->group(function () {
+            Route::get('insurance/plans', App\Livewire\Insurance\Plans::class)->name('insurance.plans');
+        });
+
+        Route::middleware('role:admin,branch_manager,cashier,sales,auditor')->group(function () {
+            Route::get('insurance', App\Livewire\Insurance\Subscriptions::class)->name('insurance.subscriptions');
+        });
+
+        // Whether the scheme pays for itself. The auditor's question, so the
+        // auditor is on the list; the cashier is not - it carries margin.
+        Route::middleware('role:admin,branch_manager,auditor')->group(function () {
+            Route::get('insurance/report', App\Livewire\Insurance\Report::class)->name('insurance.report');
+        });
+
         // What came into stock. Read-only, and the auditor is on the list:
         // they may see stock arrive without being able to move any.
         Route::middleware('role:admin,branch_manager,auditor,inventory_manager')->group(function () {
