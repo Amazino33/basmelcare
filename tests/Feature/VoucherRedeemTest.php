@@ -236,4 +236,61 @@ class VoucherRedeemTest extends TestCase
             "Reconnect extended the window: {$firstExpiry} → {$secondExpiry}"
         );
     }
+
+    // ── how a receipt is identified ──────────────────────────────
+
+    private function redeem(string $code)
+    {
+        return $this->postJson('/api/voucher/redeem',
+            ['invoice_number' => $code],
+            ['X-API-Key' => $this->apiKey]
+        );
+    }
+
+    public function test_a_receipt_is_claimed_by_its_wifi_code(): void
+    {
+        $this->makeSale(['wifi_code' => 'K7MQ2X']);
+
+        $this->redeem('K7MQ2X')->assertStatus(200)->assertJson(['valid' => true]);
+    }
+
+    public function test_a_guessed_four_digit_number_no_longer_opens_a_receipt(): void
+    {
+        // The lookup used to fall back to invoice_number LIKE '%-0001'. Numbers
+        // count up from 0001 every morning, so all nine thousand of a day's
+        // possible receipts were reachable by typing four digits - which is the
+        // whole reason wifi_code exists.
+        $this->makeSale(['wifi_code' => 'K7MQ2X']);
+
+        $this->redeem('0001')->assertStatus(404)->assertJson(['valid' => false]);
+    }
+
+    public function test_a_current_receipt_cannot_be_opened_with_its_invoice_number(): void
+    {
+        // Guessing the whole number is barely harder: the date is today's and
+        // the counter is small. If the sale has a wifi_code, that is the key.
+        $this->makeSale(['wifi_code' => 'K7MQ2X']);
+
+        $this->redeem('INV-20260706-0001')->assertStatus(404)->assertJson(['valid' => false]);
+    }
+
+    public function test_a_receipt_printed_before_wifi_codes_existed_still_works(): void
+    {
+        // Those receipts have nothing else on them. Honouring them is the only
+        // reason the invoice-number path survives at all.
+        $this->makeSale(['wifi_code' => null]);
+
+        $this->redeem('INV-20260706-0001')->assertStatus(200)->assertJson(['valid' => true]);
+    }
+
+    public function test_one_customer_s_code_does_not_open_another_s_receipt(): void
+    {
+        $this->makeSale(['invoice_number' => 'INV-20260706-0001', 'wifi_code' => 'K7MQ2X']);
+        $this->makeSale(['invoice_number' => 'INV-20260706-0002', 'wifi_code' => 'P3JD9R']);
+
+        $this->assertSame(
+            'INV-20260706-0002',
+            $this->redeem('P3JD9R')->json('invoice_number')
+        );
+    }
 }

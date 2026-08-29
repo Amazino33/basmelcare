@@ -54,12 +54,18 @@ class VoucherRedeemController extends Controller
         // receipt never causes a false "not found".
         $invoiceNumber = strtoupper(trim($request->invoice_number));
 
-        // New sales: look up by dedicated wifi_code column.
-        // Old sales: fall back to suffix embedded in invoice_number.
+        // A receipt is claimed by its wifi_code, which is random and unique.
         $sale = Sale::with('customer')->where('wifi_code', $invoiceNumber)->first()
-            ?? (str_contains($invoiceNumber, '-')
-                ? Sale::with('customer')->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])->first()
-                : Sale::with('customer')->whereRaw('UPPER(invoice_number) LIKE ?', ['%-' . $invoiceNumber])->first());
+
+            // Receipts printed before wifi_code existed carry only the invoice
+            // number, so those are still honoured - but only those. Invoice
+            // numbers count up from 0001 each morning, so anything that accepts
+            // one accepts a guess; restricting this to rows with no wifi_code
+            // means no sale made since then can be reached by guessing.
+            ?? Sale::with('customer')
+                ->whereNull('wifi_code')
+                ->whereRaw('UPPER(invoice_number) = ?', [$invoiceNumber])
+                ->first();
 
         if (! $sale) {
             // Is this actually a promoter code that reached the wrong app?
