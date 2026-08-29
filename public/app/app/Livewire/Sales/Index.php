@@ -269,7 +269,19 @@ class Index extends Component
                         'subtotal'          => $subtotal,
                     ]);
 
-                    if ($item->batch_id) {
+                    // batch_id is NOT NULL on sale_items and its foreign key
+                    // cascades, so a line always has a live batch. Refusing
+                    // rather than skipping matters anyway: silently carrying on
+                    // would pay the refund and leave the goods off the shelf,
+                    // which is exactly the fault that is hard to notice.
+                    if (! $item->batch) {
+                        throw new \RuntimeException(
+                            'The batch "' . ($item->product->name ?? 'item') . '" was sold from no longer exists, '
+                            . 'so it cannot be put back. Add the stock by hand and record the refund separately.'
+                        );
+                    }
+
+                    {
                         $item->batch->increment('quantity', $qty);
                         StockMovement::create([
                             'batch_id'  => $item->batch_id,
@@ -294,8 +306,17 @@ class Index extends Component
         } catch (\RuntimeException $e) {
             $this->returnError = $e->getMessage();
             return;
-        } catch (\Throwable) {
-            $this->returnError = 'Return could not be processed. Please try again or contact support.';
+        } catch (\Throwable $e) {
+            // Logged, because the alternative is what happened here: a return
+            // reported as not working, with nothing recorded to say why.
+            Log::error('[Return] Sale ' . $sale->invoice_number . ' failed: ' . $e->getMessage(), [
+                'sale_id' => $sale->id,
+                'user_id' => auth()->id(),
+                'qtys'    => $this->returnQtys,
+            ]);
+
+            $this->returnError = 'Return could not be processed, and nothing was changed. '
+                . 'Please try again, or tell an admin to check the logs.';
             return;
         }
 
