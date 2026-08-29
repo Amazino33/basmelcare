@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Running BasmelCare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ------------------------------------------------------------------
+     Palette taken from the app's own pharmacy theme, which is derived
+     from the logo. Grounds carry a trace of the brand navy rather than
+     being flat grey, exactly as resources/css/app.css does.
+     ------------------------------------------------------------------ */
+  :root {
+    --navy:        oklch(28.6% 0.184 264.2);
+    --navy-soft:   oklch(44% 0.145 264.2);
+    --green:       oklch(37.8% 0.119 145.1);
+    --green-soft:  oklch(52% 0.125 145.1);
+    --amber:       oklch(52% 0.125 62);
+    --red:         oklch(48% 0.185 27.33);
+
+    --ground:      oklch(98.6% 0.003 265);
+    --raise:       oklch(96.2% 0.005 265);
+    --sink:        oklch(93.4% 0.009 265);
+    --rule:        oklch(88% 0.012 265);
+    --ink:         oklch(24% 0.025 264);
+    --ink-soft:    oklch(45% 0.02 264);
+    --ink-faint:   oklch(58% 0.015 264);
+
+    --chip-bg:     oklch(94% 0.012 264);
+    --shadow:      0 1px 2px oklch(28% 0.05 264 / 0.06), 0 4px 14px oklch(28% 0.05 264 / 0.05);
+
+    --measure: 68ch;
+    --rail: 16.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --navy:       oklch(80% 0.11 264.2);
+      --navy-soft:  oklch(68% 0.11 264.2);
+      --green:      oklch(74% 0.13 150);
+      --green-soft: oklch(62% 0.12 150);
+      --amber:      oklch(78% 0.13 68);
+      --red:        oklch(70% 0.16 25);
+
+      --ground:     oklch(17.5% 0.018 264);
+      --raise:      oklch(21.5% 0.021 264);
+      --sink:       oklch(25.5% 0.024 264);
+      --rule:       oklch(32% 0.025 264);
+      --ink:        oklch(93% 0.008 264);
+      --ink-soft:   oklch(77% 0.012 264);
+      --ink-faint:  oklch(63% 0.014 264);
+
+      --chip-bg:    oklch(27% 0.028 264);
+      --shadow:     0 1px 2px oklch(0% 0 0 / 0.4), 0 4px 14px oklch(0% 0 0 / 0.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --navy:       oklch(80% 0.11 264.2);
+    --navy-soft:  oklch(68% 0.11 264.2);
+    --green:      oklch(74% 0.13 150);
+    --green-soft: oklch(62% 0.12 150);
+    --amber:      oklch(78% 0.13 68);
+    --red:        oklch(70% 0.16 25);
+
+    --ground:     oklch(17.5% 0.018 264);
+    --raise:      oklch(21.5% 0.021 264);
+    --sink:       oklch(25.5% 0.024 264);
+    --rule:       oklch(32% 0.025 264);
+    --ink:        oklch(93% 0.008 264);
+    --ink-soft:   oklch(77% 0.012 264);
+    --ink-faint:  oklch(63% 0.014 264);
+
+    --chip-bg:    oklch(27% 0.028 264);
+    --shadow:     0 1px 2px oklch(0% 0 0 / 0.4), 0 4px 14px oklch(0% 0 0 / 0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- shell ---------- */
+
+  .shell {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: 3.5rem;
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: 0 1.5rem 6rem;
+    align-items: start;
+  }
+
+  @media (max-width: 60rem) {
+    .shell { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 1.1rem 4rem; }
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    grid-column: 1 / -1;
+    border-bottom: 2px solid var(--navy);
+    padding: 3.5rem 0 1.75rem;
+    margin-bottom: 2.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+
+  .masthead h1 {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    margin: 0;
+    color: var(--navy);
+    text-wrap: balance;
+  }
+
+  .masthead .sub {
+    margin: 0.55rem 0 0;
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    max-width: 46ch;
+  }
+
+  .stamp {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-align: right;
+    line-height: 1.9;
+    white-space: nowrap;
+  }
+
+  /* ---------- contents rail ---------- */
+
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.855rem;
+    padding-bottom: 2rem;
+  }
+
+  .rail h2 {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: var(--ink-faint);
+    margin: 1.6rem 0 0.5rem;
+    font-weight: 600;
+  }
+  .rail h2:first-child { margin-top: 0; }
+
+  .rail a {
+    display: block;
+    padding: 0.24rem 0 0.24rem 0.7rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-left: 2px solid var(--rule);
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .rail a:hover, .rail a:focus-visible {
+    color: var(--navy);
+    border-left-color: var(--navy);
+  }
+
+  @media (max-width: 60rem) {
+    .rail-wrap {
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: var(--raise);
+      margin-bottom: 2.5rem;
+    }
+    .rail-wrap > summary {
+      font-family: Archivo, sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      color: var(--navy);
+    }
+    .rail { position: static; max-height: none; padding: 0 1rem 1.1rem; }
+  }
+  @media (min-width: 60.001rem) {
+    .rail-wrap > summary { display: none; }
+  }
+
+  /* ---------- prose ---------- */
+
+  main { min-width: 0; }
+
+  section { scroll-margin-top: 1.5rem; margin-bottom: 3.25rem; }
+
+  h2.part {
+    font-family: Archivo, sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.5rem, 3vw, 1.95rem);
+    letter-spacing: -0.02em;
+    color: var(--navy);
+    margin: 0 0 0.2rem;
+    padding-top: 0.4rem;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: Archivo, sans-serif;
+    font-weight: 600;
+    font-size: 1.18rem;
+    letter-spacing: -0.01em;
+    margin: 2.2rem 0 0.5rem;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  h4 {
+    font-family: Archivo, sans-serif;
+    font-weight: 600;
+    font-size: 0.97rem;
+    margin: 1.5rem 0 0.35rem;
+    color: var(--ink);
+  }
+
+  p, li { max-width: var(--measure); }
+  p { margin: 0 0 0.9rem; }
+
+  ul, ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+  li { margin-bottom: 0.35rem; }
+  li::marker { color: var(--navy-soft); }
+
+  a { color: var(--navy); }
+
+  strong { font-weight: 600; }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.855em;
+  }
+
+  code {
+    background: var(--chip-bg);
+    padding: 0.1em 0.38em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  .lede {
+    font-size: 1.08rem;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin-bottom: 1.6rem;
+  }
+
+  /* ---------- role chips ---------- */
+
+  .roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.32rem;
+    margin: 0.55rem 0 1.1rem;
+    align-items: center;
+  }
+
+  .roles .label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-right: 0.2rem;
+  }
+
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    padding: 0.16rem 0.44rem;
+    border-radius: 3px;
+    background: var(--chip-bg);
+    color: var(--ink-soft);
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .chip.key { border-color: var(--navy-soft); color: var(--navy); background: transparent; }
+  .chip.ro  { border-color: var(--rule); color: var(--ink-faint); background: transparent; font-style: italic; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--navy-soft);
+    background: var(--raise);
+    padding: 0.9rem 1.1rem;
+    border-radius: 0 5px 5px 0;
+    margin: 1.2rem 0;
+    max-width: var(--measure);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .head {
+    font-family: Archivo, sans-serif;
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--navy);
+  }
+
+  .note.warn { border-left-color: var(--amber); }
+  .note.warn .head { color: var(--amber); }
+  .note.stop { border-left-color: var(--red); }
+  .note.stop .head { color: var(--red); }
+
+  /* ---------- tables ---------- */
+
+  .scroller { overflow-x: auto; margin: 1.1rem 0 1.4rem; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 34rem;
+    font-family: Archivo, sans-serif;
+    font-size: 0.855rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--navy-soft);
+    white-space: nowrap;
+  }
+
+  tbody tr:nth-child(even) { background: var(--raise); }
+  td.n { text-align: right; }
+
+  .yes { color: var(--green); font-weight: 600; }
+  .no  { color: var(--ink-faint); }
+  .part-yes { color: var(--amber); font-weight: 600; }
+
+  /* permission grid: tight, centred marks */
+  table.perm th:not(:first-child), table.perm td:not(:first-child) {
+    text-align: center;
+    white-space: nowrap;
+  }
+  table.perm th:not(:first-child) {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0;
+    padding: 0.5rem 0.35rem;
+  }
+  table.perm td:not(:first-child) { padding: 0.45rem 0.35rem; }
+  table.perm td:first-child { font-weight: 500; }
+
+  /* ---------- step lists ---------- */
+
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.1rem;
+    margin-bottom: 0.7rem;
+  }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.16rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 1.4rem;
+    height: 1.4rem;
+    line-height: 1.4rem;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--ground);
+  }
+
+  /* ---------- misc ---------- */
+
+  hr.part-rule {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 0 0 1.4rem;
+    max-width: var(--measure);
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.67rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  dl.defs { margin: 0 0 1.2rem; max-width: var(--measure); }
+  dl.defs dt {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--navy);
+    margin-top: 0.85rem;
+  }
+  dl.defs dd { margin: 0.15rem 0 0; color: var(--ink-soft); font-size: 0.96rem; }
+
+  :where(a, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  /* ------------------------------------------------------------------
+     Print / save as PDF. The contents rail is a screen affordance and
+     goes; everything else keeps the brand palette but on white, since a
+     dark ground would empty a toner cartridge to no purpose.
+     ------------------------------------------------------------------ */
+  @media print {
+    :root {
+      --navy:      oklch(28.6% 0.184 264.2);
+      --navy-soft: oklch(44% 0.145 264.2);
+      --green:     oklch(37.8% 0.119 145.1);
+      --amber:     oklch(48% 0.12 62);
+      --red:       oklch(45% 0.18 27.33);
+      --ground:    #fff;
+      --raise:     #fff;
+      --sink:      #fff;
+      --rule:      #c9ccd8;
+      --ink:       #14161f;
+      --ink-soft:  #3a3f52;
+      --ink-faint: #5c6274;
+      --chip-bg:   #eef0f6;
+      --shadow:    none;
+      --measure:   none;
+    }
+
+    @page { margin: 16mm 14mm; }
+
+    body { font-size: 10.5pt; line-height: 1.45; background: #fff; }
+
+    .rail-wrap { display: none; }
+
+    .shell {
+      display: block;
+      max-width: none;
+      padding: 0;
+    }
+
+    .masthead {
+      padding-top: 0;
+      margin-bottom: 1.4rem;
+      break-after: avoid;
+    }
+
+    /* Each part starts its own page, so the manual can be pulled apart
+       and the counter given only the pages it needs. */
+    section { break-before: page; margin-bottom: 1.6rem; }
+    section:first-of-type { break-before: avoid; }
+
+    h2.part, h3, h4 { break-after: avoid; }
+
+    /* Nothing that is read as one thing may be split across a fold. */
+    .note, ol.steps > li, dl.defs dt, tr { break-inside: avoid; }
+    dl.defs dt { break-after: avoid; }
+
+    thead { display: table-header-group; }
+
+    .scroller { overflow: visible; }
+    table { min-width: 0; font-size: 8.6pt; }
+    table.perm th:not(:first-child) { font-size: 7pt; }
+    th, td { padding: 0.28rem 0.4rem; }
+
+    a { color: var(--ink); text-decoration: none; }
+
+    p, li { max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="masthead">
+    <div>
+      <h1>Running BasmelCare</h1>
+      <p class="sub">How the pharmacy system works, what each person can do in it, and the order things happen in.</p>
+    </div>
+    <div class="stamp">
+      Staff&nbsp;app &middot; Online&nbsp;shop<br>
+      Nine&nbsp;roles &middot; One&nbsp;database
+    </div>
+  </header>
+
+  <details class="rail-wrap" open>
+    <summary>Contents</summary>
+    <nav class="rail" aria-label="Contents">
+      <h2>Start here</h2>
+      <a href="#shape">The shape of the system</a>
+      <a href="#roles">Roles and what they open</a>
+      <a href="#permissions">Permission table</a>
+
+      <h2>The counter</h2>
+      <a href="#selling">Making a sale</a>
+      <a href="#paying">Taking payment</a>
+      <a href="#pricing">Prices, packs, wholesale</a>
+      <a href="#debts">Debts and change owed</a>
+      <a href="#returns">Returns</a>
+      <a href="#pharmacist-call">Calling the pharmacist</a>
+
+      <h2>Medicine</h2>
+      <a href="#prescriptions">Prescriptions</a>
+      <a href="#consultations">Consultations</a>
+
+      <h2>Stock</h2>
+      <a href="#products">Products and batches</a>
+      <a href="#stock">Stock levels and movement</a>
+      <a href="#stocktake">Stock take</a>
+      <a href="#procurement">Suppliers and orders</a>
+
+      <h2>Online</h2>
+      <a href="#shop">The shop</a>
+      <a href="#orders">Online orders</a>
+      <a href="#wifi">Wi-Fi on a receipt</a>
+
+      <h2>Money</h2>
+      <a href="#expenses">Expenses</a>
+      <a href="#finance">Financial records</a>
+      <a href="#reports">Reports</a>
+      <a href="#moneytrail">Money trail</a>
+
+      <h2>Cover</h2>
+      <a href="#cover">Monthly cover</a>
+
+      <h2>Growing it</h2>
+      <a href="#customers">Customers</a>
+      <a href="#coupons">Coupons</a>
+      <a href="#messages">Messages</a>
+      <a href="#commissions">Commissions</a>
+
+      <h2>Administration</h2>
+      <a href="#staff">Staff and branches</a>
+      <a href="#settings">Settings</a>
+      <a href="#gotchas">What catches people out</a>
+    </nav>
+  </details>
+
+  <main>
+
+    <!-- ============================================================ -->
+    <section id="shape">
+      <span class="eyebrow">Start here</span>
+      <h2 class="part">The shape of the system</h2>
+      <hr class="part-rule">
+
+      <p class="lede">BasmelCare is two websites sharing one set of records. What a customer does on one, staff see on the other, immediately.</p>
+
+      <dl class="defs">
+        <dt>The staff app</dt>
+        <dd>Where the pharmacy is run: the till, stock, money, patient records. Staff sign in with an email address and password given to them by an admin. There is no self sign-up — an account carries a role, a branch, and access to what customers bought, so it is created for you.</dd>
+
+        <dt>The online shop</dt>
+        <dd>Where customers browse, order, book a consultation, and look at their own account. They sign in with a code sent to their WhatsApp, or with a password.</dd>
+      </dl>
+
+      <p>Both read and write the same database. A product added by the inventory manager appears in the shop. An order placed at midnight is on the cashier's screen in the morning. A customer's cover, spent at the counter, is gone online too.</p>
+
+      <div class="note">
+        <span class="head">Everything is scoped to a branch</span>
+        <p>Most staff belong to one branch, and see that branch's sales, stock and expenses. Admins have no branch and see everything. If a figure looks wrong or a record has vanished, the branch on the account is the first thing to check.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="roles">
+      <h2 class="part">Roles and what they open</h2>
+      <hr class="part-rule">
+
+      <p>A staff account can hold more than one role, and holding two opens what either one opens — never more. A pharmacist who also covers the till gets both the pharmacist pages and the till; neither role grants the reports page, so the combination does not either.</p>
+
+      <dl class="defs">
+        <dt>admin</dt>
+        <dd>Everything, across every branch. The only role that can create staff, add branches, change Settings, or read the server logs.</dd>
+
+        <dt>branch_manager</dt>
+        <dd>Everything operational within their branch, including prices and the money pages. Cannot create staff or change Settings.</dd>
+
+        <dt>pharmacist</dt>
+        <dd>Clinical work. Reviews prescriptions on online orders, decides which products need one, sees medical records, keeps appointments. Reads the catalogue but cannot change a product, a price, or a batch — those are inventory and management decisions, and the guard is on the action, not just the button.</dd>
+
+        <dt>sales</dt>
+        <dd>The counter. Builds a sale on the till, prepares online orders, counts stock at stock take.</dd>
+
+        <dt>cashier</dt>
+        <dd>Takes the money. Settles invoices the till raised, verifies online payments, records expenses, handles debts and change owed.</dd>
+
+        <dt>inventory_manager</dt>
+        <dd>Stock. Products, batches, deliveries, transfers, adjustments, suppliers, purchase orders. Can create a product but not price it — the price saves as zero for a manager to set.</dd>
+
+        <dt>auditor</dt>
+        <dd>Reads the money and never touches it. Financial records, reports, expenses, debts, stock received, the cover report. Every write is refused in the action itself, not merely hidden.</dd>
+
+        <dt>promoter</dt>
+        <dd>Brings customers in and earns commission on them. Sees customers, appointments and their own commission.</dd>
+
+        <dt>content</dt>
+        <dd>Product photographs, and nothing else.</dd>
+      </dl>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="permissions">
+      <h2 class="part">Permission table</h2>
+      <hr class="part-rule">
+
+      <p>Which pages each role can open. <span class="yes">&#10003;</span> means the page opens; <span class="part-yes">R</span> means it opens read-only.</p>
+
+      <div class="scroller">
+        <table class="perm">
+          <thead>
+            <tr>
+              <th>Page</th>
+              <th>admin</th><th>br&nbsp;mgr</th><th>pharm</th><th>sales</th><th>cashier</th><th>inv&nbsp;mgr</th><th>auditor</th><th>promo</th><th>content</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Dashboard</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td></tr>
+            <tr><td>POS (till)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Cashier</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Sales history</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Online orders</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Prescriptions</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Prescription medicines</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Products &amp; categories</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Stock levels &amp; expiry</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Transfers, adjustments, history</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Stock received</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Can't sell list</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Stock take</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Suppliers &amp; purchase orders</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Customers &amp; appointments</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Debt book &amp; change owed</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Expenses</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Financial records</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Reports</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Money trail</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Cover (subscriptions)</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Cover plans</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Cover report</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="part-yes">R</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Coupons &amp; messages</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Commissions</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td></tr>
+            <tr><td>Product images</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td></tr>
+            <tr><td>Staff, branches, settings, logs</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="head">Hidden is not the same as locked</span>
+        <p>Buttons a role may not use are not rendered, but the refusal lives in the action underneath. A pharmacist cannot save a product even by reaching the action another way, and the auditor cannot record a premium. Both are tested for exactly that.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="selling">
+      <span class="eyebrow">The counter</span>
+      <h2 class="part">Making a sale</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>Selling is two people's work in two places. The till raises an invoice; the cashier takes the money. Nothing leaves the shelf on the till alone.</p>
+
+      <ol class="steps">
+        <li><strong>Attach the customer, if there is one.</strong> Search by name or phone, or create them on the spot. This is what makes wholesale pricing, coupons, debt and monthly cover possible — a walk-in gets none of them.</li>
+        <li><strong>Search and add products.</strong> Type part of the name. If nothing is found, note it as a missed request: it goes on the <em>Can't sell</em> list so somebody can source it.</li>
+        <li><strong>Set quantities.</strong> Each line can be sold loose or by the pack — see below.</li>
+        <li><strong>Create the invoice.</strong> The sale is saved as <code>pending</code> and given a number like <code>INV-20260829-0001</code>. Print it and give it to the customer.</li>
+        <li><strong>Send them to the cashier.</strong> They pay against that number.</li>
+        <li><strong>Confirm handover</strong> once the goods are actually in the customer's hands.</li>
+      </ol>
+
+      <p>Stock is drawn oldest-expiry-first across batches, so a quantity larger than one batch is spread automatically. You do not pick batches.</p>
+
+      <div class="note warn">
+        <span class="head">Invoice numbers count up and never fill gaps</span>
+        <p>They run from <code>0001</code> each morning. A cancelled sale leaves a gap, and the gap stays — a number is never reissued. That is deliberate: an auditor reading the day's book should find every number between the first and the last, or know a sale is missing.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="paying">
+      <h2 class="part">Taking payment</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">cashier</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>Open the pending invoice on the Cashier page. One screen settles the whole thing.</p>
+
+      <h4>Splitting the payment</h4>
+      <p>Cash, card and transfer each have their own box, and a payment can use any combination. If more than one is used the sale is recorded as <em>split</em>, and every naira is still counted under the method it came in on — so the cash, card and transfer filters on the auditor's pages add up to the same totals shown above them.</p>
+
+      <h4>What happens to the difference</h4>
+      <ul>
+        <li><strong>They paid too little.</strong> With a registered customer the shortfall becomes a debt. A walk-in must pay in full — there is nobody to chase.</li>
+        <li><strong>They paid too much.</strong> The excess clears their oldest debts first, oldest to newest. Anything still left is change.</li>
+        <li><strong>Change you cannot give.</strong> Tick <em>store as credit</em> and it goes to their wallet instead of the drawer, ready for next time.</li>
+      </ul>
+
+      <h4>Applied before they are asked for anything</h4>
+      <p>In order: a coupon, then their monthly cover, then their stored credit. Whatever remains is the amount to collect.</p>
+
+      <h4>Online orders</h4>
+      <p>The same page verifies a Paystack payment and approves a pay-on-delivery dispatch.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="pricing">
+      <h2 class="part">Prices, packs and wholesale</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who sets prices</span><span class="chip key">admin</span><span class="chip key">branch_manager</span></div>
+
+      <p>Selling and wholesale prices are a commercial decision and belong to management. Everyone else keeps full product and stock management, so a delivery is never blocked — the product simply saves unpriced, at zero, for a manager to set.</p>
+
+      <h4>Packs</h4>
+      <p>A product can carry a pack size and a pack price. On the till each line can be switched between loose units and packs. The pack price is what you typed, not the unit price multiplied — a pack is usually cheaper than its parts, and the system does not argue with the number you set.</p>
+
+      <h4>Wholesale</h4>
+      <p>A customer marked <em>wholesale</em> is priced differently, and the price is worked out in this order:</p>
+      <ol class="steps">
+        <li>A wholesale price typed onto the product wins outright.</li>
+        <li>Otherwise it is calculated: the cost of the <strong>dearest batch currently in stock</strong>, plus a markup percentage.</li>
+        <li>The markup is a single figure in Settings, and any product may override it.</li>
+      </ol>
+      <p>The dearest batch, not the cheapest and not an average, because that is the one that protects the margin whichever batch the customer walks out with. Wholesale applies at the till and on the shop alike. Buying by the pack at wholesale is the wholesale unit rate multiplied by the pack size.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="debts">
+      <h2 class="part">Debts and change owed</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">cashier</span><span class="chip key">branch_manager</span><span class="chip key">admin</span><span class="chip ro">auditor reads</span></div>
+
+      <p>Two books that mirror each other.</p>
+
+      <dl class="defs">
+        <dt>Debt book</dt>
+        <dd>What customers owe the pharmacy, from part-paid invoices. Payments can be recorded against a debt at any time, and each one prints its own receipt.</dd>
+
+        <dt>Change owed</dt>
+        <dd>What the pharmacy owes customers, from change that was stored rather than handed over. Paying it out prints a receipt too.</dd>
+      </dl>
+
+      <p>Both are visible to the auditor, who can read them and change nothing.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="returns">
+      <h2 class="part">Returns</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">cashier</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>Returns are taken against the original sale, from Sales History. Open the invoice, choose the quantity coming back on each line, and process it. A return receipt is printed and the stock goes back.</p>
+
+      <p>Two rules in Settings govern them: how many hours after the sale a return is still accepted, and whether a return requires a registered customer.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="pharmacist-call">
+      <h2 class="part">Calling the pharmacist</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who can call</span><span class="chip key">sales</span><span class="chip key">cashier</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>A button in the top bar tells the pharmacist that a customer is waiting. Any pharmacist with the app open sees a banner within about five seconds, and it chimes. They tap <em>On my way</em> and the counter sees that somebody is coming.</p>
+
+      <p>If nobody answers on screen within a set wait, their phones can be rung instead — a WhatsApp, falling back to SMS. That is off unless an admin turns it on under <em>Settings &rarr; Counter Alerts</em>, because it costs a message through the same gateway that sends receipts.</p>
+
+      <p>A call goes quiet on its own after fifteen minutes. Every active pharmacist at that branch with a number on file is messaged once per call; the system holds no rota, so it cannot tell who is actually on duty and tells everyone who could answer.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="prescriptions">
+      <span class="eyebrow">Medicine</span>
+      <h2 class="part">Prescriptions</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who decides</span><span class="chip key">pharmacist only</span></div>
+
+      <p>Which products require a prescription is a clinical judgement, so it is the pharmacist's alone. <em>Prescription medicines</em> is the only page in the system no other role can open, including admin.</p>
+
+      <h4>How it plays out online</h4>
+      <ol class="steps">
+        <li>A customer puts a listed medicine in their basket. Checkout requires them to upload a prescription before the order can be placed.</li>
+        <li>The order arrives marked <code>pending</code> review and cannot be prepared until a pharmacist has looked at it.</li>
+        <li>The pharmacist opens the file, then approves or refuses it. A refusal takes a reason, so the customer can be told something useful.</li>
+        <li>Only then does the order join the normal queue.</li>
+      </ol>
+
+      <p>An order that needs no prescription has no review status at all — that is deliberately different from one that needs a review and has not had it yet.</p>
+
+      <div class="note stop">
+        <span class="head">Who may see what</span>
+        <p>Sales staff can see a prescription attached to an order they are preparing, because they have to. <strong>Medical records are pharmacist and admin only</strong> and are not on the counter's screens at all. Product photographs are hosted externally for speed; patient documents never are.</p>
+      </div>
+
+      <p>The till has no prescription check. Face-to-face, that judgement is the pharmacist's in the room.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="consultations">
+      <h2 class="part">Consultations</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">pharmacist</span><span class="chip key">sales</span><span class="chip key">cashier</span><span class="chip key">branch_manager</span><span class="chip key">admin</span><span class="chip key">promoter</span></div>
+
+      <p>Anyone can book a consultation from the shop without an account. Identity comes from the phone number, which is matched to a customer record or creates one — the free allowance is per customer, and an unattached booking could claim it over and over.</p>
+
+      <p>Settings control the price per provider type, how many consultations are free and over what period, and how long an unpaid booking holds its slot. Paid consultations go through Paystack.</p>
+
+      <p>Bookings appear under <em>Appointments</em>, where staff confirm, reschedule or record the outcome.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="products">
+      <span class="eyebrow">Stock</span>
+      <h2 class="part">Products and batches</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">inventory_manager</span><span class="chip key">branch_manager</span><span class="chip key">admin</span><span class="chip ro">pharmacist reads</span></div>
+
+      <p>A <strong>product</strong> is the thing you sell. A <strong>batch</strong> is a particular delivery of it, with its own cost, expiry date and quantity. Stock is the sum of the batches; sales draw from the one expiring soonest.</p>
+
+      <h4>Adding stock</h4>
+      <ul>
+        <li><strong>Add batch</strong> against an existing product — the everyday route when a delivery arrives.</li>
+        <li><strong>Quick add</strong> creates the product and its first batch in one form, for something new arriving on the counter.</li>
+        <li><strong>Import</strong> takes a spreadsheet. Download the template from the page so the columns match.</li>
+      </ul>
+
+      <h4>Fixing a mistake</h4>
+      <p>Bulk edit was removed. To correct a mistyped delivery, open the product's batches and edit the batch itself — its number, cost and expiry date. Quantity is deliberately not editable there: changing what is on the shelf is a stock adjustment, which is recorded as one and shows up in the movement history.</p>
+
+      <div class="note">
+        <span class="head">Names are stored in capitals</span>
+        <p>However they are typed. Duplicate detection ignores case, so <em>Paracetamol</em> will not sit next to <em>PARACETAMOL</em> as two products.</p>
+      </div>
+
+      <h4>Photographs</h4>
+      <p>Product images upload on the product form or through the dedicated <em>Product Images</em> page, which is what the content role exists for. Images can be hosted on Cloudinary and resized on the fly; that is switched on in Settings, and existing images are pushed up in batches rather than all at once.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="stock">
+      <h2 class="part">Stock levels and movement</h2>
+      <hr class="part-rule">
+
+      <dl class="defs">
+        <dt>Stock levels</dt>
+        <dd>What is on hand, with a printable version for a physical walk-round.</dd>
+
+        <dt>Expiry alerts</dt>
+        <dd>What is close to its date. How many days counts as close is a setting.</dd>
+
+        <dt>Transfers</dt>
+        <dd>Moving stock between branches, or between storage locations within one.</dd>
+
+        <dt>Adjustments</dt>
+        <dd>Correcting what is on the shelf — breakage, loss, a miscount found outside a stock take. Pick the product, then the batch, then say what the true number is and why.</dd>
+
+        <dt>Stock received</dt>
+        <dd>What came in and when, which is what an auditor asks for when they want last week's delivery. The auditor can read it.</dd>
+
+        <dt>Can't sell</dt>
+        <dd>Things asked for and not stocked, or run out. Buying staff mark an item as sourced once it arrives. Sales staff can see the list — they are the ones who hear the requests — but only buying staff can mark anything.</dd>
+
+        <dt>Movement history</dt>
+        <dd>Every change in quantity, with its reason and who made it.</dd>
+      </dl>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="stocktake">
+      <h2 class="part">Stock take</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who counts</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>A stock take is counted by one person and approved by another.</p>
+
+      <ol class="steps">
+        <li>Start a count. The system lists what it believes is on the shelf.</li>
+        <li>Walk the shelves and enter the physical quantity for each line. Filter to what you have not counted yet.</li>
+        <li>Submit it. Nothing has moved yet — the count is a claim, not a correction.</li>
+        <li>A manager approves or rejects it. Approving is what writes the differences into stock, each one recorded as a movement.</li>
+      </ol>
+
+      <p>The person who counted cannot be the person who approves. That is the whole point of the two steps.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="procurement">
+      <h2 class="part">Suppliers and purchase orders</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">inventory_manager</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>Suppliers hold contact details and what you buy from them. A purchase order lists what was ordered, from whom, and at what cost; receiving it against the delivery is what creates the batches. A purchase order can be cancelled if it never arrives.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="shop">
+      <span class="eyebrow">Online</span>
+      <h2 class="part">The shop</h2>
+      <hr class="part-rule">
+
+      <p>The customer-facing site. Nothing here needs staff attention day to day, but it is worth knowing what customers can do.</p>
+
+      <dl class="defs">
+        <dt>Browsing and buying</dt>
+        <dd>Products with photographs, a basket, and checkout as a guest or with an account. Guest checkout is deliberate — making people register before they can buy medicine loses the sale.</dd>
+
+        <dt>Signing in</dt>
+        <dd>A six-digit code sent to their WhatsApp, or a password. The code works once and is then spent. A phone number works in place of an email address, because that is what people give at the counter.</dd>
+
+        <dt>Their account</dt>
+        <dd>Past purchases in store and online, debts, wallet balance, appointments, and their monthly cover if they have any.</dd>
+
+        <dt>Paying</dt>
+        <dd>Paystack, or pay on delivery. A Paystack payment is verified by the cashier before the order is prepared.</dd>
+
+        <dt>Delivery or collection</dt>
+        <dd>Chosen at checkout. Delivery carries a fee; collection does not.</dd>
+      </dl>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="orders">
+      <h2 class="part">Online orders</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <ol class="steps">
+        <li><strong>Claim it.</strong> One person takes responsibility, and only they can cancel it afterwards.</li>
+        <li><strong>Check the prescription</strong>, if the order carries one. It cannot be prepared until a pharmacist has approved it.</li>
+        <li><strong>Prepare it.</strong> Marking it ready is what takes the stock off the shelf.</li>
+        <li><strong>Payment.</strong> A Paystack payment is verified on the Cashier page; a pay-on-delivery order is approved for dispatch there too.</li>
+        <li><strong>Dispatch</strong> with the name and number of whoever is carrying it, or hand it over for collection.</li>
+      </ol>
+
+      <p>Cancelling an order that was already marked ready puts the stock back, and gives back any monthly cover it had used.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="wifi">
+      <h2 class="part">Wi-Fi on a receipt</h2>
+      <hr class="part-rule">
+
+      <p>Every receipt carries a short code that gives the customer a day of Wi-Fi through the pharmacy's hotspot. How long a day lasts is a setting.</p>
+
+      <ul>
+        <li>The clock starts at the <strong>first</strong> connection and is never extended. Reconnecting mid-window keeps the same wall-clock expiry.</li>
+        <li>Staff can revoke a receipt's access from Sales History.</li>
+        <li>The code is random and unique to that receipt. An invoice number will not open somebody else's Wi-Fi.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="expenses">
+      <span class="eyebrow">Money</span>
+      <h2 class="part">Expenses</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">cashier</span><span class="chip key">branch_manager</span><span class="chip key">admin</span><span class="chip ro">auditor reads</span></div>
+
+      <p>Money spent out of the till — transport, repairs, small purchases. Everyone at a branch sees that branch's whole expense book, not only their own entries, so two cashiers on different shifts are looking at the same page.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="finance">
+      <h2 class="part">Financial records</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span><span class="chip ro">auditor reads</span></div>
+
+      <p>What was earned, what it cost, and what actually moved in and out of the till, over any date range.</p>
+
+      <div class="note">
+        <span class="head">Trading and cash are reported separately, and never mixed</span>
+        <p>Buying &#8358;500,000 of stock and selling half of it is a profitable month on a trading basis and a heavy outflow on a cash basis. Presenting either as "profit" would be wrong, so both are shown and labelled.</p>
+      </div>
+
+      <p>The invoice list can be filtered by status and by payment method. A split payment appears under every method that contributed to it, so the filters reconcile with the totals above them rather than quietly excluding splits. Any invoice opens to its full detail.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="reports">
+      <h2 class="part">Reports</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span><span class="chip ro">auditor reads</span></div>
+
+      <p>Revenue, profit, and the three hot-product rankings — most units sold, most revenue, most profit. There is a printable version for the auditor.</p>
+
+      <div class="note">
+        <span class="head">Units are counted as packs, not tablets</span>
+        <p>Counting loose tablets put items like vitamin C at the top of every list simply because they are sold in large numbers. The ranking reflects what actually moves.</p>
+      </div>
+
+      <p>The printed top-products sheet shows margin, so it is narrower than the page itself: admin and branch manager only.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="moneytrail">
+      <h2 class="part">Money trail</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span></div>
+
+      <p>Every change to a figure that moves money — a selling price, a wholesale price, a coupon's value, a cover plan's premium, a setting — with the old value, the new value, who changed it and when.</p>
+
+      <p>It is not a general activity log. It exists to answer one question: who changed this number, and to what.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="cover">
+      <span class="eyebrow">Cover</span>
+      <h2 class="part">Monthly cover</h2>
+      <hr class="part-rule">
+
+      <p class="lede">Customers pay a premium each month and draw medicine against it when they need it. Built, tested, and switched off until the pharmacy decides to sell it.</p>
+
+      <div class="note warn">
+        <span class="head">Off by default</span>
+        <p>Nothing pays for anything at the till or online until an admin turns it on under <em>Settings &rarr; Monthly Cover</em>. Until then the till looks exactly as it did and the Cover menu is hidden — but plans can be set up in advance, because they have to exist before it can be turned on.</p>
+      </div>
+
+      <h3>What a plan is</h3>
+      <div class="roles"><span class="label">Who sets plans</span><span class="chip key">admin</span><span class="chip key">branch_manager</span></div>
+
+      <p>This is insurance, not a discount card, and the difference is the whole design. A discount costs a known fraction of a sale; cover costs whatever the customer needs, out of stock already paid for. Every setting on a plan exists to keep that bounded.</p>
+
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Setting</th><th>What it does</th><th>Why it is there</th></tr></thead>
+          <tbody>
+            <tr><td>Monthly premium</td><td>What the customer pays each month.</td><td>The money coming in.</td></tr>
+            <tr><td>Cover per month</td><td>The most the plan will pay out in a month.</td><td>Required. Without a ceiling, one subscriber on an expensive course takes a year of everybody's premiums.</td></tr>
+            <tr><td>Waiting period</td><td>Days after the first premium before anything can be claimed. Default 30.</td><td>Stops somebody joining the morning they fall ill, claiming the lot that afternoon, and never paying again.</td></tr>
+            <tr><td>Grace period</td><td>Days past the paid-to date that cover continues. Default 7.</td><td>People pay late. Cutting them off at midnight turns a busy week into an uncovered emergency.</td></tr>
+            <tr><td>Co-pay</td><td>A percentage the subscriber still pays on covered items.</td><td>Taken off the top, so it stretches the cover rather than draining it &mdash; and free medicine is not collected for a cupboard at home.</td></tr>
+            <tr><td>Not covered</td><td>Categories the plan will never pay for.</td><td>The premium was collected for medicine, not cosmetics.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The plans page shows, for each plan, how many people are on it and what it would cost if every one of them claimed their full allowance this month. That is the figure to look at before agreeing a premium.</p>
+
+      <p>A plan is withdrawn rather than deleted, because subscriptions read their cover and waiting period from it and claims already paid under it have to stay explicable.</p>
+
+      <h3>Signing a customer up</h3>
+      <div class="roles"><span class="label">Who</span><span class="chip key">cashier</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span><span class="chip ro">auditor reads</span></div>
+
+      <ol class="steps">
+        <li>Find the customer, choose a plan, and take the first premium.</li>
+        <li>The screen tells you the exact date cover starts. <strong>Say it to them.</strong> Being told "you are covered" and turned away that afternoon is what loses a customer for good.</li>
+        <li>Each month, record the premium. Paying early adds a month to the end rather than costing them days.</li>
+      </ol>
+
+      <p>A customer can hold only one live plan at a time. Cancelling stops cover immediately; premiums already taken are not refunded automatically — do that at the counter.</p>
+
+      <h3>Using it</h3>
+      <p>Once it is switched on, a subscriber's bill simply drops. At the counter the cashier sees what cover pays and how much is left for the month. If they cannot use it, the screen says why in words that can be read out: the premium is overdue, cover starts on such a date, or this month's cover is used up.</p>
+
+      <ul>
+        <li>Cover is one pool, drawn from at the counter and on the shop alike.</li>
+        <li>Unused cover does not carry into next month. This month's premiums pay this month's claims.</li>
+        <li>Online, the cover is spent when the order is <em>placed</em>, not when it is paid. Cancelling an order gives it back.</li>
+        <li>Delivery is never covered.</li>
+      </ul>
+
+      <h3>Is it working?</h3>
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span><span class="chip ro">auditor reads</span></div>
+
+      <p>The cover report gives two figures and refuses to conflate them.</p>
+
+      <dl class="defs">
+        <dt>Cash result</dt>
+        <dd>Premiums collected, less what the medicine given out actually cost the pharmacy. This is the one that says whether the scheme pays for itself.</dd>
+
+        <dt>Against walking in and buying</dt>
+        <dd>Premiums, less what the shop would have taken had those customers simply bought the same medicine. This figure is worse, and it is the one to weigh against the custom the scheme brings in.</dd>
+      </dl>
+
+      <p>Both are broken down per plan, so one that loses money can be repriced rather than the whole scheme abandoned. A table of who is drawing most is there for the same reason an insurer keeps one: a few people claiming many times their premium is normal, and it is only a problem when the pool as a whole stops covering them.</p>
+
+      <div class="note">
+        <span class="head">Not built yet</span>
+        <p>Recurring Paystack billing. A premium can be recorded as paid by Paystack with its reference, but real subscription billing needs a live plan and a webhook, which cannot be exercised until the pharmacy is actually using this.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="customers">
+      <span class="eyebrow">Growing it</span>
+      <h2 class="part">Customers</h2>
+      <hr class="part-rule">
+
+      <p>A customer record holds their name, phone, email, address and notes, and links to everything they have done: purchases, debts, wallet, appointments, medical records, cover.</p>
+
+      <p>Customers are marked <strong>retail</strong> or <strong>wholesale</strong>, which is what drives wholesale pricing. Who registered a customer is recorded, which is what promoter commission is calculated from.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="coupons">
+      <h2 class="part">Coupons</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span></div>
+
+      <p>A coupon is a fixed amount or a percentage off, with a cap if you want one. It can be restricted by customer type, order value, item count, category or product, given a usage limit and an expiry date.</p>
+
+      <p>A coupon marked <em>auto-apply</em> needs no code — the best applicable one is applied at the till by itself. Coupons require a registered customer.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="messages">
+      <h2 class="part">Messages</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span></div>
+
+      <p>One message to many customers &mdash; all of them, wholesale only, or those who have bought recently &mdash; with an optional picture.</p>
+
+      <ol class="steps">
+        <li>Write the message and choose who it goes to. The page tells you how many people that is.</li>
+        <li>Prepare it. The recipient list is fixed at that moment, so a broadcast happened to a particular set of people.</li>
+        <li>Send in batches of twenty. Stopping is safe; nobody is messaged twice, and the rest wait until you come back.</li>
+      </ol>
+
+      <div class="note">
+        <span class="head">Nobody is put in a group</span>
+        <p>Each message is sent individually. A group would show every member who else buys medicine here &mdash; a fact about named people's health that none of them agreed to share.</p>
+      </div>
+
+      <p>Write so the message makes sense without the picture: a customer reached by SMS gets the words only, because a text message cannot carry an image. The page reports how many actually received the picture rather than letting you assume everyone did.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="commissions">
+      <h2 class="part">Commissions</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">promoter</span><span class="chip key">cashier</span><span class="chip key">sales</span><span class="chip key">branch_manager</span><span class="chip key">admin</span></div>
+
+      <p>Promoters bring customers in and earn a fixed amount per qualifying customer. Each promoter has a code and a monthly target; the amount per customer and the default target are set in Settings.</p>
+
+      <p>Promoter codes are handled by the staff app, not the shop &mdash; a code sent to the wrong address is refused with an explanation rather than a bare "not found".</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="staff">
+      <span class="eyebrow">Administration</span>
+      <h2 class="part">Staff and branches</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin only</span></div>
+
+      <p>Staff accounts are created here, given one or more roles, and assigned a branch. An account can be deactivated without being deleted &mdash; their sales, stock movements and audit entries all point back at it, so nobody can be removed.</p>
+
+      <div class="note warn">
+        <span class="head">The branch matters more than it looks</span>
+        <p>Anyone who records branch-scoped work &mdash; a cashier, a sales person &mdash; needs the right branch, or their sales and expenses land somewhere nobody is looking. A cashier created with "all branches" will not appear on any branch's book. Roles that do not record branch work, such as auditor or content, may legitimately have none.</p>
+      </div>
+
+      <p>Branches carry a name and a main-branch flag. Storage locations sit inside a branch and are what stock transfers move between.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="settings">
+      <h2 class="part">Settings</h2>
+      <hr class="part-rule">
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin only</span></div>
+
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Tab</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td>General</td><td>Pharmacy name, address, phone, email, website, currency symbol. These print on receipts.</td></tr>
+            <tr><td>Monthly Cover</td><td>The switch that makes cover live, and an explanation of what turning it on does.</td></tr>
+            <tr><td>Counter Alerts</td><td>Whether an unanswered pharmacist call rings their phones, and how long to wait first.</td></tr>
+            <tr><td>Consultations</td><td>Price per provider type, how many are free and over what period, how long an unpaid booking holds its slot.</td></tr>
+            <tr><td>Wholesale</td><td>The markup percentage added to the dearest batch cost. Any product can override it.</td></tr>
+            <tr><td>WhatsApp</td><td>The WhatsApp gateway, and the SMS service used when WhatsApp fails.</td></tr>
+            <tr><td>Paystack</td><td>Public and secret keys for online payment.</td></tr>
+            <tr><td>Product Images</td><td>Cloudinary hosting and resizing, and pushing existing images up in batches.</td></tr>
+            <tr><td>Incentives</td><td>Commission per customer, default promoter target, the promoter coupon code.</td></tr>
+            <tr><td>Notifications</td><td>Low-stock and expiry warnings, and how many days ahead counts as expiring.</td></tr>
+            <tr><td>Returns</td><td>How long after a sale a return is accepted, and whether it needs a registered customer.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The Wi-Fi voucher settings &mdash; how long a receipt's internet lasts, and the key the hotspot uses to check a code &mdash; live alongside these.</p>
+
+      <p>Every setting change is recorded in the money trail with its old and new value.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="gotchas">
+      <h2 class="part">What catches people out</h2>
+      <hr class="part-rule">
+
+      <h4>"The figures do not add up"</h4>
+      <p>Check the branch on the account first. Most records are filtered to the branch of whoever is looking, and a person on the wrong branch sees a book that is genuinely missing rows.</p>
+
+      <h4>"The customer says they are covered but the till disagrees"</h4>
+      <p>The cover panel says why. It will be one of four things: the first premium was never taken, the waiting period has not ended, the premium is overdue, or this month's cover is already spent. All four are shown in plain words, not a code.</p>
+
+      <h4>"A wholesale customer is being charged retail"</h4>
+      <p>The customer must be attached to the sale, and marked wholesale on their record. A walk-in gets retail prices whatever they say at the counter.</p>
+
+      <h4>"An online order will not move"</h4>
+      <p>If it carries a prescription, a pharmacist has to approve it first. Nobody else can, including admin.</p>
+
+      <h4>"A product will not save with a price"</h4>
+      <p>Only admin and branch manager can set prices. Everyone else can create the product &mdash; it saves at zero for a manager to price, so a delivery is never held up.</p>
+
+      <h4>"The stock take did not change anything"</h4>
+      <p>Submitting is a claim, not a correction. A manager still has to approve it, and approval is what writes the differences into stock.</p>
+
+      <h4>"A customer cannot use their Wi-Fi code"</h4>
+      <p>The window runs from the first connection, not from the purchase, and cannot be extended by reconnecting. Check whether it was revoked from Sales History.</p>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
