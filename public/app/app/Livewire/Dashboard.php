@@ -436,17 +436,41 @@ class Dashboard extends Component
             ->where('expiry_date', '<', now())
             ->count();
 
-        $potentialRevenue = 0;
-        $potentialCost = 0;
-        foreach (Product::with('batches')->get() as $product) {
-            foreach ($product->batches as $batch) {
-                if ($batch->quantity > 0 && $batch->expiry_date->isFuture()) {
-                    $potentialRevenue += $product->selling_price * $batch->quantity;
-                    $potentialCost += $batch->cost_price * $batch->quantity;
-                }
-            }
-        }
-        $potentialProfit = $potentialRevenue - $potentialCost;
+        // What is on the shelf right now, priced to sell. A snapshot, not a
+        // figure for the period chosen above: nothing here is filtered by date,
+        // because "what the pharmacy is holding" has no date range.
+        //
+        // Expired stock is left out of both sides. It cannot be sold, so
+        // counting it as revenue would flatter the figure, and counting its
+        // cost would understate the profit on what can actually be sold.
+        //
+        // Done in the database rather than by loading every product and every
+        // batch into memory, which is what this used to do.
+        $onShelf = DB::table('batches')
+            ->join('products', 'products.id', '=', 'batches.product_id')
+            ->where('batches.quantity', '>', 0)
+            ->whereDate('batches.expiry_date', '>', today())
+            ->selectRaw('COALESCE(SUM(products.selling_price * batches.quantity), 0) AS revenue')
+            ->selectRaw('COALESCE(SUM(batches.cost_price * batches.quantity), 0) AS cost')
+            ->first();
+
+        $potentialRevenue = (float) ($onShelf->revenue ?? 0);
+        $potentialCost    = (float) ($onShelf->cost ?? 0);
+        $potentialProfit  = $potentialRevenue - $potentialCost;
+
+        // Stock that has never been priced counts as nothing towards revenue,
+        // which quietly makes the figure too low. Inventory staff can create a
+        // product without a price - it saves at zero for a manager to set - so
+        // this is a normal state, not a fault, and it has to be said rather
+        // than left to be discovered by the number looking wrong.
+        $unpricedStock = DB::table('batches')
+            ->join('products', 'products.id', '=', 'batches.product_id')
+            ->where('batches.quantity', '>', 0)
+            ->whereDate('batches.expiry_date', '>', today())
+            ->where('products.selling_price', '<=', 0)
+            ->selectRaw('COUNT(DISTINCT products.id) AS products')
+            ->selectRaw('COALESCE(SUM(batches.quantity), 0) AS units')
+            ->first();
 
         $recentSales = Sale::with('user', 'customer')
             ->whereIn('status', ['paid', 'completed'])
@@ -492,6 +516,8 @@ class Dashboard extends Component
             'potentialProfit' => $potentialProfit,
             'potentialRevenue' => $potentialRevenue,
             'potentialCost' => $potentialCost,
+            'unpricedProducts' => (int) ($unpricedStock->products ?? 0),
+            'unpricedUnits'    => (int) ($unpricedStock->units ?? 0),
             'recentSales' => $recentSales,
             'todayOnlineRevenue' => $todayOnlineRevenue,
             'todayOnlineCount' => $todayOnlineCount,

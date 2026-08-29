@@ -588,7 +588,7 @@
 
     <!-- Potential Profit -->
     @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
-    <x-card title="Potential Profit" class="mb-4">
+    <x-card title="Potential Profit" subtitle="What is on the shelf right now, if it all sold" class="mb-4">
         <div class="grid grid-cols-3 gap-2">
             <div class="text-center p-2 sm:p-4 bg-base-200 rounded-lg">
                 <div class="text-xs text-base-content/60">Revenue</div>
@@ -603,6 +603,25 @@
                 <div class="text-sm sm:text-xl font-bold text-success">₦{{ number_format($potentialProfit, 0) }}</div>
             </div>
         </div>
+        {{-- Unpriced stock counts as nothing towards revenue, which quietly
+             makes the figure too low. Better said than discovered. --}}
+        @if($unpricedUnits > 0)
+            <div class="alert alert-warning py-2 mt-3 text-sm gap-2">
+                <x-icon name="o-exclamation-triangle" class="w-4 h-4 shrink-0" />
+                <span>
+                    {{ number_format($unpricedUnits) }} {{ Str::plural('unit', $unpricedUnits) }}
+                    across {{ $unpricedProducts }} {{ Str::plural('product', $unpricedProducts) }}
+                    have no selling price, so they add nothing to the figure above.
+                    <a href="{{ route('products.index') }}" class="link">Price them</a>
+                    and it will rise.
+                </span>
+            </div>
+        @endif
+
+        <p class="text-xs text-base-content/50 mt-2">
+            Stock past its expiry date is left out of all three. The date filter above does not apply here.
+        </p>
+
         <div class="mt-2">
             <x-button label="View Reports" link="{{ route('reports.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
         </div>
