@@ -50,7 +50,7 @@ class Index extends Component
 
     // Returns
     public int  $return_window_hours    = 48;
-    public bool $return_require_customer = true;
+    public bool $return_require_customer = false;
 
     // Commissions
     public float $commission_amount = 100;
@@ -114,7 +114,7 @@ class Index extends Component
         $this->expiry_alert_days = (int) AppSetting::get('expiry_alert_days', 90);
 
         $this->return_window_hours     = (int) AppSetting::get('return_window_hours', 48);
-        $this->return_require_customer = AppSetting::bool('return_require_customer', true);
+        $this->return_require_customer = AppSetting::bool('return_require_customer', false);
         $this->commission_amount       = (float) AppSetting::get('commission_amount', 100);
         $this->promoter_target_default = (int) AppSetting::get('promoter_target_default', 20);
         $this->promoter_coupon_code    = (string) AppSetting::get('promoter_coupon_code', '');

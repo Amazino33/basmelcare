@@ -415,9 +415,9 @@
                         class="max-w-xs"
                     />
                     <x-toggle
-                        label="Require Customer on Return"
+                        label="Only registered customers may return"
                         wire:model="return_require_customer"
-                        hint="Block returns on walk-in sales (no customer attached). Disable to allow walk-in returns without credit."
+                        hint="Off by default. A walk-in return is refunded in cash from the till, since there is no account to credit. Turn this on only if every return must be tied to a named person."
                         class="mt-4"
                     />
                     <x-input

@@ -300,6 +300,19 @@ class Index extends Component
                 ->sum('total_credit')
             : 0.0;
 
+        // Only the part of that which was handed back in cash. A store-credit
+        // refund takes nothing out of the drawer - it creates a liability, and
+        // the drawer is only lighter later, when the customer draws it, which
+        // creditPaidOut below already counts. Treating every refund as cash
+        // subtracted it twice.
+        $cashRefunds = Schema::hasTable('sale_returns') && Schema::hasColumn('sale_returns', 'refund_method')
+            ? (float) DB::table('sale_returns')
+                ->whereIn('sale_id', $settledIds)
+                ->whereBetween('created_at', [$from, $to])
+                ->where('refund_method', 'cash')
+                ->sum('total_credit')
+            : 0.0;
+
         $cogs = (float) DB::table('sale_items')
             ->whereIn('sale_id', $settledIds)
             ->sum(DB::raw('sale_items.cost_price * sale_items.quantity'));
@@ -349,13 +362,17 @@ class Index extends Component
                 ->sum('total_amount')
             : 0.0;
 
-        $collected = $netRevenue - $newDebt + $debtRepaid - $creditPaidOut;
+        // Cash basis, so refunds count here only if they were paid in cash.
+        // netRevenue is the trading figure and nets every refund, which is
+        // right for profit and wrong for the drawer.
+        $collected = ($revenue - $cashRefunds) - $newDebt + $debtRepaid - $creditPaidOut;
         $paidOut   = $expenses + $stockPurchases;
 
         return [
             // Trading
             'revenue'      => $revenue,
             'refunds'      => $refunds,
+            'cashRefunds'  => $cashRefunds,
             'netRevenue'   => $netRevenue,
             'cogs'         => $netCogs,
             'gross'        => $gross,

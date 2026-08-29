@@ -36,6 +36,15 @@ class Index extends Component
     public array $returnQtys = [];
     public array $returnableQtys = [];
     public string $returnReason = '';
+
+    /**
+     * How this return is paid back: store credit, or cash out of the till.
+     *
+     * Forced to cash for a walk-in, because there is no account to credit. The
+     * value is re-decided when the return is processed rather than trusted
+     * from here.
+     */
+    public string $refundMethod = SaleReturn::CREDIT;
     public string $returnError  = '';
 
     public function updatedReturnQtys(): void
@@ -146,9 +155,12 @@ class Index extends Component
 
         $sale = Sale::with('saleItems.product', 'saleItems.batch')->findOrFail($saleId);
 
-        $requireCustomer = AppSetting::bool('return_require_customer', true);
-        if ($requireCustomer && !$sale->customer_id) {
-            $this->error('This sale has no customer attached. Attach a customer to the sale before processing a return.');
+        // A walk-in has no account for store credit to sit on, so their refund
+        // is cash out of the till. That is allowed unless the pharmacy has
+        // chosen to tie every return to a named person.
+        $requireCustomer = AppSetting::bool('return_require_customer', false);
+        if ($requireCustomer && ! $sale->customer_id) {
+            $this->error('This pharmacy only accepts returns from registered customers. Attach a customer to the sale, or turn the rule off under Settings → Returns.');
             return;
         }
 
@@ -176,6 +188,11 @@ class Index extends Component
         $this->returnSaleId = $saleId;
         $this->returnReason = '';
         $this->returnError  = '';
+
+        // Cash is the only refund a walk-in can be given, so it is not offered
+        // as a choice - there is nowhere else for the money to go.
+        $this->refundMethod = $sale->customer_id ? SaleReturn::CREDIT : SaleReturn::CASH;
+
         $this->returnModal  = true;
     }
 
@@ -185,11 +202,19 @@ class Index extends Component
 
         $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
 
-        $requireCustomer = AppSetting::bool('return_require_customer', true);
-        if ($requireCustomer && !$sale->customer_id) {
-            $this->error('No customer attached to this sale.');
+        $requireCustomer = AppSetting::bool('return_require_customer', false);
+        if ($requireCustomer && ! $sale->customer_id) {
+            $this->error('This pharmacy only accepts returns from registered customers.');
             return;
         }
+
+        // Decided here rather than trusted from the form: a walk-in cannot be
+        // credited whatever the screen was showing, because there is no account
+        // to credit. Getting this wrong would put goods back on the shelf and
+        // give the customer nothing.
+        $method = $sale->customer_id
+            ? ($this->refundMethod === SaleReturn::CASH ? SaleReturn::CASH : SaleReturn::CREDIT)
+            : SaleReturn::CASH;
 
         $windowHours = (int) AppSetting::get('return_window_hours', 48);
         if ($sale->created_at->diffInHours(now()) > $windowHours) {
@@ -206,12 +231,14 @@ class Index extends Component
         $saleReturnId = null;
 
         try {
-            DB::transaction(function () use ($sale, &$totalCredit, &$saleReturnId) {
+            DB::transaction(function () use ($sale, $method, &$totalCredit, &$saleReturnId) {
                 $saleReturn = SaleReturn::create([
-                    'sale_id'      => $sale->id,
-                    'processed_by' => auth()->id(),
-                    'reason'       => $this->returnReason ?: null,
-                    'total_credit' => 0,
+                    'sale_id'       => $sale->id,
+                    'processed_by'  => auth()->id(),
+                    'reason'        => $this->returnReason ?: null,
+                    'total_credit'  => 0,
+                    'refund_method' => $method,
+                    'refunded_at'   => now(),
                 ]);
 
                 foreach ($sale->saleItems as $item) {
@@ -256,7 +283,9 @@ class Index extends Component
 
                 $saleReturn->update(['total_credit' => $totalCredit]);
 
-                if ($sale->customer_id && $totalCredit > 0) {
+                // Only a credit refund touches the account. Cash has already
+                // left the drawer by the time the slip prints.
+                if ($method === SaleReturn::CREDIT && $sale->customer_id && $totalCredit > 0) {
                     $sale->customer->increment('credit_balance', $totalCredit);
                 }
 
@@ -273,11 +302,17 @@ class Index extends Component
         $this->returnModal  = false;
         $this->returnSaleId = null;
         $this->returnQtys   = [];
-        $this->success('Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
+        // Say which it was. "Credited to customer account" on a cash refund
+        // would send the cashier looking for a balance that does not exist.
+        $this->success($method === SaleReturn::CASH
+            ? 'Return processed. Give the customer ₦' . number_format($totalCredit, 2) . ' from the till.'
+            : 'Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
 
         $this->dispatch('open-return-receipt', url: route('return.receipt', $saleReturnId));
 
-        $phone = $sale->customer?->phone;
+        // A cash refund is settled at the counter and needs no message; there
+        // is also no new balance to quote.
+        $phone = $method === SaleReturn::CREDIT ? $sale->customer?->phone : null;
         if ($phone && $totalCredit > 0) {
             try {
                 $pharmacyName  = AppSetting::get('pharmacy_name', 'BasmelCare');

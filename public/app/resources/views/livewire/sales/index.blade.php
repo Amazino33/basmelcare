@@ -358,8 +358,43 @@
                     }
                 @endphp
                 @if($liveTotal > 0)
+                    {{-- How the money goes back. A walk-in has no account for
+                         store credit to sit on, so there is nothing to choose. --}}
+                    @if($returnableSale->customer_id)
+                        <div class="rounded-lg border border-base-300 p-3">
+                            <p class="text-sm font-semibold mb-2">Refund as</p>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <label class="flex items-start gap-2 flex-1 cursor-pointer rounded-lg border p-2.5
+                                              {{ $refundMethod === 'credit' ? 'border-primary bg-primary/5' : 'border-base-300' }}">
+                                    <input type="radio" class="radio radio-sm mt-0.5" value="credit" wire:model.live="refundMethod" />
+                                    <span>
+                                        <span class="block text-sm font-medium">Store credit</span>
+                                        <span class="block text-xs text-base-content/60">Goes on their account for next time.</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-start gap-2 flex-1 cursor-pointer rounded-lg border p-2.5
+                                              {{ $refundMethod === 'cash' ? 'border-primary bg-primary/5' : 'border-base-300' }}">
+                                    <input type="radio" class="radio radio-sm mt-0.5" value="cash" wire:model.live="refundMethod" />
+                                    <span>
+                                        <span class="block text-sm font-medium">Cash</span>
+                                        <span class="block text-xs text-base-content/60">Out of the till, now.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    @else
+                        <div class="rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm">
+                            <span class="font-semibold">Refunded in cash.</span>
+                            <span class="text-base-content/70">
+                                This sale has no customer attached, so there is no account to credit.
+                            </span>
+                        </div>
+                    @endif
+
                     <div class="flex justify-between items-center p-3 bg-success/10 rounded-lg border border-success/20">
-                        <span class="text-sm font-semibold text-success">Credit to be issued:</span>
+                        <span class="text-sm font-semibold text-success">
+                            {{ $refundMethod === 'cash' ? 'Cash to give back:' : 'Credit to be issued:' }}
+                        </span>
                         <span class="text-lg font-bold text-success">₦{{ number_format($liveTotal, 2) }}</span>
                     </div>
                 @endif

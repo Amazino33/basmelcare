@@ -99,16 +99,23 @@
         <div class="line"></div>
     @endif
 
+    {{-- What the customer actually walked away with. A slip that says "credit
+         added" after a cash refund sends them back to the counter to claim a
+         balance that was never created. --}}
     <div class="credit-box">
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:.5px;">Credit Added to Account</div>
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:.5px;">{{ $saleReturn->refundLabel() }}</div>
         <div class="total-row">₦{{ number_format($saleReturn->total_credit, 2) }}</div>
-        @if($customer)
+        @if($customer && ! $saleReturn->isCash())
             <div style="font-size:10px; margin-top:2px;">Balance: ₦{{ number_format($customer->credit_balance, 2) }}</div>
         @endif
     </div>
 
     <div class="footer">
-        <p>Credit is redeemable on your next purchase.</p>
+        @if($saleReturn->isCash())
+            <p>Refunded in cash at the counter.</p>
+        @else
+            <p>Credit is redeemable on your next purchase.</p>
+        @endif
         <p style="margin-top:6px;">{{ $pharmacyName ?: 'BasmelCare Pharmacy' }}</p>
         @if($pharmacyPhone)<p>{{ $pharmacyPhone }}</p>@endif
         @if($pharmacyWebsite)<p>{{ $pharmacyWebsite }}</p>@endif
