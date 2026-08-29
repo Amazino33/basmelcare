@@ -245,4 +245,46 @@ class ReturnRestocksTest extends TestCase
         $this->assertStringContainsString('10', $page->get('returnError'),
             'The message did not say how many could still be returned.');
     }
+
+    // ── the whole way round, through the real screens ───────────────────
+
+    public function test_a_real_till_sale_returns_its_stock(): void
+    {
+        // The tests above build sale lines by hand. This one goes through the
+        // POS and the cashier exactly as the counter does, because the reported
+        // fault was 55 in stock, 54 after a sale of one, and still 54 after the
+        // return.
+        $product = $this->product(['selling_price' => 1200]);
+        $batch   = $this->batch($product, 55);
+
+        $seller = User::factory()->create(['role' => ['sales'], 'status' => 'active']);
+
+        Livewire::actingAs($seller)
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $product->id)
+            ->call('createInvoice');
+
+        $this->assertSame(54, $batch->fresh()->quantity, 'The sale did not take the unit off the shelf.');
+
+        $sale = Sale::latest('id')->first();
+
+        Livewire::actingAs(User::factory()->create(['role' => ['cashier'], 'status' => 'active']))
+            ->test(\App\Livewire\Cashier\Index::class)
+            ->call('openPayment', $sale->id)
+            ->set('cash_tendered', 1200)
+            ->call('processPayment');
+
+        $this->assertSame('paid', $sale->fresh()->status);
+
+        $item = $sale->saleItems()->first();
+
+        Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Sales\Index::class)
+            ->call('openReturn', $sale->id)
+            ->set('returnQtys.' . $item->id, 1)
+            ->call('processReturn');
+
+        $this->assertSame(55, $batch->fresh()->quantity,
+            'The returned unit never went back on the shelf.');
+    }
 }

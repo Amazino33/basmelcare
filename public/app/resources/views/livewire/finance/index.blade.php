@@ -161,7 +161,7 @@
                         <td class="text-right tabular-nums text-sm">₦{{ number_format($m['settledTotal'], 2) }}</td>
                     </tr>
 
-                    @if($m['storeCredit'] > 0 || $m['changeGiven'] > 0)
+                    @if($m['storeCredit'] > 0 || $m['changeGiven'] > 0 || ($m['cashRefunds'] ?? 0) > 0)
                         <tr><td colspan="2" class="pt-3 pb-0 text-xs uppercase tracking-wide text-base-content/40">Also worth knowing</td></tr>
                         @if($m['storeCredit'] > 0)
                             <tr class="text-base-content/70">
@@ -177,6 +177,14 @@
                                     <span class="text-xs block opacity-70">already deducted from cash above</span>
                                 </td>
                                 <td class="text-right tabular-nums text-sm">₦{{ number_format($m['changeGiven'], 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(($m['cashRefunds'] ?? 0) > 0)
+                            <tr class="text-base-content/70">
+                                <td class="text-sm">Refunded in cash
+                                    <span class="text-xs block opacity-70">already deducted from cash above &mdash; store credit refunds are not, nothing was handed over</span>
+                                </td>
+                                <td class="text-right tabular-nums text-sm">₦{{ number_format($m['cashRefunds'], 2) }}</td>
                             </tr>
                         @endif
                     @endif

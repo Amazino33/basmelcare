@@ -169,4 +169,83 @@ class RefundCashBasisTest extends TestCase
         $this->assertEquals(20000, $f['refunds'], 'Both refunds belong in the trading figure.');
         $this->assertEquals(10000, $f['cashRefunds'], 'Only one of them emptied the drawer.');
     }
+
+    // ── the method breakdown ────────────────────────────────────────────
+
+    private function salesHistory(): array
+    {
+        $page = Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Sales\Index::class);
+
+        return [
+            'collected'     => $page->viewData('collected'),
+            'cashCollected' => $page->viewData('cashCollected'),
+            'cashRefunded'  => $page->viewData('cashRefunded'),
+        ];
+    }
+
+    private function financeMethods(): array
+    {
+        return Livewire::actingAs($this->staff())
+            ->test(\App\Livewire\Finance\Index::class)
+            ->viewData('f')['methods'];
+    }
+
+    public function test_a_cash_refund_comes_off_the_cash_line(): void
+    {
+        // Money handed back left the drawer exactly as change does, so the cash
+        // figure has to fall - not merely report the refund beside it.
+        $this->refund($this->sale(null), SaleReturn::CASH);
+
+        $this->assertEquals(0, $this->salesHistory()['collected']['cash']);
+        $this->assertEquals(0, $this->financeMethods()['byMethod']['cash']);
+    }
+
+    public function test_a_credit_refund_leaves_the_cash_line_alone(): void
+    {
+        // Nothing was handed over. The drawer still holds the ₦10,000.
+        $this->refund($this->sale($this->customer()), SaleReturn::CREDIT);
+
+        $this->assertEquals(10000, $this->salesHistory()['collected']['cash']);
+        $this->assertEquals(10000, $this->financeMethods()['byMethod']['cash']);
+    }
+
+    public function test_a_cash_refund_comes_off_the_takings(): void
+    {
+        $this->refund($this->sale(null), SaleReturn::CASH);
+
+        $this->assertEquals(0, $this->salesHistory()['cashCollected']);
+    }
+
+    public function test_the_refunded_amount_is_shown_so_the_figure_is_explained(): void
+    {
+        // A smaller number with nothing saying why is what sends people looking
+        // for a discrepancy that is not there.
+        $this->refund($this->sale(null), SaleReturn::CASH);
+
+        $this->assertEquals(10000, $this->salesHistory()['cashRefunded']);
+    }
+
+    public function test_sales_history_and_financial_records_agree(): void
+    {
+        // The two pages compute cash separately, and staff read both. They must
+        // not disagree about the same day.
+        $this->refund($this->sale(null), SaleReturn::CASH);
+        $this->refund($this->sale($this->customer()), SaleReturn::CREDIT);
+
+        $this->assertEquals(
+            $this->salesHistory()['collected']['cash'],
+            $this->financeMethods()['byMethod']['cash'],
+            'Sales History and Financial Records report different cash.'
+        );
+    }
+
+    public function test_only_the_cash_half_is_taken_off(): void
+    {
+        $this->refund($this->sale(null), SaleReturn::CASH);            // 10,000 out
+        $this->refund($this->sale($this->customer()), SaleReturn::CREDIT); // nothing out
+
+        // Two ₦10,000 sales came in, one ₦10,000 refund went back out.
+        $this->assertEquals(10000, $this->salesHistory()['collected']['cash']);
+    }
 }

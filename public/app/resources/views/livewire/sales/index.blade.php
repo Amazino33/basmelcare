@@ -101,6 +101,15 @@
                     </div>
                 @endforeach
 
+                @if($cashRefunded > 0)
+                    {{-- Already taken off the cash line above. Shown so the
+                         figure is explained rather than just smaller. --}}
+                    <div class="flex justify-between items-center text-xs text-error mt-1">
+                        <span>Less cash refunded</span>
+                        <span class="tabular-nums">−₦{{ number_format($cashRefunded, 2) }}</span>
+                    </div>
+                @endif
+
                 @if($creditUsed > 0)
                     <div class="flex justify-between items-center text-xs text-base-content/50 mt-1">
                         <span>Store credit</span>

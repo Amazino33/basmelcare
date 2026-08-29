@@ -219,10 +219,22 @@ class Index extends Component
             }
         }
 
+        // Money refunded in cash left the drawer exactly as change does, so it
+        // comes off the cash line too. Store credit refunds do not: nothing was
+        // handed over, and the drawer is only lighter later when the customer
+        // draws it.
+        $cashRefunds = Schema::hasTable('sale_returns') && Schema::hasColumn('sale_returns', 'refund_method')
+            ? (float) DB::table('sale_returns')
+                ->whereIn('sale_id', $sales->pluck('id'))
+                ->whereBetween('created_at', [$from, $to])
+                ->where('refund_method', 'cash')
+                ->sum('total_credit')
+            : 0.0;
+
         // Change is handed back in cash, so it comes off the cash line — not
         // merely reported alongside it. Sales History nets it the same way;
         // leaving it out here made the two pages disagree.
-        $methods['cash'] -= $changeGiven;
+        $methods['cash'] -= $changeGiven + $cashRefunds;
 
         // Debt repayments record their own method and are real money taken today.
         // Under a search they are traced back through their originating sale, so
@@ -267,6 +279,7 @@ class Index extends Component
             'methodTotal'   => array_sum($methods),
             'storeCredit'   => $storeCredit,
             'changeGiven'   => $changeGiven,
+            'cashRefunds'   => $cashRefunds,
             // What the till took but never labelled with a method.
             // Billed less what is still owed: an unattributed amount that was
             // never collected is not money taken.

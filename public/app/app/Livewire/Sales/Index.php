@@ -466,9 +466,17 @@ class Index extends Component
             }
         }
 
+        // Cash handed back on a return left the drawer just as change does, so
+        // it comes off the cash line and out of the takings. A store-credit
+        // refund does not: nothing was handed over, and the drawer only gets
+        // lighter later, when the customer draws it.
+        $cashRefunded = (float) SaleReturn::whereIn('sale_id', (clone $filteredSales)->select('sales.id'))
+            ->where('refund_method', SaleReturn::CASH)
+            ->sum('total_credit');
+
         // Change is handed back in cash, so it comes off the cash line itself —
         // otherwise the three method figures sum to more than Cash Collected.
-        $collected['cash'] -= $changeGiven;
+        $collected['cash'] -= $changeGiven + $cashRefunded;
 
         // Repayments on older debts taken during this period are real money in.
         // The opening part-payment is excluded: it is already counted above from
@@ -599,6 +607,7 @@ class Index extends Component
             'avgSale'              => $avgSale,
             'collected'            => $collected,
             'cashCollected'        => $cashCollected,
+            'cashRefunded'         => $cashRefunded,
             'creditUsed'           => $creditUsed,
             'unrecordedCash'       => $unrecorded,
             'onlineHeaders'        => $onlineHeaders,
