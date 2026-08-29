@@ -39,10 +39,14 @@ class PotentialRevenueTest extends TestCase
         ]);
     }
 
+    /**
+     * The card is its own component now, so it can refresh itself without the
+     * whole dashboard being redrawn.
+     */
     private function dashboard(?User $as = null)
     {
         return Livewire::actingAs($as ?? User::factory()->create(['role' => ['admin'], 'status' => 'active']))
-            ->test(\App\Livewire\Dashboard::class);
+            ->test(\App\Livewire\Dashboard\PotentialProfit::class);
     }
 
     public function test_it_is_what_the_shelf_would_take(): void
@@ -89,11 +93,10 @@ class PotentialRevenueTest extends TestCase
         // for the chosen period; this one is what is there now.
         $this->stock(price: 1200, cost: 700, qty: 10);
 
-        $today = $this->dashboard()->set('dateFilter', 'today')->viewData('potentialRevenue');
-        $year  = $this->dashboard()->set('dateFilter', 'yesterday')->viewData('potentialRevenue');
-
-        $this->assertEquals(12000, $today);
-        $this->assertEquals(12000, $year);
+        // It has no date input at all now, which is the strongest form of
+        // "the period does not apply to it".
+        $this->assertFalse(property_exists(\App\Livewire\Dashboard\PotentialProfit::class, 'dateFilter'));
+        $this->assertEquals(12000, $this->dashboard()->viewData('potentialRevenue'));
     }
 
     // ── the silent understatement ───────────────────────────────────────
@@ -140,5 +143,99 @@ class PotentialRevenueTest extends TestCase
 
         $this->assertEquals(0, $page->viewData('potentialRevenue'));
         $this->assertEquals(0, $page->viewData('potentialProfit'));
+    }
+
+    // ── it moves as the shelf does ──────────────────────────────────────
+
+    public function test_it_falls_as_stock_is_sold(): void
+    {
+        // The whole point: the card is polled, so selling from the shelf shows
+        // up without the page being reloaded.
+        $batch = $this->stock(price: 1200, cost: 700, qty: 10);
+
+        $card = $this->dashboard();
+        $this->assertEquals(12000, $card->viewData('potentialRevenue'));
+
+        $batch->decrement('quantity', 4);
+
+        // What the poll does: render again, nothing else.
+        $card->call('$refresh');
+
+        $this->assertEquals(7200, $card->viewData('potentialRevenue'));
+        $this->assertEquals(4200, $card->viewData('potentialCost'));
+        $this->assertEquals(3000, $card->viewData('potentialProfit'));
+    }
+
+    public function test_it_rises_when_stock_comes_back(): void
+    {
+        $batch = $this->stock(price: 1200, cost: 700, qty: 10);
+
+        $card = $this->dashboard();
+        $batch->decrement('quantity', 1);
+        $card->call('$refresh');
+        $this->assertEquals(10800, $card->viewData('potentialRevenue'));
+
+        // A return puts it back.
+        $batch->increment('quantity', 1);
+        $card->call('$refresh');
+
+        $this->assertEquals(12000, $card->viewData('potentialRevenue'));
+    }
+
+    public function test_it_rises_when_something_is_finally_priced(): void
+    {
+        $unpriced = $this->stock(price: 0, cost: 400, qty: 25);
+
+        $card = $this->dashboard();
+        $this->assertEquals(0, $card->viewData('potentialRevenue'));
+        $this->assertSame(25, $card->viewData('unpricedUnits'));
+
+        $unpriced->product->update(['selling_price' => 800]);
+        $card->call('$refresh');
+
+        $this->assertEquals(20000, $card->viewData('potentialRevenue'));
+        $this->assertSame(0, $card->viewData('unpricedUnits'));
+    }
+
+    public function test_it_asks_again_on_its_own(): void
+    {
+        // Without the poll it would sit at whatever it read when the page was
+        // opened, which is what made it look broken.
+        $this->assertStringContainsString(
+            'wire:poll',
+            file_get_contents(resource_path('views/livewire/dashboard/potential-profit.blade.php')),
+            'The card no longer refreshes itself.'
+        );
+    }
+
+    // ── who sees it ─────────────────────────────────────────────────────
+
+    public function test_a_cashier_is_shown_nothing(): void
+    {
+        // It is margin, and a cashier has no business with margin. Guarded in
+        // the component, not only by where it is placed on the page.
+        $this->stock(price: 1200, cost: 700, qty: 10);
+
+        $card = $this->dashboard(User::factory()->create(['role' => ['cashier'], 'status' => 'active']));
+
+        $card->assertDontSee('Potential Profit');
+        $card->assertDontSee('12,000');
+    }
+
+    public function test_a_pharmacist_can_see_it(): void
+    {
+        $this->stock(price: 1200, cost: 700, qty: 10);
+
+        $this->dashboard(User::factory()->create(['role' => ['pharmacist'], 'status' => 'active']))
+            ->assertSee('Potential Profit');
+    }
+
+    public function test_the_dashboard_still_renders_around_it(): void
+    {
+        $this->stock(price: 1200, cost: 700, qty: 10);
+
+        Livewire::actingAs(User::factory()->create(['role' => ['admin'], 'status' => 'active']))
+            ->test(\App\Livewire\Dashboard::class)
+            ->assertOk();
     }
 }
