@@ -287,4 +287,28 @@ class ReturnRestocksTest extends TestCase
         $this->assertSame(55, $batch->fresh()->quantity,
             'The returned unit never went back on the shelf.');
     }
+
+    public function test_the_batch_quantity_change_is_audited(): void
+    {
+        // Batch audits quantity, and increment() fires the updated event, so a
+        // return leaves a before/after entry in the Money Trail. That is the
+        // independent proof that stock moved - separate from the movement row,
+        // and written by a different mechanism.
+        $product = $this->product();
+        $batch   = $this->batch($product, 54);
+        $sale    = $this->sale();
+        $item    = $this->line($sale, $batch, 1);
+
+        $this->processReturn($sale, [$item->id => 1]);
+
+        $entry = \App\Models\AuditLog::where('auditable_type', \App\Models\Batch::class)
+            ->where('auditable_id', (string) $batch->id)
+            ->where('field', 'quantity')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($entry, 'A stock change went unrecorded in the Money Trail.');
+        $this->assertEquals(54, $entry->old_value);
+        $this->assertEquals(55, $entry->new_value);
+    }
 }
