@@ -43,6 +43,13 @@
             @endif
         </button>
         @endif
+        <button role="tab" wire:click="$set('tab','returns')"
+            @class(['tab', 'tab-active' => $tab === 'returns'])>
+            Returns
+            @if($returnsCount > 0)
+                <span class="badge badge-ghost badge-xs ml-1">{{ $returnsCount }}</span>
+            @endif
+        </button>
     </div>
 
     @if($tab === 'pos')
@@ -221,7 +228,7 @@
         </x-table>
         @endif
 
-    @else
+    @elseif($tab === 'online')
         <!-- Online Orders Summary Stats -->
         <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
             <x-stat
@@ -302,6 +309,88 @@
                 <x-button icon="o-eye" wire:click="viewOrderDetails({{ $order->id }})" class="btn-xs btn-ghost" tooltip="Details" />
             @endscope
         </x-table>
+
+    @elseif($tab === 'returns')
+        {{-- What came back. A return moves stock and money, so it belongs in
+             the same history as the sale it undoes. --}}
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <x-card>
+                <div class="text-xs text-base-content/50">Returns</div>
+                <div class="text-xl font-bold tabular-nums">{{ number_format($returnsCount) }}</div>
+            </x-card>
+            <x-card>
+                <div class="text-xs text-base-content/50">Value returned</div>
+                <div class="text-xl font-bold tabular-nums">₦{{ number_format($returnsTotal, 2) }}</div>
+            </x-card>
+            <x-card>
+                {{-- Kept apart on purpose: cash left the drawer, credit is owed
+                     and only leaves it when the customer draws it. --}}
+                <div class="text-xs text-base-content/50">Paid in cash</div>
+                <div class="text-xl font-bold tabular-nums text-error">₦{{ number_format($returnsCash, 2) }}</div>
+            </x-card>
+            <x-card>
+                <div class="text-xs text-base-content/50">Given as credit</div>
+                <div class="text-xl font-bold tabular-nums">₦{{ number_format($returnsCredit, 2) }}</div>
+            </x-card>
+        </div>
+
+        @if($returnedUnits > 0)
+            <p class="text-sm text-base-content/60 mb-3">
+                {{ number_format($returnedUnits) }} {{ Str::plural('unit', $returnedUnits) }}
+                went back on the shelf in this period.
+            </p>
+        @endif
+
+        @forelse($returns as $return)
+            <x-card class="mb-2">
+                <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-mono text-sm font-semibold">
+                                RT-{{ str_pad($return->id, 5, '0', STR_PAD_LEFT) }}
+                            </span>
+                            <span class="badge badge-sm {{ $return->isCash() ? 'badge-error' : 'badge-ghost' }}">
+                                {{ $return->isCash() ? 'Cash' : 'Credit' }}
+                            </span>
+                            <span class="text-xs text-base-content/50">
+                                against {{ $return->sale?->invoice_number ?? 'sale #' . $return->sale_id }}
+                            </span>
+                        </div>
+
+                        <div class="text-sm text-base-content/70 mt-1">
+                            {{ $return->sale?->customer?->name ?? 'Walk-in customer' }}
+                            &middot; {{ $return->processor?->name ?? 'unknown' }}
+                            &middot; {{ $return->created_at->format('j M Y, g:ia') }}
+                        </div>
+
+                        <div class="text-xs text-base-content/60 mt-1">
+                            @foreach($return->items as $item)
+                                {{ $item->quantity_returned }}&times; {{ $item->product?->name ?? 'item' }}@if(! $loop->last), @endif
+                            @endforeach
+                        </div>
+
+                        @if($return->reason)
+                            <div class="text-xs text-base-content/60 mt-1 italic">{{ $return->reason }}</div>
+                        @endif
+                    </div>
+
+                    <div class="sm:text-right shrink-0">
+                        <div class="text-lg font-bold tabular-nums">₦{{ number_format($return->total_credit, 2) }}</div>
+                        <a href="{{ route('return.receipt', $return->id) }}" target="_blank"
+                           class="btn btn-ghost btn-xs">Slip</a>
+                    </div>
+                </div>
+            </x-card>
+        @empty
+            <x-card>
+                <div class="text-center py-8">
+                    <x-icon name="o-arrow-uturn-left" class="w-10 h-10 mx-auto text-base-content/20" />
+                    <p class="text-base-content/60 mt-2">Nothing was returned in this period.</p>
+                </div>
+            </x-card>
+        @endforelse
+
+        {{ $returns->links() }}
     @endif
 
     <!-- Return Modal -->

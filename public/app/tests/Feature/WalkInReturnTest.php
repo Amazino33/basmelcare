@@ -245,4 +245,105 @@ class WalkInReturnTest extends TestCase
 
         $this->assertSame(0, SaleReturn::count());
     }
+
+    // ── they have to be traceable afterwards ────────────────────────────
+
+    private function historyTab(?User $as = null)
+    {
+        return Livewire::actingAs($as ?? $this->staff())
+            ->test(\App\Livewire\Sales\Index::class)
+            ->set('tab', 'returns');
+    }
+
+    public function test_a_return_shows_up_in_sales_history(): void
+    {
+        // It was recorded from the start, but there was nowhere to look at it:
+        // the only trace was the printed slip.
+        $this->returnOne($this->sale());
+
+        $page = $this->historyTab();
+
+        $this->assertSame(1, $page->viewData('returnsCount'));
+        $this->assertCount(1, $page->viewData('returns'));
+    }
+
+    public function test_the_listing_names_the_walk_in_as_such(): void
+    {
+        $this->returnOne($this->sale());
+
+        $this->historyTab()->assertSee('Walk-in customer');
+    }
+
+    public function test_the_listing_names_a_registered_customer(): void
+    {
+        $customer = $this->customer();
+        $this->returnOne($this->sale($customer));
+
+        $this->historyTab()->assertSee($customer->name);
+    }
+
+    public function test_cash_and_credit_are_totalled_separately(): void
+    {
+        // The same distinction the drawer cares about: one emptied it, the
+        // other did not.
+        $this->returnOne($this->sale());                                  // 4,000 cash
+        $this->returnOne($this->sale($this->customer()), SaleReturn::CREDIT); // 4,000 credit
+
+        $page = $this->historyTab();
+
+        $this->assertEquals(8000, $page->viewData('returnsTotal'));
+        $this->assertEquals(4000, $page->viewData('returnsCash'));
+        $this->assertEquals(4000, $page->viewData('returnsCredit'));
+    }
+
+    public function test_it_counts_the_units_that_went_back_on_the_shelf(): void
+    {
+        $this->returnOne($this->sale());
+
+        $this->assertSame(1, $this->historyTab()->viewData('returnedUnits'));
+    }
+
+    public function test_it_shows_who_processed_it(): void
+    {
+        $manager = User::factory()->create([
+            'name' => 'NKEM UDOH', 'role' => ['branch_manager'], 'status' => 'active',
+        ]);
+
+        $sale = $this->sale();
+        Livewire::actingAs($manager)
+            ->test(\App\Livewire\Sales\Index::class)
+            ->call('openReturn', $sale->id)
+            ->set('returnQtys.' . $sale->saleItems->first()->id, 1)
+            ->call('processReturn');
+
+        $this->historyTab()->assertSee('NKEM UDOH');
+    }
+
+    public function test_the_period_filter_applies_to_returns(): void
+    {
+        $this->returnOne($this->sale());
+
+        SaleReturn::sole()->forceFill(['created_at' => now()->subMonths(3)])->save();
+
+        $this->assertSame(0, $this->historyTab()->set('period', 'today')->viewData('returnsCount'));
+    }
+
+    public function test_a_period_with_no_returns_reports_nothing_rather_than_breaking(): void
+    {
+        $page = $this->historyTab();
+
+        $this->assertSame(0, $page->viewData('returnsCount'));
+        $this->assertEquals(0, $page->viewData('returnsTotal'));
+        $page->assertSee('Nothing was returned in this period.');
+    }
+
+    public function test_counter_staff_can_read_the_returns_tab(): void
+    {
+        // Seeing what came back is not the same as being able to give money
+        // back. A cashier asked about a refund should be able to look it up.
+        $this->returnOne($this->sale());
+
+        $this->historyTab(User::factory()->create(['role' => ['cashier'], 'status' => 'active']))
+            ->assertSee('Walk-in customer');
+    }
 }
