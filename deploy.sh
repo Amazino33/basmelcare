@@ -109,6 +109,15 @@ for app in "${APPS[@]}"; do
     step "[$name] Running migrations"
     php artisan migrate --force
 
+    # Movements recorded before balances were kept can have their before/after
+    # recovered from the money trail, which already holds both figures. Safe to
+    # re-run: it only touches rows with nothing recorded, and fills only what it
+    # can match on batch, timing and size of change together.
+    if php artisan list 2>/dev/null | grep -q 'stock:backfill-balances'; then
+        step "[$name] Recovering stock balances for older movements"
+        php artisan stock:backfill-balances ||             echo "    could not backfill — movement history simply shows no balance for older rows"
+    fi
+
     step "[$name] Ensuring storage symlink"
     link="$app/public/storage"
     target="$app/storage/app/public"
