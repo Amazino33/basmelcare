@@ -267,9 +267,23 @@ class InsuranceAdminTest extends TestCase
             ->call('recordPremium')
             ->assertHasNoErrors();
 
+        $fresh = $subscription->fresh();
+
+        // Asserted as "the next month runs on from the last one", not as
+        // "the old end plus a month". Those are the same only while months are
+        // the same length: paying on 31 August ends the first period on 30
+        // September, and the month bought from 1 October ends on the 31st, not
+        // the 30th. The shortcut failed on month ends and the code was right.
         $this->assertSame(
-            $firstEnd->copy()->addMonth()->toDateString(),
-            $subscription->fresh()->period_end->toDateString()
+            $firstEnd->copy()->addDay()->toDateString(),
+            $fresh->period_start->toDateString(),
+            'The new month did not start the day after the old one ended.'
+        );
+
+        $this->assertSame(
+            $fresh->period_start->copy()->addMonth()->subDay()->toDateString(),
+            $fresh->period_end->toDateString(),
+            'The customer was not given a full month.'
         );
     }
 

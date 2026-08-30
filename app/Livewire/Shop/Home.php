@@ -116,6 +116,10 @@ class Home extends Component
         ])->filter(fn ($rail) => $rail['products']->isNotEmpty());
 
         return view('livewire.shop.home', [
+            // Uploaded by staff under Images -> Shop Front. Null is a normal
+            // state: the hero falls back to its own colour, which is finished
+            // rather than empty-looking.
+            'heroImage'     => \App\Models\AppSetting::get('site_hero_image') ?: null,
             'bestSellers'   => $bestSellers,
             'newArrivals'   => $this->sellable()->latest()->limit(8)->get(),
             'categories'    => $categories->take(6),

@@ -24,9 +24,18 @@
     {{-- Hero. The pharmacy's own promise, over its own colour - no stock
          photograph standing in for a shop that exists. --}}
     <section class="relative overflow-hidden" style="background: var(--pub-deep)">
-        <div aria-hidden="true"
-             class="absolute inset-0 opacity-[0.07]"
-             style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 22px 22px;"></div>
+        @if($heroImage)
+            {{-- object-cover, so whatever shape is uploaded fills the banner
+                 rather than stretching. A dark wash sits over it: the writing
+                 is white, and a bright photograph would swallow it. --}}
+            <img src="{{ asset('storage/' . $heroImage) }}" alt=""
+                 class="absolute inset-0 w-full h-full object-cover" />
+            <div aria-hidden="true" class="absolute inset-0" style="background: oklch(38% 0.062 178 / 0.72)"></div>
+        @else
+            <div aria-hidden="true"
+                 class="absolute inset-0 opacity-[0.07]"
+                 style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 22px 22px;"></div>
+        @endif
 
         <div class="relative max-w-7xl mx-auto px-4 py-14 md:py-20">
             <div class="max-w-xl">
@@ -82,8 +91,15 @@
                     <a href="{{ route('shop.index', ['category' => $category->id]) }}"
                        class="group bg-base-100 border border-base-200 rounded-xl p-4 flex flex-col items-center gap-2 text-center
                               hover:border-primary/40 hover:shadow-sm transition-all">
-                        <span class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                            <x-icon name="{{ $iconFor($category->name) }}" class="w-5 h-5 text-primary" />
+                        <span class="w-12 h-12 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                            @if($category->image)
+                                <img src="{{ asset('storage/' . $category->image) }}" alt=""
+                                     class="w-full h-full object-cover" loading="lazy" />
+                            @else
+                                {{-- No picture uploaded. A symbol chosen from the
+                                     shelf's name, so the row still looks finished. --}}
+                                <x-icon name="{{ $iconFor($category->name) }}" class="w-5 h-5 text-primary" />
+                            @endif
                         </span>
                         <span class="text-sm font-medium leading-snug">{{ Str::title(Str::lower($category->name)) }}</span>
                         <span class="text-[11px] text-base-content/50">

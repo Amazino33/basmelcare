@@ -10,7 +10,7 @@ class Category extends Model
     use NormalisesName;
 
     protected $fillable = [
-        'name', 'description',
+        'name', 'description', 'image',
     ];
 
     public function products()

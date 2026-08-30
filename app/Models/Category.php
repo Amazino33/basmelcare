@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Category extends Model
 {
     protected $fillable = [
-        'name', 'description',
+        'name', 'description', 'image',
     ];
 
     public function getNameAttribute(string $value): string
