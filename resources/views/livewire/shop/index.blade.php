@@ -40,47 +40,9 @@
     <!-- Products Grid -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
         @forelse($products as $product)
-            @php $stock = $product->batches->sum('quantity'); @endphp
-            <a href="{{ route('shop.show', $product->id) }}" class="card bg-base-100 border border-base-200 hover:shadow-md transition-all active:scale-[0.98]">
-                <!-- Image -->
-                <figure class="{{ $product->image ? 'bg-white' : 'bg-base-200' }} aspect-square relative overflow-hidden">
-                    @if($product->image)
-                        <img src="{{ $product->imageUrl('card') }}" alt="{{ $product->name }}" class="w-full h-full object-contain p-2" loading="lazy" />
-                    @else
-                        <div class="w-full h-full flex items-center justify-center">
-                            <x-icon name="o-cube" class="w-10 h-10 text-base-content/15" />
-                        </div>
-                    @endif
-
-                    <!-- Badges -->
-                    <div class="absolute top-2 left-2 flex flex-col gap-1">
-                        @if($product->requires_prescription)
-                            <span class="badge badge-error badge-xs">Rx</span>
-                        @endif
-                        @if($stock == 0)
-                            <span class="badge badge-neutral badge-xs">Out of Stock</span>
-                        @endif
-                    </div>
-                </figure>
-
-                <div class="p-2.5">
-                    <!-- Category -->
-                    <span class="text-xs text-primary font-medium">{{ $product->category?->name }}</span>
-
-                    <!-- Name -->
-                    <h3 class="text-sm font-semibold leading-tight line-clamp-2 mt-0.5">{{ $product->name }}</h3>
-
-                    <!-- Price -->
-                    <div class="flex items-center justify-between mt-2">
-                        <span class="text-primary font-bold text-sm md:text-base">@if($product->hasWholesaleDiscount())<span class="text-xs text-base-content/40 line-through mr-1">&#8358;{{ number_format($product->selling_price, 0) }}</span>@endif&#8358;{{ number_format($product->shopPrice(), 0) }}</span>
-                        @if($stock > 0)
-                            <span class="text-xs text-success">In Stock</span>
-                        @else
-                            <span class="text-xs text-error">Sold Out</span>
-                        @endif
-                    </div>
-                </div>
-            </a>
+            {{-- The same card as the shop front, so a product looks the same
+                 wherever it is met. --}}
+            <x-shop.product-card :product="$product" />
         @empty
             <div class="col-span-full text-center py-12">
                 <x-icon name="o-magnifying-glass" class="w-12 h-12 mx-auto mb-3 text-base-content/20" />

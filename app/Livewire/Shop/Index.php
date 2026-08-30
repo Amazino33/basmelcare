@@ -4,15 +4,17 @@ namespace App\Livewire\Shop;
 
 use App\Models\Category;
 use App\Models\Product;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Mary\Traits\Toast;
 
 #[Layout('layouts.public')]
 class Index extends Component
 {
-    use WithPagination;
+    use Toast, WithPagination;
 
     #[Url]
     public string $search = '';
@@ -26,6 +28,34 @@ class Index extends Component
     public function updatedSearch()
     {
         $this->resetPage();
+    }
+
+    /**
+     * Add straight from the grid.
+     *
+     * The card carries a basket button now, so the shop no longer sends
+     * somebody to the product page for a box of paracetamol they already know
+     * they want.
+     */
+    public function addToCart(int $productId): void
+    {
+        $product = Product::where('show_in_shop', true)->find($productId);
+
+        if (! $product) {
+            return;
+        }
+
+        // Checked here rather than trusted from the card: the button is not
+        // rendered for an empty product, but the action is what decides.
+        if ($product->batches()->sum('quantity') < 1) {
+            $this->warning('That one is out of stock. Ask at the counter and we will source it.');
+
+            return;
+        }
+
+        (new \App\Services\CartService)->add($productId);
+
+        $this->success(Str::title(Str::lower($product->name)) . ' added to your basket.');
     }
 
     public function updatedCategory()
