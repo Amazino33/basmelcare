@@ -50,7 +50,7 @@ class Medicines extends Component
         return in_array('pharmacist', auth()->user()->role ?? [], true);
     }
 
-    public function toggle(int $productId): void
+    public function togglePrescriptionOnly(int $productId): void
     {
         // Checked here rather than only in the route: this is the write.
         if (! $this->canDecide()) {

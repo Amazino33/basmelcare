@@ -44,7 +44,7 @@ class Index extends Component
     public function switchTab(string $tab): void
     {
         $this->tab = $tab;
-        $this->cancelUpload();
+        $this->cancelPhotoUpload();
         $this->cancelCategoryUpload();
         $this->heroPhoto = null;
         $this->resetValidation();
@@ -57,7 +57,7 @@ class Index extends Component
 
     public function updatedFilter(): void
     {
-        $this->cancelUpload();
+        $this->cancelPhotoUpload();
         $this->resetPage();
     }
 
@@ -68,7 +68,7 @@ class Index extends Component
         $this->resetValidation();
     }
 
-    public function cancelUpload(): void
+    public function cancelPhotoUpload(): void
     {
         $this->uploadingId = null;
         $this->photo = null;

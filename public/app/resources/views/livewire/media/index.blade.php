@@ -194,7 +194,7 @@
                                 <x-button label="Save" wire:click="saveImage"
                                           class="btn-primary btn-sm" icon="o-check"
                                           wire:loading.attr="disabled" wire:target="photo,saveImage" />
-                                <x-button label="Cancel" wire:click="cancelUpload" class="btn-ghost btn-sm" />
+                                <x-button label="Cancel" wire:click="cancelPhotoUpload" class="btn-ghost btn-sm" />
                             </div>
                         </div>
 

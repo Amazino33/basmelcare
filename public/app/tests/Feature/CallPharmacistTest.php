@@ -42,14 +42,14 @@ class CallPharmacistTest extends TestCase
 
     public function test_a_sales_person_can_call(): void
     {
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $this->assertSame(1, PharmacistCall::count());
     }
 
     public function test_a_cashier_can_call(): void
     {
-        $this->bar($this->user(['cashier']))->call('call');
+        $this->bar($this->user(['cashier']))->call('callPharmacist');
 
         $this->assertSame(1, PharmacistCall::count());
     }
@@ -67,9 +67,9 @@ class CallPharmacistTest extends TestCase
         $caller = $this->user(['sales']);
 
         $bar = $this->bar($caller);
-        $bar->call('call');
-        $bar->call('call');
-        $bar->call('call');
+        $bar->call('callPharmacist');
+        $bar->call('callPharmacist');
+        $bar->call('callPharmacist');
 
         $this->assertSame(1, PharmacistCall::count());
     }
@@ -79,10 +79,10 @@ class CallPharmacistTest extends TestCase
         $caller     = $this->user(['sales']);
         $pharmacist = $this->user(['pharmacist']);
 
-        $this->bar($caller)->call('call');
+        $this->bar($caller)->call('callPharmacist');
         $this->bar($pharmacist)->call('acknowledge', PharmacistCall::first()->id);
 
-        $this->bar($caller)->call('call');
+        $this->bar($caller)->call('callPharmacist');
 
         $this->assertSame(2, PharmacistCall::count());
     }
@@ -92,7 +92,7 @@ class CallPharmacistTest extends TestCase
     public function test_the_pharmacist_sees_a_waiting_customer(): void
     {
         $caller = User::factory()->create(['role' => ['sales'], 'status' => 'active', 'name' => 'BOLA']);
-        $this->bar($caller)->call('call');
+        $this->bar($caller)->call('callPharmacist');
 
         $this->bar($this->user(['pharmacist']))
             ->assertSee('A customer is waiting')
@@ -101,7 +101,7 @@ class CallPharmacistTest extends TestCase
 
     public function test_acknowledging_clears_the_banner(): void
     {
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $pharmacist = $this->user(['pharmacist']);
         $this->bar($pharmacist)->call('acknowledge', PharmacistCall::first()->id);
@@ -111,7 +111,7 @@ class CallPharmacistTest extends TestCase
 
     public function test_it_records_who_answered(): void
     {
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $pharmacist = $this->user(['pharmacist']);
         $this->bar($pharmacist)->call('acknowledge', PharmacistCall::first()->id);
@@ -125,7 +125,7 @@ class CallPharmacistTest extends TestCase
         $caller     = $this->user(['sales']);
         $pharmacist = User::factory()->create(['role' => ['pharmacist'], 'status' => 'active', 'name' => 'ADUNNI']);
 
-        $this->bar($caller)->call('call');
+        $this->bar($caller)->call('callPharmacist');
         $this->bar($pharmacist)->call('acknowledge', PharmacistCall::first()->id);
 
         $this->bar($caller)->assertSee('ADUNNI')->assertSee('on the way');
@@ -133,7 +133,7 @@ class CallPharmacistTest extends TestCase
 
     public function test_a_second_pharmacist_cannot_answer_the_same_call_twice(): void
     {
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $first  = $this->user(['pharmacist']);
         $second = $this->user(['pharmacist']);
@@ -146,7 +146,7 @@ class CallPharmacistTest extends TestCase
 
     public function test_a_cashier_cannot_answer_a_call(): void
     {
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $this->bar($this->user(['cashier']))->call('acknowledge', PharmacistCall::first()->id);
 
@@ -204,7 +204,7 @@ class CallPharmacistTest extends TestCase
     /** A call made long enough ago that the phones should ring. */
     private function staleCall(User $caller): PharmacistCall
     {
-        $this->bar($caller)->call('call');
+        $this->bar($caller)->call('callPharmacist');
 
         $call = PharmacistCall::first();
         $call->forceFill(['created_at' => now()->subMinutes(2)])->save();
@@ -251,7 +251,7 @@ class CallPharmacistTest extends TestCase
         AppSetting::set('pharmacist_call_alert_after_seconds', 60);
 
         $this->pharmacistWithPhone();
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $this->assertFalse(PharmacistCall::first()->shouldNotify());
     }
@@ -262,7 +262,7 @@ class CallPharmacistTest extends TestCase
         AppSetting::set('pharmacist_call_alert_after_seconds', 15);
 
         $this->pharmacistWithPhone();
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         PharmacistCall::first()->forceFill(['created_at' => now()->subSeconds(20)])->save();
 
@@ -344,7 +344,7 @@ class CallPharmacistTest extends TestCase
     {
         // A banner that never clears trains people to ignore it, which costs
         // more than losing the occasional call.
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         PharmacistCall::first()->forceFill([
             'created_at' => now()->subMinutes(PharmacistCall::EXPIRES_AFTER_MINUTES + 1),
@@ -360,7 +360,7 @@ class CallPharmacistTest extends TestCase
         $uyo   = Branch::create(['name' => 'UYO CITY BRANCH', 'is_main' => true]);
         $ikeja = Branch::create(['name' => 'IKEJA BRANCH', 'is_main' => false]);
 
-        $this->bar($this->user(['sales'], $uyo->id))->call('call');
+        $this->bar($this->user(['sales'], $uyo->id))->call('callPharmacist');
 
         $this->bar($this->user(['pharmacist'], $ikeja->id))
             ->assertDontSee('A customer is waiting');
@@ -370,7 +370,7 @@ class CallPharmacistTest extends TestCase
     {
         $uyo = Branch::create(['name' => 'UYO CITY BRANCH', 'is_main' => true]);
 
-        $this->bar($this->user(['sales'], $uyo->id))->call('call');
+        $this->bar($this->user(['sales'], $uyo->id))->call('callPharmacist');
 
         $this->bar($this->user(['pharmacist'], $uyo->id))
             ->assertSee('A customer is waiting');
@@ -381,7 +381,7 @@ class CallPharmacistTest extends TestCase
     public function test_the_banner_reaches_the_pharmacist_on_any_page(): void
     {
         // It lives in the layout, so they do not have to be on a dashboard.
-        $this->bar($this->user(['sales']))->call('call');
+        $this->bar($this->user(['sales']))->call('callPharmacist');
 
         $this->actingAs($this->user(['pharmacist']))
             ->get(route('customers.index'))

@@ -55,7 +55,7 @@ class PrescriptionMedicinesTest extends TestCase
     {
         $product = $this->product();
 
-        $this->page($this->user(['pharmacist']))->call('toggle', $product->id);
+        $this->page($this->user(['pharmacist']))->call('togglePrescriptionOnly', $product->id);
 
         $this->assertTrue((bool) $product->fresh()->requires_prescription);
     }
@@ -64,7 +64,7 @@ class PrescriptionMedicinesTest extends TestCase
     {
         $product = $this->product(rx: true);
 
-        $this->page($this->user(['pharmacist']))->call('toggle', $product->id);
+        $this->page($this->user(['pharmacist']))->call('togglePrescriptionOnly', $product->id);
 
         $this->assertFalse((bool) $product->fresh()->requires_prescription);
     }
@@ -75,7 +75,7 @@ class PrescriptionMedicinesTest extends TestCase
         // defeat the point of the review.
         $product = $this->product();
 
-        $this->page($this->user(['admin']))->call('toggle', $product->id);
+        $this->page($this->user(['admin']))->call('togglePrescriptionOnly', $product->id);
 
         $this->assertFalse((bool) $product->fresh()->requires_prescription);
     }
@@ -86,7 +86,7 @@ class PrescriptionMedicinesTest extends TestCase
         // catalogue one.
         $product = $this->product();
 
-        $this->page($this->user(['inventory_manager']))->call('toggle', $product->id);
+        $this->page($this->user(['inventory_manager']))->call('togglePrescriptionOnly', $product->id);
 
         $this->assertFalse((bool) $product->fresh()->requires_prescription);
     }
@@ -111,7 +111,7 @@ class PrescriptionMedicinesTest extends TestCase
         $pharmacist = $this->user(['pharmacist']);
         $product    = $this->product();
 
-        $this->page($pharmacist)->call('toggle', $product->id);
+        $this->page($pharmacist)->call('togglePrescriptionOnly', $product->id);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $pharmacist->id,
@@ -128,7 +128,7 @@ class PrescriptionMedicinesTest extends TestCase
         $product = $this->product();
         $before  = $product->only(['name', 'selling_price', 'category_id', 'reorder_level']);
 
-        $this->page($this->user(['pharmacist']))->call('toggle', $product->id);
+        $this->page($this->user(['pharmacist']))->call('togglePrescriptionOnly', $product->id);
 
         $after = $product->fresh()->only(['name', 'selling_price', 'category_id', 'reorder_level']);
 
@@ -184,7 +184,7 @@ class PrescriptionMedicinesTest extends TestCase
 
         $this->assertFalse((bool) $product->fresh()->requires_prescription);
 
-        $this->page($this->user(['pharmacist']))->call('toggle', $product->id);
+        $this->page($this->user(['pharmacist']))->call('togglePrescriptionOnly', $product->id);
 
         $this->assertTrue((bool) $product->fresh()->requires_prescription);
     }

@@ -49,16 +49,16 @@
 
                     {{-- Instant, with the row showing it working rather than a page-wide spinner --}}
                     <div class="shrink-0 flex items-center gap-2">
-                        <span wire:loading wire:target="toggle({{ $product->id }})"
+                        <span wire:loading wire:target="togglePrescriptionOnly({{ $product->id }})"
                               class="loading loading-spinner loading-xs text-primary"></span>
 
                         <input type="checkbox"
                                class="toggle toggle-sm toggle-error"
                                @checked($product->requires_prescription)
                                @disabled(! $canDecide)
-                               wire:click="toggle({{ $product->id }})"
+                               wire:click="togglePrescriptionOnly({{ $product->id }})"
                                wire:loading.attr="disabled"
-                               wire:target="toggle({{ $product->id }})" />
+                               wire:target="togglePrescriptionOnly({{ $product->id }})" />
                     </div>
                 </div>
             </x-card>

@@ -46,7 +46,7 @@
             </div>
         @else
             <x-button label="Call pharmacist" icon="o-bell"
-                      wire:click="call" spinner="call"
+                      wire:click="callPharmacist" spinner="callPharmacist"
                       class="btn-sm btn-outline btn-warning" />
         @endif
     @endif

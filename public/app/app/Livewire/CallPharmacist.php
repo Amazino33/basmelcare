@@ -38,7 +38,16 @@ class CallPharmacist extends Component
         return (bool) array_intersect(auth()->user()->role ?? [], self::RESPONDERS);
     }
 
-    public function call(): void
+    /**
+     * Ring for a pharmacist.
+     *
+     * Not named call(). wire:click="call" compiles to $wire.call(), which is
+     * Livewire's own way of invoking a method - so the browser asked the server
+     * to run a method with no name and got a 500. The Livewire test helper
+     * calls methods directly and never goes near that, which is why every test
+     * passed while the button was broken.
+     */
+    public function callPharmacist(): void
     {
         if (! $this->canCall()) {
             return;
