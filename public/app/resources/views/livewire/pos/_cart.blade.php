@@ -27,7 +27,17 @@
                         </button>
                     @endif
                 </div>
-                <input type="number" wire:change="updateQty('{{ $key }}', $event.target.value)" value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}" class="input input-xs input-bordered w-14 text-center" />
+                {{-- wire:key carries the quantity, so when the server settles
+                     on a different figure - a clamp to what is in stock, or a
+                     cleared box put back to what it was - the element is
+                     replaced rather than morphed. Livewire will not overwrite
+                     a box somebody has typed in, so without this the cart said
+                     20 while the box still read 999. --}}
+                <input type="number"
+                       wire:key="qty-{{ $key }}-{{ $item['qty'] }}"
+                       wire:change="updateQty('{{ $key }}', $event.target.value)"
+                       value="{{ $item['qty'] }}" min="1" max="{{ $item['max_qty'] }}"
+                       class="input input-xs input-bordered w-14 text-center" />
                 <x-button icon="o-x-mark" wire:click="removeFromCart('{{ $key }}')" class="btn-xs btn-ghost text-error" />
             </div>
         @endforeach

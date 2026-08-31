@@ -199,12 +199,22 @@ class Index extends Component
         if (! isset($this->cart[$key])) return;
 
         $line = $this->cart[$key];
-        $qty  = (int) $qty;
 
-        if ($qty <= 0) {
-            $this->removeProduct((int) $line['product_id']);
-            $this->saveCartToSession();
+        // Anything that is not a number is somebody mid-edit: a cleared box, a
+        // half-typed figure, a stray paste from a phone keyboard. Leave the
+        // line exactly as it was; the box is redrawn with the real quantity.
+        if (! is_numeric($qty)) {
             return;
+        }
+
+        $qty = (int) $qty;
+
+        // Zero is not a request to delete. Clearing the field to retype is the
+        // commonest thing anybody does to this box, and losing the product at
+        // that moment - with a customer waiting - meant finding it and adding
+        // it again. Removing a line is the X beside it, which is unambiguous.
+        if ($qty < 1) {
+            $qty = 1;
         }
 
         $short = $this->allocate(
