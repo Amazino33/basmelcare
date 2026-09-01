@@ -106,7 +106,13 @@ class StockReceivedTest extends TestCase
         $this->received('PARACETAMOL 500MG', 100, 85, $ibrahim);
         $this->received('AMOXIL 500MG', 50, 260, $ibrahim, on: now()->subDays(3)->toDateTimeString());
 
-        $this->assertCount(2, $this->page($ibrahim)->viewData('intakes'));
+        // The window is set rather than left at its default. The page opens on
+        // this month, so on the first of a month "three days ago" is in the
+        // last one - and the test failed for three days in every thirty while
+        // the grouping it is about was perfectly correct.
+        $page = $this->page($ibrahim)->set('dateFrom', now()->subWeek()->format('Y-m-d'));
+
+        $this->assertCount(2, $page->viewData('intakes'));
     }
 
     // ── what the auditor asked for ──────────────────────────────────────

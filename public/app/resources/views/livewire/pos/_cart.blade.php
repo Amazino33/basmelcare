@@ -1,7 +1,11 @@
 @if(count($cart))
     <div class="space-y-2 max-h-60 lg:max-h-96 overflow-y-auto">
         @foreach($cart as $key => $item)
-            <div class="flex items-center gap-2 p-2 rounded bg-base-200">
+            {{-- Each row is tracked by which line it is, not by where it sits.
+                 Without this the browser matches rows by position, so any
+                 change to the order crosses one product's details onto
+                 another's row. --}}
+            <div wire:key="cart-{{ $key }}" class="flex items-center gap-2 p-2 rounded bg-base-200">
                 <div class="flex-1 min-w-0">
                     <div class="font-semibold text-xs truncate">{{ $item['name'] }}</div>
                     <div class="text-xs text-base-content/60">

@@ -341,9 +341,21 @@ class InsuranceCoverTest extends TestCase
 
         $subscription->fresh(['plan'])->recordPremium(5000, 'cash');
 
+        $fresh = $subscription->fresh();
+
+        // "Runs on from the last one", not "the old end plus a month". Those
+        // agree only while months are the same length: a period ending 30
+        // September buys October, which ends on the 31st.
         $this->assertSame(
-            $firstEnd->copy()->addMonth()->toDateString(),
-            $subscription->fresh()->period_end->toDateString()
+            $firstEnd->copy()->addDay()->toDateString(),
+            $fresh->period_start->toDateString(),
+            'The paid-for month did not start the day after the last one ended.'
+        );
+
+        $this->assertSame(
+            $fresh->period_start->copy()->addMonth()->subDay()->toDateString(),
+            $fresh->period_end->toDateString(),
+            'Paying early did not buy a full month.'
         );
     }
 

@@ -238,4 +238,119 @@ class PosQuantityInputTest extends TestCase
         $this->assertStringContainsString('Short by', $queued,
             'Nothing told the operator the quantity had been cut down.');
     }
+
+    // ── editing one line must not disturb the others ────────────────────
+
+    public function test_changing_a_quantity_leaves_the_cart_in_the_same_order(): void
+    {
+        // Reported from the counter as "typing a quantity switches the
+        // products". The line was being removed and re-added, which appends -
+        // so editing the first item sent it to the bottom, and the rows are
+        // drawn in cart order.
+        $first  = $this->product([50], ['name' => 'AAA FIRST']);
+        $second = $this->product([50], ['name' => 'BBB SECOND']);
+        $third  = $this->product([50], ['name' => 'CCC THIRD']);
+
+        $page = Livewire::actingAs($this->seller())
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $first->id)
+            ->call('addToCart', $second->id)
+            ->call('addToCart', $third->id);
+
+        $before = collect($page->get('cart'))->pluck('name')->all();
+
+        $page->call('updateQty', array_key_first($page->get('cart')), '5');
+
+        $after = collect($page->get('cart'))->pluck('name')->all();
+
+        $this->assertSame($before, $after, 'Changing a quantity reordered the cart.');
+    }
+
+    public function test_the_quantity_lands_on_the_product_it_was_typed_against(): void
+    {
+        $first  = $this->product([50], ['name' => 'AAA FIRST']);
+        $second = $this->product([50], ['name' => 'BBB SECOND']);
+
+        $page = Livewire::actingAs($this->seller())
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $first->id)
+            ->call('addToCart', $second->id);
+
+        $firstKey = array_key_first($page->get('cart'));
+
+        $page->call('updateQty', $firstKey, '7');
+
+        $cart = collect($page->get('cart'));
+
+        $this->assertSame(7, (int) $cart->firstWhere('name', 'AAA FIRST')['qty']);
+        $this->assertSame(1, (int) $cart->firstWhere('name', 'BBB SECOND')['qty'],
+            'The quantity landed on the wrong product.');
+    }
+
+    public function test_it_holds_even_when_the_line_splits_across_batches(): void
+    {
+        // The awkward case: one line becomes two, and both have to appear where
+        // the single one was rather than at the end.
+        $first  = $this->product([15, 30], ['name' => 'AAA SPLITS']);
+        $second = $this->product([50], ['name' => 'BBB SECOND']);
+
+        $page = Livewire::actingAs($this->seller())
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $first->id)
+            ->call('addToCart', $second->id);
+
+        $page->call('updateQty', array_key_first($page->get('cart')), '40');
+
+        $names = collect($page->get('cart'))->pluck('name')->all();
+
+        $this->assertSame(['AAA SPLITS', 'AAA SPLITS', 'BBB SECOND'], $names,
+            'The split line did not stay where the product was.');
+    }
+
+    public function test_reducing_a_split_line_keeps_its_place_too(): void
+    {
+        $first  = $this->product([15, 30], ['name' => 'AAA SPLITS']);
+        $second = $this->product([50], ['name' => 'BBB SECOND']);
+
+        $page = Livewire::actingAs($this->seller())
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $first->id)
+            ->call('addToCart', $second->id);
+
+        $page->call('updateQty', array_key_first($page->get('cart')), '40')
+            ->call('updateQty', array_key_first($page->get('cart')), '2');
+
+        $this->assertSame(['AAA SPLITS', 'BBB SECOND'],
+            collect($page->get('cart'))->pluck('name')->all());
+    }
+
+    public function test_switching_a_line_to_packs_keeps_its_place(): void
+    {
+        // togglePack allocates too, so it had the same fault.
+        $first  = $this->product([50], [
+            'name' => 'AAA PACKS', 'has_pack' => true, 'pack_size' => 10, 'pack_price' => 900,
+        ]);
+        $second = $this->product([50], ['name' => 'BBB SECOND']);
+
+        $page = Livewire::actingAs($this->seller())
+            ->test(\App\Livewire\Pos\Index::class)
+            ->call('addToCart', $first->id)
+            ->call('addToCart', $second->id);
+
+        $page->call('togglePack', array_key_first($page->get('cart')));
+
+        $this->assertSame(['AAA PACKS', 'BBB SECOND'],
+            collect($page->get('cart'))->pluck('name')->all());
+    }
+
+    public function test_each_row_is_drawn_with_an_identity_of_its_own(): void
+    {
+        // Order is kept above, but the rows also carry a key so the browser
+        // matches them by which line they are rather than by position. Belt and
+        // braces on the thing that put a quantity on the wrong product.
+        $product = $this->product();
+        $page    = $this->till($product);
+
+        $page->assertSee('wire:key="cart-' . $this->firstKey($page) . '"', false);
+    }
 }

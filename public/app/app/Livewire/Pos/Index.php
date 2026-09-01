@@ -246,14 +246,13 @@ class Index extends Component
      */
     private function allocate(int $productId, int $wanted, bool $asPack, ?int $packSize, array $template): int
     {
-        $this->removeProduct($productId);
-
         $batches = Batch::where('product_id', $productId)
             ->where('quantity', '>', 0)
             ->orderBy('expiry_date')
             ->get();
 
         $remaining = $wanted;
+        $lines     = [];
 
         foreach ($batches as $batch) {
             if ($remaining <= 0) {
@@ -273,7 +272,7 @@ class Index extends Component
             $take = min($capacity, $remaining);
             $key  = $productId . '-' . $batch->id;
 
-            $this->cart[$key] = [
+            $lines[$key] = [
                 'product_id'   => $productId,
                 'batch_id'     => $batch->id,
                 'name'         => $template['name'],
@@ -292,6 +291,34 @@ class Index extends Component
             $remaining -= $take;
         }
 
+        // Put the product back exactly where it was in the list.
+        //
+        // This used to unset the old lines and then assign the new ones, which
+        // appends them - so changing the quantity on the first item sent it to
+        // the bottom of the cart. The rows are drawn in cart order, so from the
+        // counter it looked as though typing a quantity had switched one
+        // product for another.
+        $before = [];
+        $after  = [];
+        $passed = false;
+
+        foreach ($this->cart as $key => $item) {
+            if ((int) $item['product_id'] === $productId) {
+                $passed = true;
+                continue;
+            }
+
+            if ($passed) {
+                $after[$key] = $item;
+            } else {
+                $before[$key] = $item;
+            }
+        }
+
+        // Keys are "product-batch" strings and never collide across the three
+        // groups, so union keeps every line and the order they are written in.
+        $this->cart = $before + $lines + $after;
+
         // Priced only once the whole allocation exists: whether wholesale
         // applies depends on the total across every batch, not on what landed
         // on any single line.
@@ -305,15 +332,6 @@ class Index extends Component
     }
 
     /** Drop every line belonging to one product. */
-    private function removeProduct(int $productId): void
-    {
-        foreach (array_keys($this->cart) as $key) {
-            if ((int) $this->cart[$key]['product_id'] === $productId) {
-                unset($this->cart[$key]);
-            }
-        }
-    }
-
     public function removeFromCart($key)
     {
         unset($this->cart[$key]);
