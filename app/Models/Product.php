@@ -67,8 +67,26 @@ class Product extends Model
     }
 
     /** True when this viewer is being charged under the shelf price. */
+    /**
+     * Is this visitor actually paying less than everybody else?
+     *
+     * Only then is a struck-through price honest. It used to compare the shop
+     * price against the shelf price, which shows a permanent "was ₦5, now ₦3"
+     * on any product whose wholesale minimum is 1 - because then the wholesale
+     * price is what everyone pays, and the ₦5 is a figure nobody is ever
+     * charged. A reference price nobody pays is not a discount.
+     *
+     * A quantity break is a real saving, but the shop lists at one unit, so the
+     * only visitor genuinely paying less on a listing is a wholesale customer.
+     */
     public function hasWholesaleDiscount(): bool
     {
+        $customer = auth('customer')->user();
+
+        if (! $customer instanceof Customer || $customer->type !== 'wholesale') {
+            return false;
+        }
+
         return $this->shopPrice() < (float) $this->selling_price;
     }
 
