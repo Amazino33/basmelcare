@@ -414,15 +414,28 @@ class Dashboard extends Component
         $totalProducts = Product::count();
         $totalStock = Batch::sum('quantity');
 
-        $lowStockProducts = Product::with('category', 'batches')
-            ->get()
-            ->filter(fn($p) => $p->batches->sum('quantity') <= $p->reorder_level && $p->batches->sum('quantity') > 0)
-            ->take(5);
+        // Counted in the database, by the same rule the Products page filters
+        // on. Both tiles link straight to that page, so a definition that drifts
+        // here sends somebody to a list that does not match the number they
+        // just clicked. It also used to load every product and every batch into
+        // memory, twice, to produce two numbers.
+        $held    = '(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE batches.product_id = products.id)';
+        $lowRule = fn ($q) => $q->whereRaw($held . ' > 0')->whereRaw($held . ' <= products.reorder_level');
 
-        $outOfStock = Product::with('batches')
-            ->get()
-            ->filter(fn($p) => $p->batches->sum('quantity') == 0)
-            ->count();
+        $lowStockCount = $lowRule(Product::query())->count();
+
+        $lowStockProducts = $lowRule(Product::with('category')->withSum('batches as stock', 'quantity'))
+            ->orderByRaw($held . ' ASC')
+            ->limit(5)
+            ->get();
+
+        // Anything with no unit on the shelf, whether it ran out or was never
+        // stocked. Counted apart below, because they need different action:
+        // one is a reorder, the other is a product somebody set up and never
+        // received.
+        $outOfStock = Product::whereDoesntHave('batches', fn ($q) => $q->where('quantity', '>', 0))->count();
+
+        $neverStocked = Product::doesntHave('batches')->count();
 
         $expiringBatches = Batch::with('product')
             ->where('quantity', '>', 0)
@@ -478,6 +491,8 @@ class Dashboard extends Component
             'totalProducts' => $totalProducts,
             'totalStock' => $totalStock,
             'outOfStock' => $outOfStock,
+            'neverStocked' => $neverStocked,
+            'lowStockCount' => $lowStockCount,
             'lowStockProducts' => $lowStockProducts,
             'expiringBatches' => $expiringBatches,
             'expiredBatches' => $expiredBatches,

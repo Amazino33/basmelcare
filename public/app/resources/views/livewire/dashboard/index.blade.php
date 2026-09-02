@@ -527,9 +527,21 @@
             <x-stat
                 title="Out of Stock"
                 value="{{ $outOfStock }}"
-                description="need restocking"
+                description="{{ $neverStocked > 0 ? $neverStocked . ' never stocked' : 'need restocking' }}"
                 icon="o-exclamation-circle"
                 color="{{ $outOfStock > 0 ? 'text-error' : 'text-success' }}"
+                class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+            />
+        </a>
+        {{-- Low stock only existed as a list at the bottom of this page, so
+             the figure nobody could see was the one worth acting on. --}}
+        <a href="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="block">
+            <x-stat
+                title="Low Stock"
+                value="{{ $lowStockCount }}"
+                description="at or below reorder level"
+                icon="o-arrow-trending-down"
+                color="{{ $lowStockCount > 0 ? 'text-warning' : 'text-success' }}"
                 class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
             />
         </a>
@@ -634,12 +646,17 @@
                         <div class="text-xs text-base-content/60">{{ $product->category?->name }}</div>
                     </div>
                     <div class="text-right ml-2 shrink-0">
-                        <div class="text-sm font-bold text-warning">{{ $product->batches->sum('quantity') }}</div>
+                        <div class="text-sm font-bold text-warning">{{ (int) $product->stock }}</div>
                         <div class="text-xs text-base-content/60">/ {{ $product->reorder_level }}</div>
                     </div>
                 </a>
             @empty
-                <div class="text-center py-4 text-base-content/60 text-sm">All stocked.</div>
+                <div class="text-center py-4 text-base-content/60 text-sm">
+                    Nothing is at or below its reorder level.
+                    <span class="block text-xs mt-1 opacity-70">
+                        A product with no reorder level set can never appear here.
+                    </span>
+                </div>
             @endforelse
             <div class="mt-2">
                 <x-button label="View Products" link="{{ route('products.index', ['stockFilter' => 'low_stock']) }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
