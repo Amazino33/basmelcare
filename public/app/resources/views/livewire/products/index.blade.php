@@ -111,130 +111,165 @@
     <!-- Product Modal -->
     <x-modal wire:model="productModal" title="{{ $productId ? 'Edit Product' : 'New Product' }}" box-class="max-w-2xl">
         <x-form wire:submit="saveProduct">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Image Upload -->
-                <div class="md:col-span-2">
-                    <label class="label"><span class="label-text font-semibold">Product Image</span></label>
-                    <div class="flex items-center gap-4">
-                        @if($photo)
-                            <img src="{{ $photo->temporaryUrl() }}" class="w-20 h-20 rounded object-cover border" />
-                        @elseif($existingImage)
-                            <img src="{{ \App\Support\CloudinaryImage::deliver($existingImage, 'thumb') }}" class="w-20 h-20 rounded object-cover border" />
-                        @else
-                            <div class="w-20 h-20 rounded bg-base-200 flex items-center justify-center border">
-                                <x-icon name="o-photo" class="w-8 h-8 text-base-content/30" />
+
+            {{-- ── What it is ────────────────────────────────────────── --}}
+            <div class="flex items-start gap-4">
+                {{-- The picture sits beside the name rather than above it in a
+                     band of its own: it is one small thing, and it was taking
+                     the width of the form to say so. --}}
+                <div class="shrink-0">
+                    @if($photo && $photo->isPreviewable())
+                        <img src="{{ $photo->temporaryUrl() }}" class="w-20 h-20 rounded-lg object-cover border border-base-300" alt="Preview" />
+                    @elseif($existingImage)
+                        <img src="{{ \App\Support\CloudinaryImage::deliver($existingImage, 'thumb') }}" class="w-20 h-20 rounded-lg object-cover border border-base-300" alt="" />
+                    @else
+                        <div class="w-20 h-20 rounded-lg bg-base-200 border border-base-300 flex items-center justify-center">
+                            <x-icon name="o-photo" class="w-7 h-7 text-base-content/25" />
+                        </div>
+                    @endif
+
+                    <label class="btn btn-ghost btn-xs w-20 mt-1">
+                        <span>{{ $existingImage || $photo ? 'Change' : 'Add photo' }}</span>
+                        <input type="file" wire:model="photo" accept="image/*" class="hidden" />
+                    </label>
+
+                    @if($existingImage || $photo)
+                        <button type="button" wire:click="removeImage" class="btn btn-ghost btn-xs w-20 text-error">Remove</button>
+                    @endif
+                </div>
+
+                <div class="flex-1 min-w-0 space-y-3">
+                    <x-input label="Product name" wire:model="name" placeholder="e.g. Ascorvit 1000" />
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <x-select label="Category" wire:model="category_id" :options="$categories"
+                                  option-value="id" option-label="name" placeholder="Choose one" />
+
+                        {{-- Only for things broken out of their packet. Left
+                             empty, the shop shows a plain price, which is right
+                             for a bottle or a thermometer. --}}
+                        <x-select label="Sold as" wire:model="unit"
+                                  :options="collect(\App\Models\Product::UNITS)->map(fn($label, $value) => ['id' => $value, 'name' => $label])->values()"
+                                  option-value="id" option-label="name"
+                                  placeholder="Whole item" />
+                    </div>
+                </div>
+            </div>
+
+            @error('photo') <p class="text-error text-xs">{{ $message }}</p> @enderror
+
+            @if($unit)
+                <p class="text-xs text-base-content/60 -mt-1">
+                    The shop will show this as a price <strong>per {{ strtolower(\App\Models\Product::UNITS[$unit] ?? 'unit') }}</strong>,
+                    so a small figure is not mistaken for the price of the whole packet.
+                </p>
+            @endif
+
+            {{-- ── Pricing ───────────────────────────────────────────── --}}
+            <div class="pt-1">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Pricing</span>
+                    <span class="h-px flex-1 bg-base-300"></span>
+                </div>
+
+                @if($this->canSetPrices())
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <x-input label="Cost price" wire:model.live.debounce.500ms="cost_price_hint"
+                                 prefix="₦" type="number" step="0.01"
+                                 hint="Not saved — only used to work out the price below" />
+
+                        <div x-data
+                             x-effect="$el.querySelector('.price-warn').style.display =
+                                 (parseFloat($wire.selling_price) > 0 && parseFloat($wire.cost_price_hint) > 0 && parseFloat($wire.selling_price) < parseFloat($wire.cost_price_hint))
+                                 ? 'flex' : 'none'">
+                            <x-input label="Selling price" wire:model.live="selling_price"
+                                     prefix="₦" type="number" step="0.01"
+                                     hint="Filled from cost × 1.4 — type over it" />
+
+                            <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
+                                <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                                Below cost — you would sell at a loss.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 rounded-lg border border-base-300 p-3">
+                        <p class="text-xs font-semibold text-base-content/70 mb-3">Wholesale</p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <x-input label="Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01"
+                                     hint="Leave empty for none" />
+                            <x-input label="From quantity" wire:model="wholesale_min_qty" type="number" min="2"
+                                     hint="Retail buyers get it at this many" />
+                            <x-input label="Or markup" wire:model="wholesale_markup_percent" type="number"
+                                     step="0.01" min="0" max="100" suffix="%"
+                                     hint="Used only if no price above" />
+                        </div>
+
+                        {{-- Said here rather than left to be discovered on the
+                             shop: a minimum of one means everybody gets it. --}}
+                        @if((int) $wholesale_min_qty === 1)
+                            <div class="alert alert-warning py-1.5 text-xs mt-3 gap-1">
+                                <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
+                                A minimum of 1 gives every customer the wholesale price. Leave it empty
+                                unless that is what you want.
                             </div>
                         @endif
-                        <div class="flex-1">
-                            <input type="file" wire:model="photo" accept="image/*" class="file-input file-input-bordered file-input-sm w-full" />
-                            @if($existingImage || $photo)
-                                <x-button label="Remove" wire:click="removeImage" class="btn-xs btn-ghost text-error mt-1" icon="o-trash" />
-                            @endif
-                        </div>
                     </div>
-                    @error('photo') <span class="text-error text-xs">{{ $message }}</span> @enderror
-                </div>
-
-                <x-input label="Product Name" wire:model="name" />
-
-                {{-- Only for things broken out of their packet and sold one at
-                     a time. Left blank, the shop shows a plain price, which is
-                     right for a bottle or a thermometer. --}}
-                <x-select label="Sold as" wire:model="unit"
-                          :options="collect(\App\Models\Product::UNITS)->map(fn($label, $value) => ['id' => $value, 'name' => $label])->values()"
-                          option-value="id" option-label="name"
-                          placeholder="Whole item — no unit needed"
-                          hint="Set this for anything sold loose, so the shop can say &quot;per tablet&quot; rather than a bare price." />
-
-                <x-input label="SKU" wire:model="sku" placeholder="Optional" />
-                <x-select label="Category" wire:model="category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" />
-
-                <!-- Barcode with scan button -->
-                <div>
-                    <x-input label="Barcode" wire:model="barcode" placeholder="Scan or type barcode">
-                        <x-slot:append>
-                            <x-button icon="o-camera" class="btn-sm btn-ghost rounded-l-none" onclick="startBarcodeScanner()" tooltip="Scan barcode" />
-                        </x-slot:append>
-                    </x-input>
-                </div>
-
-                <x-input
-                    label="Cost Price (for calculation)"
-                    wire:model.live.debounce.500ms="cost_price_hint"
-                    prefix="₦"
-                    type="number"
-                    step="0.01"
-                    hint="Not saved — used to auto-calculate selling price"
-                />
-                @if($this->canSetPrices())
-                    <div x-data
-                         x-effect="$el.querySelector('.price-warn').style.display =
-                             (parseFloat($wire.selling_price) > 0 && parseFloat($wire.cost_price_hint) > 0 && parseFloat($wire.selling_price) < parseFloat($wire.cost_price_hint))
-                             ? 'flex' : 'none'">
-                        <x-input
-                            label="Selling Price (Retail)"
-                            wire:model.live="selling_price"
-                            prefix="₦"
-                            type="number"
-                            step="0.01"
-                            hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
-                        />
-                        <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
-                            <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />
-                            Selling price is below cost — you will sell at a loss.
-                        </div>
-                    </div>
-                    <x-input label="Wholesale Price" wire:model="wholesale_price" prefix="₦" type="number" step="0.01" hint="Leave empty if no wholesale pricing" />
                 @else
-                    <div class="md:col-span-2">
-                        <div class="flex items-start gap-2 p-3 bg-base-200 rounded-lg">
-                            <x-icon name="o-lock-closed" class="w-4 h-4 shrink-0 mt-0.5 text-base-content/50" />
-                            <div class="text-sm">
-                                <p class="font-medium">Pricing is set by a manager</p>
-                                <p class="text-xs text-base-content/60 mt-0.5">
-                                    @if($productId)
-                                        Current price: <span class="font-semibold">₦{{ number_format((float) $selling_price, 2) }}</span>. Ask an admin or branch manager to change it.
-                                    @else
-                                        Save the product and stock now — an admin or branch manager will set the price.
-                                    @endif
-                                </p>
-                            </div>
+                    <div class="flex items-start gap-2 p-3 bg-base-200 rounded-lg">
+                        <x-icon name="o-lock-closed" class="w-4 h-4 shrink-0 mt-0.5 text-base-content/50" />
+                        <div class="text-sm">
+                            <p class="font-medium">Pricing is set by a manager</p>
+                            <p class="text-xs text-base-content/60 mt-0.5">
+                                @if($productId)
+                                    Currently <span class="font-semibold">₦{{ number_format((float) $selling_price, 2) }}</span>.
+                                    Ask an admin or branch manager to change it.
+                                @else
+                                    Save the product and its stock now — a manager will price it.
+                                @endif
+                            </p>
                         </div>
                     </div>
                 @endif
-                <x-input label="Wholesale Min Qty" wire:model="wholesale_min_qty" type="number" hint="Retail buyers get wholesale price at this quantity" />
-
-                <x-input label="Wholesale Markup" wire:model="wholesale_markup_percent" type="number" step="0.01" min="0" max="100" suffix="%"
-                         hint="Leave empty to use the pharmacy default. Only applies when no wholesale price is set above." />
-
-                <div class="md:col-span-2 rounded-lg border border-base-300 p-4">
-                    <x-checkbox label="Also sold as a pack" wire:model.live="has_pack"
-                                hint="A card, strip or bottle sold whole, as well as loose" />
-
-                    @if($has_pack)
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                            <x-input label="Units per pack" wire:model="pack_size" type="number" min="2"
-                                     hint="e.g. 10 tablets in a card" />
-                            <x-input label="Pack price" wire:model="pack_price" prefix="₦" type="number" step="0.01"
-                                     hint="What a retail customer pays for one whole pack" />
-                        </div>
-
-                        <p class="text-xs text-base-content/60 mt-3">
-                            Stock is always counted in single units. Selling one pack of
-                            {{ $pack_size ?: '?' }} takes {{ $pack_size ?: '?' }} off the shelf.
-                        </p>
-                        <p class="text-xs text-base-content/60 mt-1">
-                            Wholesale customers are not charged this price &mdash; they pay their own
-                            per-unit rate multiplied by the pack size, so a pack is never a worse
-                            deal for them than buying loose.
-                        </p>
-                    @endif
-                </div>
-                <x-input label="Reorder Level" wire:model="reorder_level" type="number" hint="Alert when stock falls below this" />
-                <div class="md:col-span-2">
-                    <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
-                </div>
             </div>
+
+            {{-- ── Sold as a pack ────────────────────────────────────── --}}
+            <div class="rounded-lg border border-base-300 p-3">
+                <x-checkbox label="Also sold as a pack" wire:model.live="has_pack"
+                            hint="A card, strip or bottle sold whole, as well as loose" />
+
+                @if($has_pack)
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <x-input label="Units per pack" wire:model="pack_size" type="number" min="2"
+                                 hint="e.g. 10 tablets in a card" />
+                        <x-input label="Pack price" wire:model="pack_price" prefix="₦" type="number" step="0.01"
+                                 hint="What a retail customer pays for one" />
+                    </div>
+
+                    <p class="text-xs text-base-content/60 mt-3">
+                        Stock is counted in single units, so selling one pack of {{ $pack_size ?: '?' }}
+                        takes {{ $pack_size ?: '?' }} off the shelf. Wholesale customers pay their own
+                        per-unit rate times the pack size, so a pack is never a worse deal for them.
+                    </p>
+                @endif
+            </div>
+
+            {{-- ── The rest ──────────────────────────────────────────── --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <x-input label="Reorder level" wire:model="reorder_level" type="number"
+                         hint="Warn below this" />
+                <x-input label="SKU" wire:model="sku" placeholder="Optional" />
+                <x-input label="Barcode" wire:model="barcode" placeholder="Scan or type">
+                    <x-slot:append>
+                        <x-button icon="o-camera" class="btn-sm btn-ghost rounded-l-none"
+                                  onclick="startBarcodeScanner()" tooltip="Scan barcode" />
+                    </x-slot:append>
+                </x-input>
+            </div>
+
+            <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
+
             <x-slot:actions>
                 <x-button :label="$productId ? 'Cancel' : 'Done'" @click="$wire.productModal = false" />
                 <x-button label="Save" type="submit" class="btn-primary" />
