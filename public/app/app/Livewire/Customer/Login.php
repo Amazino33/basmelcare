@@ -24,11 +24,10 @@ class Login extends Component
     {
         $input = trim($this->identifier);
 
-        return Customer::where('email', $input)
-            ->orWhere('phone', $input)
-            ->orWhere('phone', '0' . ltrim($input, '234'))
-            ->orWhere('phone', '234' . ltrim($input, '0'))
-            ->first();
+        // The phone half goes through the same comparison the rest of the
+        // app uses, rather than this screen's own guess at the spellings.
+        return Customer::where('email', $input)->first()
+            ?? Customer::findByPhone($input);
     }
 
     public function sendOtp()

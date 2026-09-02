@@ -11,7 +11,7 @@ class Customer extends Authenticatable
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'type', 'phone', 'email', 'password', 'address', 'notes',
+        'name', 'type', 'phone', 'phone_normalised', 'email', 'password', 'address', 'notes',
         'otp', 'otp_expires_at', 'credit_balance', 'registered_by',
     ];
 
@@ -23,6 +23,72 @@ class Customer extends Authenticatable
         'password'          => 'hashed',
         'credit_balance'    => 'decimal:2',
     ];
+
+    /**
+     * The comparable form of a phone number.
+     *
+     * Nigerian numbers arrive written every which way - 08031234567,
+     * 0803 123 4567, +2348031234567, 234 803 123 4567 - and they are all the
+     * same line. Reduced to its digits without the country code or the leading
+     * zero, so any of those spellings finds the same person.
+     *
+     * Returns null for anything with no digits in it at all, which is not a
+     * phone number and must not match every other blank one.
+     */
+    public static function normalisePhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if (str_starts_with($digits, '234') && strlen($digits) > 10) {
+            $digits = substr($digits, 3);
+        }
+
+        $digits = ltrim($digits, '0');
+
+        return $digits === '' ? null : $digits;
+    }
+
+    /**
+     * Find a customer by any spelling of their number.
+     *
+     * The single way to look someone up by phone. Booking a consultation used
+     * an exact string match, so a number typed with spaces created a second
+     * customer - and with it a second free consultation, a second purchase
+     * history and a second debt.
+     */
+    public static function findByPhone(?string $phone): ?self
+    {
+        $normalised = static::normalisePhone($phone);
+
+        return $normalised === null
+            ? null
+            : static::where('phone_normalised', $normalised)->first();
+    }
+
+    public function scopeWithPhone($query, ?string $phone)
+    {
+        return $query->where('phone_normalised', static::normalisePhone($phone));
+    }
+
+    /**
+     * Keep the comparable form in step with whatever was typed.
+     *
+     * On the model rather than at each call site: a customer is created from
+     * the till, the cashier's screen, the shop's booking form and its sign-up
+     * page, and the one that forgot would quietly reintroduce the duplicates.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $customer) {
+            if ($customer->isDirty('phone')) {
+                $customer->phone_normalised = static::normalisePhone($customer->phone);
+            }
+        });
+    }
 
     public function isWholesale(): bool
     {

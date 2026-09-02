@@ -62,7 +62,10 @@ class Book extends Component
     {
         $phone = trim($this->phone);
 
-        return $phone === '' ? null : Customer::where('phone', $phone)->first();
+        // Any spelling of the number finds the same person. An exact match
+        // made 0803... and +234803... two customers, each with their own free
+        // consultation - which is the whole allowance, leaking.
+        return $phone === '' ? null : Customer::findByPhone($phone);
     }
 
     public function isFree(): bool
@@ -104,10 +107,13 @@ class Book extends Component
         ]);
 
         $appointment = DB::transaction(function () {
-            $customer = Customer::firstOrCreate(
-                ['phone' => trim($this->phone)],
-                ['name' => strtoupper(trim($this->name)), 'type' => 'retail'],
-            );
+            // Matched on the comparable form, created with the number as it
+            // was typed - that is what staff recognise and what gets printed.
+            $customer = Customer::findByPhone($this->phone) ?? Customer::create([
+                'phone' => trim($this->phone),
+                'name'  => strtoupper(trim($this->name)),
+                'type'  => 'retail',
+            ]);
 
             // Priced here, inside the transaction, so two bookings made at once
             // cannot both be told they are the free one.
