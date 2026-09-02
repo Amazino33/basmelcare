@@ -10,8 +10,11 @@ class Product extends Model
     private static ?float $defaultMarkup = null;
 
     protected $fillable = [
-        'name', 'sku', 'category_id', 'selling_price', 'wholesale_price',
+        'name', 'unit', 'sku', 'category_id', 'selling_price', 'wholesale_price',
         'wholesale_min_qty', 'wholesale_markup_percent', 'reorder_level', 'description', 'image', 'barcode',
+        // The shop reads these to describe a pack; kept fillable so the two
+        // apps' models agree about what a product is.
+        'has_pack', 'pack_size', 'pack_price',
         'requires_prescription', 'is_featured', 'show_in_shop',
     ];
 
@@ -145,6 +148,67 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * How a single one of this product is described.
+     *
+     * The list is fixed rather than typed free, so "tablet", "Tablets" and
+     * "tabs" cannot all end up on the shop for the same kind of thing.
+     */
+    public const UNITS = [
+        'tablet'      => 'Tablet',
+        'capsule'     => 'Capsule',
+        'sachet'      => 'Sachet',
+        'strip'       => 'Strip',
+        'bottle'      => 'Bottle',
+        'tube'        => 'Tube',
+        'vial'        => 'Vial',
+        'ampoule'     => 'Ampoule',
+        'suppository' => 'Suppository',
+        'piece'       => 'Piece',
+        'pair'        => 'Pair',
+        'roll'        => 'Roll',
+    ];
+
+    /**
+     * The word for one of these, pluralised for a quantity.
+     *
+     * Falls back to nothing rather than to a guess: most products are sold as
+     * whole items and saying "1 each" is worse than saying nothing at all.
+     */
+    public function unitLabel(int $quantity = 1): ?string
+    {
+        if (! $this->unit || ! array_key_exists($this->unit, static::UNITS)) {
+            return null;
+        }
+
+        return \Illuminate\Support\Str::plural(strtolower(static::UNITS[$this->unit]), $quantity);
+    }
+
+    /**
+     * What the shop price buys - "per tablet", or nothing for a whole item.
+     *
+     * A bare ₦50 beside a picture of a box reads as the price of the box.
+     */
+    public function priceUnitLabel(): ?string
+    {
+        $unit = $this->unitLabel();
+
+        return $unit ? 'per ' . $unit : null;
+    }
+
+    /** "Pack of 10 tablets", for a product that is also sold sealed. */
+    public function packLabel(): ?string
+    {
+        if (! $this->has_pack || ! $this->pack_size) {
+            return null;
+        }
+
+        $size = (int) $this->pack_size;
+        $unit = $this->unitLabel($size);
+
+        return 'Pack of ' . $size . ($unit ? ' ' . $unit : '');
     }
 
     public function batches()

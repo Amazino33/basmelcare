@@ -36,8 +36,25 @@
                 <span class="text-2xl md:text-3xl font-bold text-primary">
                     @if($product->hasWholesaleDiscount())<span class="text-base font-normal text-base-content/40 line-through mr-2">&#8358;{{ number_format($product->selling_price, 2) }}</span>@endif&#8358;{{ number_format($product->shopPrice(), 2) }}
                 </span>
+                @if($product->priceUnitLabel())
+                    <span class="text-base font-normal text-base-content/60">{{ $product->priceUnitLabel() }}</span>
+                @endif
+
                 @if($product->hasWholesaleDiscount())
                     <div class="text-xs text-success mt-1">Wholesale price, applied to your account.</div>
+                @endif
+
+                {{-- Where the same thing is also sold sealed, say so and say
+                     what it costs. Somebody wanting a full course should not
+                     have to work out that ten of these is a packet. --}}
+                @if($product->packLabel() && $product->pack_price)
+                    <div class="mt-2 inline-flex items-center gap-2 rounded-lg border border-base-300 bg-base-200/50 px-3 py-1.5 text-sm">
+                        <x-icon name="o-squares-2x2" class="w-4 h-4 text-base-content/50" />
+                        <span>{{ $product->packLabel() }} &mdash;
+                            <strong class="text-primary">&#8358;{{ number_format($product->pack_price, 2) }}</strong>
+                        </span>
+                        <span class="text-xs text-base-content/50">ask at the counter</span>
+                    </div>
                 @endif
             </div>
 
@@ -117,7 +134,7 @@
                         </figure>
                         <div class="p-2">
                             <h3 class="text-xs font-semibold line-clamp-2">{{ $related->name }}</h3>
-                            <span class="text-primary font-bold text-sm">@if($related->hasWholesaleDiscount())<span class="text-xs text-base-content/40 line-through mr-1">&#8358;{{ number_format($related->selling_price, 0) }}</span>@endif&#8358;{{ number_format($related->shopPrice(), 0) }}</span>
+                            <span class="text-primary font-bold text-sm">@if($related->hasWholesaleDiscount())<span class="text-xs text-base-content/40 line-through mr-1">&#8358;{{ number_format($related->selling_price, 0) }}</span>@endif&#8358;{{ number_format($related->shopPrice(), 0) }}@if($related->priceUnitLabel())<span class="block text-[11px] font-normal text-base-content/60">{{ $related->priceUnitLabel() }}</span>@endif</span>
                         </div>
                     </a>
                 @endforeach

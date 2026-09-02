@@ -136,6 +136,16 @@
                 </div>
 
                 <x-input label="Product Name" wire:model="name" />
+
+                {{-- Only for things broken out of their packet and sold one at
+                     a time. Left blank, the shop shows a plain price, which is
+                     right for a bottle or a thermometer. --}}
+                <x-select label="Sold as" wire:model="unit"
+                          :options="collect(\App\Models\Product::UNITS)->map(fn($label, $value) => ['id' => $value, 'name' => $label])->values()"
+                          option-value="id" option-label="name"
+                          placeholder="Whole item — no unit needed"
+                          hint="Set this for anything sold loose, so the shop can say &quot;per tablet&quot; rather than a bare price." />
+
                 <x-input label="SKU" wire:model="sku" placeholder="Optional" />
                 <x-select label="Category" wire:model="category_id" :options="$categories" option-value="id" option-label="name" placeholder="Select category" />
 

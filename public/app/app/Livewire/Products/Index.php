@@ -39,6 +39,15 @@ class Index extends Component
 
     // Product form
     public string $name = '';
+
+    /**
+     * What one of these is, when it is sold loose.
+     *
+     * Left empty for anything sold whole. It exists so the shop can say "per
+     * tablet" - a bare price beside a picture of a box reads as the price of
+     * the box.
+     */
+    public ?string $unit = null;
     public ?string $sku = null;
     public ?int $category_id = null;
     public string $selling_price = '';
@@ -283,7 +292,7 @@ class Index extends Component
     {
         if ($this->blockedFromCatalogue()) return;
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'unit', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
 
@@ -320,6 +329,7 @@ class Index extends Component
 
         $data = [
             'name' => $this->name,
+            'unit' => $this->unit ?: null,
             'sku' => $this->sku,
             'category_id' => $this->category_id,
             'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
@@ -360,7 +370,7 @@ class Index extends Component
             $data
         );
 
-        $this->reset(['name', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->reset(['name', 'unit', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
 
         if ($isNew) {
             $this->success('Product saved. Add another or click Done.');
@@ -378,6 +388,7 @@ class Index extends Component
         $product = Product::findOrFail($id);
         $this->productId = $product->id;
         $this->name = $product->name;
+        $this->unit = $product->unit;
         $this->sku = $product->sku;
         $this->category_id = $product->category_id;
         $this->selling_price = $product->selling_price;

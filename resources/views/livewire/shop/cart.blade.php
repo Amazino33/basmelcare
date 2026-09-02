@@ -22,7 +22,12 @@
                             <div class="flex justify-between items-start">
                                 <div class="min-w-0 flex-1">
                                     <h3 class="font-semibold text-sm truncate">{{ $item['name'] }}</h3>
-                                    <div class="text-primary font-bold text-sm mt-0.5">₦{{ number_format($item['price'], 2) }}</div>
+                                    <div class="text-primary font-bold text-sm mt-0.5">
+                                        ₦{{ number_format($item['price'], 2) }}
+                                        @if($item['price_unit_label'] ?? null)
+                                            <span class="font-normal text-xs text-base-content/60">{{ $item['price_unit_label'] }}</span>
+                                        @endif
+                                    </div>
                                     @if($item['requires_prescription'] ?? false)
                                         <span class="badge badge-error badge-xs mt-1">Rx Required</span>
                                     @endif
@@ -36,7 +41,9 @@
                             <div class="flex items-center justify-between mt-2">
                                 <div class="flex items-center border border-base-300 rounded-lg">
                                     <button wire:click="updateQuantity({{ $item['product_id'] }}, {{ $item['quantity'] - 1 }})" class="btn btn-ghost btn-xs btn-square">−</button>
-                                    <span class="w-8 text-center text-sm font-bold">{{ $item['quantity'] }}</span>
+                                    <span class="text-center text-sm font-bold px-2 whitespace-nowrap">
+                                        {{ $item['quantity'] }}@if($item['unit'] ?? null)<span class="font-normal text-xs text-base-content/60"> {{ Str::plural($item['unit'], $item['quantity']) }}</span>@endif
+                                    </span>
                                     <button wire:click="updateQuantity({{ $item['product_id'] }}, {{ $item['quantity'] + 1 }})" class="btn btn-ghost btn-xs btn-square">+</button>
                                 </div>
                                 <span class="font-bold text-sm">₦{{ number_format($item['price'] * $item['quantity'], 2) }}</span>

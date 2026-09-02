@@ -74,6 +74,10 @@ class CartService
                 'price'                 => $product->getPriceFor($customer, $quantity),
                 'retail_price'          => (float) $product->selling_price,
                 'image'                 => $product->image,
+                // What one of these is, so the basket can say "3 tablets"
+                // rather than a bare 3, and the price can say what it buys.
+                'unit'                  => $product->unitLabel(),
+                'price_unit_label'      => $product->priceUnitLabel(),
                 'quantity'              => $quantity,
                 'requires_prescription' => (bool) $product->requires_prescription,
                 'max_stock'             => $stock,

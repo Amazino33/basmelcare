@@ -51,6 +51,13 @@
                     </span>
                 @endif
                 &#8358;{{ number_format($product->shopPrice(), 0) }}
+                {{-- ₦50 beside a picture of a box reads as the price of the
+                     box. Said plainly wherever a price appears. --}}
+                @if($product->priceUnitLabel())
+                    <span class="block text-[11px] font-normal text-base-content/60 tracking-normal">
+                        {{ $product->priceUnitLabel() }}
+                    </span>
+                @endif
             </span>
 
             @if($stock > 0)
