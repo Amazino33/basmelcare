@@ -37,6 +37,10 @@ class Index extends Component
     #[Url]
     public string $stockFilter = '';
 
+    /** all | visible | hidden — which products the shop is showing. */
+    #[Url]
+    public string $shopFilter = 'all';
+
     // Product form
     public string $name = '';
 
@@ -48,6 +52,16 @@ class Index extends Component
      * the box.
      */
     public ?string $unit = null;
+
+    /**
+     * Whether customers can see this on the online shop.
+     *
+     * Defaults to on, because that is the column's default and every product
+     * in the catalogue is already published under it. Turning it off is how a
+     * pharmacy keeps something to the counter - a controlled item, something
+     * dispensed only on advice, or a line it does not want strangers ordering.
+     */
+    public bool $show_in_shop = true;
     public ?string $sku = null;
     public ?int $category_id = null;
     public string $selling_price = '';
@@ -292,6 +306,7 @@ class Index extends Component
     {
         if ($this->blockedFromCatalogue()) return;
 
+        $this->show_in_shop = true;
         $this->reset(['name', 'unit', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
         $this->productModal = true;
     }
@@ -330,6 +345,7 @@ class Index extends Component
         $data = [
             'name' => $this->name,
             'unit' => $this->unit ?: null,
+            'show_in_shop' => $this->show_in_shop,
             'sku' => $this->sku,
             'category_id' => $this->category_id,
             'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
@@ -370,6 +386,7 @@ class Index extends Component
             $data
         );
 
+        $this->show_in_shop = true;
         $this->reset(['name', 'unit', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
 
         if ($isNew) {
@@ -381,6 +398,29 @@ class Index extends Component
         }
     }
 
+    /**
+     * Publish or unpublish one product without opening the form.
+     *
+     * With a catalogue this size, doing it through the form one product at a
+     * time is not a feature anybody would use.
+     */
+    public function toggleShopVisibility(int $id): void
+    {
+        if ($this->blockedFromCatalogue()) return;
+
+        $product = Product::findOrFail($id);
+        $product->update(['show_in_shop' => ! $product->show_in_shop]);
+
+        $this->success($product->show_in_shop
+            ? $product->name . ' is now on the online shop.'
+            : $product->name . ' is hidden from the online shop. It can still be sold at the counter.');
+    }
+
+    public function updatedShopFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function editProduct($id)
     {
         if ($this->blockedFromCatalogue()) return;
@@ -389,6 +429,7 @@ class Index extends Component
         $this->productId = $product->id;
         $this->name = $product->name;
         $this->unit = $product->unit;
+        $this->show_in_shop = (bool) $product->show_in_shop;
         $this->sku = $product->sku;
         $this->category_id = $product->category_id;
         $this->selling_price = $product->selling_price;
@@ -507,6 +548,8 @@ class Index extends Component
         $products = Product::with('category', 'batches')
             ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%")
                 ->orWhere('barcode', 'like', "%{$this->search}%"))
+            ->when($this->shopFilter === 'visible', fn($q) => $q->where('show_in_shop', true))
+            ->when($this->shopFilter === 'hidden', fn($q) => $q->where('show_in_shop', false))
             ->when($this->stockFilter === 'out_of_stock', fn($q) =>
                 $q->whereDoesntHave('batches', fn($bq) => $bq->where('quantity', '>', 0))
             )
@@ -528,6 +571,8 @@ class Index extends Component
             'products'    => $products,
             'categories'  => $categories,
             'viewProduct' => $viewProduct,
+            'onShopCount' => Product::where('show_in_shop', true)->count(),
+            'hiddenCount' => Product::where('show_in_shop', false)->count(),
         ]);
     }
 }

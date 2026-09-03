@@ -12,6 +12,23 @@
         </x-slot:actions>
     </x-header>
 
+        {{-- Which of these the public shop is showing. Every product is
+             published by default, so this is how a pharmacy keeps something to
+             the counter. --}}
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            @foreach([
+                'all'     => ['All products', $onShopCount + $hiddenCount],
+                'visible' => ['On the shop', $onShopCount],
+                'hidden'  => ['Hidden', $hiddenCount],
+            ] as $key => [$label, $count])
+                <button type="button" wire:click="$set('shopFilter', '{{ $key }}')"
+                    class="btn btn-sm {{ $shopFilter === $key ? 'btn-primary' : 'btn-ghost bg-base-200' }}">
+                    {{ $label }}
+                    <span class="badge badge-sm {{ $shopFilter === $key ? 'badge-neutral' : 'badge-ghost' }}">{{ $count }}</span>
+                </button>
+            @endforeach
+        </div>
+
         {{-- Normal table --}}
         <x-table :headers="$headers" :rows="$products" with-pagination>
             @scope('cell_image', $product)
@@ -59,6 +76,13 @@
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
                     @if($mayEditCatalogue)
+                    {{-- One tap rather than opening the form: doing this
+                         product by product through a modal is not something
+                         anybody would sit and do. --}}
+                    <x-button icon="{{ $product->show_in_shop ? 'o-globe-alt' : 'o-eye-slash' }}"
+                              wire:click="toggleShopVisibility({{ $product->id }})"
+                              class="btn-xs btn-ghost {{ $product->show_in_shop ? 'text-success' : 'text-base-content/40' }}"
+                              tooltip="{{ $product->show_in_shop ? 'On the online shop — tap to hide' : 'Hidden from the online shop — tap to show' }}" />
                     <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
                     <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
                     <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
@@ -269,6 +293,19 @@
             </div>
 
             <x-textarea label="Description" wire:model="description" placeholder="Optional" rows="2" />
+
+            {{-- ── The online shop ───────────────────────────────────── --}}
+            <div class="rounded-lg border border-base-300 p-3">
+                <x-toggle label="Show on the online shop" wire:model.live="show_in_shop"
+                          hint="On by default. Turn it off to keep this one to the counter." />
+
+                @unless($show_in_shop)
+                    <p class="text-xs text-base-content/60 mt-2">
+                        Customers will not find this online, and it disappears from any
+                        category listing. It can still be sold at the till as normal.
+                    </p>
+                @endunless
+            </div>
 
             <x-slot:actions>
                 <x-button :label="$productId ? 'Cancel' : 'Done'" @click="$wire.productModal = false" />

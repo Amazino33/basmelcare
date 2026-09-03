@@ -18,6 +18,12 @@ class Show extends Component
 
     public function mount(Product $product)
     {
+        // A product kept back from the shop has to be kept back everywhere on
+        // it. Hiding it from the listings while its own page still answers
+        // makes the setting a suggestion: anybody with the link - a bookmark,
+        // a shared message, a tab left open - could still order it.
+        abort_unless($product->show_in_shop, 404);
+
         $this->product = $product->load('category', 'batches');
     }
 
@@ -34,6 +40,14 @@ class Show extends Component
 
     public function addToCart()
     {
+        // Checked again here rather than trusted from mount: the page can have
+        // been open since before the product was taken off the shop.
+        if (! $this->product->fresh()?->show_in_shop) {
+            $this->warning('That one is no longer available online. Please ask at the counter.');
+
+            return;
+        }
+
         $cart = new CartService();
         $cart->add($this->product->id, $this->quantity);
         $this->success($this->product->name . ' added to cart.');
@@ -42,8 +56,14 @@ class Show extends Component
 
     public function buyNow()
     {
-        $cart = new CartService();
-        $cart->add($this->product->id, $this->quantity);
+        // Same door, same lock. addToCart already refuses a product taken off
+        // the shop, and going straight to the basket must not be a way round it.
+        $this->addToCart();
+
+        if (! $this->product->fresh()?->show_in_shop) {
+            return;
+        }
+
         $this->redirect('/cart');
     }
 
