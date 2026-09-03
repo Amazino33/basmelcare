@@ -60,6 +60,19 @@
 /* maryUI */
 @source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
 
+/*
+ * Laravel's own pagination markup.
+ *
+ * It lives in vendor/, and Tailwind only generates classes for files it is
+ * told to look at - so every class in it was missing from the stylesheet and
+ * the paging controls under every list rendered unstyled. Nothing in the app's
+ * own source references those classes, which is why nobody could find them by
+ * searching for one.
+ */
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../../vendor/livewire/livewire/src/Features/SupportPagination/views/*.blade.php";
+
+
 /* Theme toggle */
 @custom-variant dark (&:where(.dark, .dark *));
 
