@@ -233,15 +233,29 @@ class Product extends Model
      * "tabs" cannot all end up on the shop for the same kind of thing.
      */
     public const UNITS = [
+        // What one of a loose product is.
         'tablet'      => 'Tablet',
         'capsule'     => 'Capsule',
         'sachet'      => 'Sachet',
+        'suppository' => 'Suppository',
+
+        // Sealed quantities sold whole. A product sold only by the card has a
+        // card as its unit - stock is counted in cards and the shop says "per
+        // card". This is the common case here: some drugs go out by the
+        // tablet, some by the card, some by the pack, and the word has to
+        // match how that particular one is actually sold.
         'strip'       => 'Strip',
+        'card'        => 'Card',
+        'pack'        => 'Pack',
+        'tin'         => 'Tin',
+        'box'         => 'Box',
+        'carton'      => 'Carton',
+
+        // Whole items.
         'bottle'      => 'Bottle',
         'tube'        => 'Tube',
         'vial'        => 'Vial',
         'ampoule'     => 'Ampoule',
-        'suppository' => 'Suppository',
         'piece'       => 'Piece',
         'pair'        => 'Pair',
         'roll'        => 'Roll',

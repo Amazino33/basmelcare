@@ -162,4 +162,51 @@ class ProductUnitTest extends TestCase
 
         Livewire::test(\App\Livewire\Shop\Home::class)->assertDontSee('per each');
     }
+
+    // ── how this pharmacy actually sells ────────────────────────────────
+
+    public static function theWaysThingsAreSoldHere(): array
+    {
+        // Some drugs go out by the tablet, some by the card, some by the pack.
+        // The word has to match how that particular one is really sold, or the
+        // price beside it means nothing.
+        return [
+            'by the tablet' => ['tablet', 'per tablet', 'tablets'],
+            'by the card'   => ['card',   'per card',   'cards'],
+            'by the pack'   => ['pack',   'per pack',   'packs'],
+            'by the tin'    => ['tin',    'per tin',    'tins'],
+            'by the box'    => ['box',    'per box',    'boxes'],
+            'by the carton' => ['carton', 'per carton', 'cartons'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('theWaysThingsAreSoldHere')]
+    public function test_the_shop_says_what_the_price_buys(string $unit, string $perLabel, string $plural): void
+    {
+        $product = $this->product(['unit' => $unit]);
+
+        $this->assertSame($perLabel, $product->priceUnitLabel());
+        $this->assertSame($plural, $product->unitLabel(3));
+    }
+
+    public function test_a_product_sold_only_by_the_card_is_counted_in_cards(): void
+    {
+        // Nothing here converts between levels. A product whose unit is a card
+        // has cards on the shelf, and the number in stock is a number of cards.
+        $product = $this->product(['unit' => 'card']);
+
+        $this->assertSame('per card', $product->priceUnitLabel());
+        $this->assertSame(200, (int) $product->batches->sum('quantity'));
+    }
+
+    public function test_something_sold_loose_can_still_offer_a_sealed_quantity(): void
+    {
+        // The other case: sold by the tablet, and also by the card of ten.
+        $product = $this->product([
+            'unit' => 'tablet', 'has_pack' => true, 'pack_size' => 10, 'pack_price' => 45,
+        ]);
+
+        $this->assertSame('per tablet', $product->priceUnitLabel());
+        $this->assertSame('Pack of 10 tablets', $product->packLabel());
+    }
 }
