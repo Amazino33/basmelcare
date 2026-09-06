@@ -12,7 +12,7 @@ class PaystackController extends Controller
     public function pay(Order $order)
     {
         if ($order->payment_status === 'paid') {
-            return redirect('/order/' . $order->id . '/confirmation');
+            return redirect(route('order.status', $order->public_token));
         }
 
         $paystackKey = AppSetting::get('paystack_public_key', '');
@@ -46,7 +46,7 @@ class PaystackController extends Controller
                         'paid_at' => now(),
                     ]);
 
-                    return redirect('/order/' . $order->id . '/confirmation');
+                    return redirect(route('order.status', $order->public_token));
                 }
             }
         }

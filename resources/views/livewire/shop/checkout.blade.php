@@ -89,13 +89,18 @@
                     <div class="card bg-base-100 border border-base-200 p-4">
                         <h2 class="font-semibold mb-3">Fulfillment Method</h2>
                         <div class="flex gap-2">
-                            <button wire:click="$set('fulfillment_type', 'delivery')" @class([
-                                'btn btn-sm flex-1',
-                                'btn-primary' => $fulfillment_type === 'delivery',
-                                'btn-ghost border border-base-300' => $fulfillment_type !== 'delivery',
-                            ])>
-                                <x-icon name="o-truck" class="w-4 h-4" /> Delivery
-                            </button>
+                            {{-- Hidden rather than shown and refused when the
+                                 pharmacy is not delivering: a choice that
+                                 cannot be taken is not a choice. --}}
+                            @if($deliveryOffered)
+                                <button wire:click="$set('fulfillment_type', 'delivery')" @class([
+                                    'btn btn-sm flex-1',
+                                    'btn-primary' => $fulfillment_type === 'delivery',
+                                    'btn-ghost border border-base-300' => $fulfillment_type !== 'delivery',
+                                ])>
+                                    <x-icon name="o-truck" class="w-4 h-4" /> Delivery
+                                </button>
+                            @endif
                             <button wire:click="$set('fulfillment_type', 'pickup')" @class([
                                 'btn btn-sm flex-1',
                                 'btn-primary' => $fulfillment_type === 'pickup',
@@ -107,6 +112,37 @@
 
                         @if($fulfillment_type === 'delivery')
                             <div class="space-y-3 mt-4">
+                                {{-- Asked before the address, because it is
+                                     what decides the fee, and the customer
+                                     should see that figure while they are
+                                     still deciding. --}}
+                                @if($zones->count() > 1)
+                                    <div>
+                                        <label class="label"><span class="label-text font-semibold text-sm">Delivery Area</span></label>
+                                        <select wire:model.live="delivery_zone_id" class="select w-full select-sm">
+                                            <option value="">Choose your area</option>
+                                            @foreach($zones as $zone)
+                                                <option value="{{ $zone->id }}">
+                                                    {{ $zone->name }} — {{ $zone->fee > 0 ? '₦' . number_format($zone->fee, 0) : 'Free' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('delivery_zone_id') <span class="text-error text-xs">Choose the area you want this delivered to.</span> @enderror
+
+                                        @if($chosenZone?->note)
+                                            <p class="text-xs text-base-content/60 mt-1">{{ $chosenZone->note }}</p>
+                                        @endif
+                                    </div>
+                                @elseif($chosenZone?->note)
+                                    <p class="text-xs text-base-content/60">{{ $chosenZone->note }}</p>
+                                @endif
+
+                                @if($freeOver > 0 && $subtotal < $freeOver)
+                                    <p class="text-xs text-success">
+                                        Spend ₦{{ number_format($freeOver - $subtotal, 0) }} more and delivery is free.
+                                    </p>
+                                @endif
+
                                 <div>
                                     <label class="label"><span class="label-text font-semibold text-sm">Delivery Address</span></label>
                                     <textarea wire:model="delivery_address" class="textarea textarea-bordered w-full text-sm" rows="2" placeholder="Full delivery address" required></textarea>
@@ -204,8 +240,23 @@
                             @endif
 
                             <div class="flex justify-between">
-                                <span class="text-base-content/60">Delivery</span>
-                                <span>{{ $deliveryFee > 0 ? '₦' . number_format($deliveryFee, 2) : 'Free' }}</span>
+                                <span class="text-base-content/60">
+                                    Delivery
+                                    @if($fulfillment_type === 'delivery' && $chosenZone)
+                                        <span class="block text-xs">{{ $chosenZone->name }}</span>
+                                    @endif
+                                </span>
+                                <span>
+                                    @if($fulfillment_type !== 'delivery')
+                                        —
+                                    @elseif(! $chosenZone)
+                                        <span class="text-base-content/50">Choose an area</span>
+                                    @elseif($deliveryFee > 0)
+                                        ₦{{ number_format($deliveryFee, 2) }}
+                                    @else
+                                        <span class="text-success">Free</span>
+                                    @endif
+                                </span>
                             </div>
                             <div class="flex justify-between font-bold text-base border-t border-base-200 pt-2">
                                 <span>Total</span>

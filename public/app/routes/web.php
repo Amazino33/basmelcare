@@ -19,6 +19,9 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         Route::middleware('role:admin,branch_manager,sales')->group(function () {
             Route::get('pos', App\Livewire\Pos\Index::class)->name('pos.index');
             Route::get('online-orders', App\Livewire\OnlineOrders\Index::class)->name('online-orders.index');
+            // Sales can see what the shop charges to deliver where; only a
+            // manager can change it, which the component enforces.
+            Route::get('delivery-areas', App\Livewire\Delivery\Zones::class)->name('delivery.zones');
             Route::get('stock/take', App\Livewire\StockTake\Index::class)->name('stock-take.index');
             Route::get('stock/take/{stockTake}', App\Livewire\StockTake\Show::class)->name('stock-take.show');
         });
@@ -103,6 +106,13 @@ Route::prefix(config('app.desk_prefix'))->group(function () {
         // Reports — revenue, profit and CSV exports
         Route::middleware('role:admin,branch_manager,auditor')->group(function () {
             Route::get('reports', App\Livewire\Reports\Index::class)->name('reports.index');
+        });
+
+        // Delivery fees are revenue, so the auditor reads this alongside the
+        // rest of the money. Sales are here too - they dispatch, and knowing
+        // what is still out is their job.
+        Route::middleware('role:admin,branch_manager,auditor,sales')->group(function () {
+            Route::get('delivery-report', App\Livewire\Delivery\Report::class)->name('delivery.report');
         });
 
         // The printed Top Products sheet shows margin, so it is narrower than

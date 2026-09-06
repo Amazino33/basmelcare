@@ -183,14 +183,17 @@
                         <div class="text-right">
                             <div class="font-bold text-primary">₦{{ number_format($order->total_amount, 2) }}</div>
                             <div class="flex gap-1 mt-1">
+                                {{-- The pharmacy's own word for the stage is
+                                     written for the shelf, not for somebody
+                                     waiting at home. --}}
                                 <span @class([
                                     'badge badge-xs',
                                     'badge-warning' => $order->status === 'pending',
-                                    'badge-info' => $order->status === 'processing',
+                                    'badge-info' => in_array($order->status, ['processing', 'dispatched']),
                                     'badge-primary' => $order->status === 'ready',
                                     'badge-success' => $order->status === 'completed',
                                     'badge-error' => $order->status === 'cancelled',
-                                ])>{{ ucfirst($order->status) }}</span>
+                                ])>{{ $order->progressLabel() }}</span>
                                 <span @class([
                                     'badge badge-xs',
                                     'badge-warning' => $order->payment_status === 'pending',
@@ -207,9 +210,30 @@
                             </div>
                         @endforeach
                     </div>
-                    @if($order->payment_status === 'pending' && $order->payment_method === 'paystack')
-                        <a href="{{ route('order.pay', $order->id) }}" class="btn btn-primary btn-sm btn-block mt-3">Pay Now</a>
+                    {{-- Who is bringing it. A customer with a rider's number
+                         does not have to ring the pharmacy to ask where their
+                         medicine is. --}}
+                    @if($order->isOnItsWay() && $order->delivery_person_name)
+                        <div class="flex items-center gap-2 mt-3 p-2 rounded-lg bg-info/10 text-xs">
+                            <x-icon name="o-truck" class="w-4 h-4 shrink-0 text-info" />
+                            <span>
+                                <span class="font-semibold">{{ $order->delivery_person_name }}</span>
+                                is bringing this
+                                @if($order->delivery_area) to {{ $order->delivery_area }} @endif
+                                @if($order->delivery_person_phone)
+                                    — <a href="tel:{{ $order->delivery_person_phone }}" class="link">{{ $order->delivery_person_phone }}</a>
+                                @endif
+                            </span>
+                        </div>
                     @endif
+
+                    @if($order->payment_status === 'pending' && $order->payment_method === 'paystack')
+                        <a href="{{ route('order.pay', $order->public_token) }}" class="btn btn-primary btn-sm btn-block mt-3">Pay Now</a>
+                    @endif
+
+                    <a href="{{ route('order.status', $order->public_token) }}" class="btn btn-ghost btn-sm btn-block mt-2">
+                        Track this order
+                    </a>
                 </div>
             @empty
                 <div class="text-center py-8 text-base-content/60">

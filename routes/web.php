@@ -25,8 +25,22 @@ Route::middleware('guest:customer')->group(function () {
 
 // Checkout (guest or logged in)
 Route::get('/checkout', App\Livewire\Shop\Checkout::class)->name('checkout');
-Route::get('/order/{order}/pay', [App\Http\Controllers\PaystackController::class, 'pay'])->name('order.pay');
-Route::get('/order/{order}/confirmation', fn(App\Models\Order $order) => view('public.order-confirmation', ['order' => $order]))->name('order.confirmation');
+// Bound on the token, not the id. These pages have no login in front of
+// them - a guest has no account to log into - so the link itself is what
+// stands between one customer's order and the next. Addressed by id, as they
+// were, anyone could count upwards and read a stranger's order: what they
+// bought, what they paid, and the street it was going to.
+//
+// The binding is set here rather than by overriding getRouteKeyName on the
+// model, which would also reach the staff app's invoice, receipt and
+// prescription-file routes - all of which are bound by id.
+Route::get('/order/{order:public_token}/pay', [App\Http\Controllers\PaystackController::class, 'pay'])->name('order.pay');
+Route::get('/order/{order:public_token}', App\Livewire\Shop\OrderStatus::class)->name('order.status');
+
+// Getting back to an order whose link has been lost. Kept off the /order
+// prefix on purpose: anything under there would have to be excluded from the
+// token pattern, and one day somebody would forget.
+Route::get('/find-order', App\Livewire\Shop\FindOrder::class)->name('order.find');
 
 // Customer portal
 Route::middleware('auth:customer')->group(function () {

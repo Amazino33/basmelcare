@@ -200,7 +200,7 @@
 
                 <div class="border-t border-base-200 pt-2">
                     <div class="flex justify-between text-sm"><span class="text-base-content/60">Subtotal</span><span>₦{{ number_format($viewOrder->subtotal, 2) }}</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-base-content/60">Delivery</span><span>{{ $viewOrder->delivery_fee > 0 ? '₦' . number_format($viewOrder->delivery_fee, 2) : 'Free' }}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-base-content/60">Delivery{{ $viewOrder->delivery_area ? ' — ' . $viewOrder->delivery_area : '' }}</span><span>{{ $viewOrder->delivery_fee > 0 ? '₦' . number_format($viewOrder->delivery_fee, 2) : 'Free' }}</span></div>
                     <div class="flex justify-between font-bold text-base mt-1"><span>Total</span><span class="text-primary">₦{{ number_format($viewOrder->total_amount, 2) }}</span></div>
                 </div>
 

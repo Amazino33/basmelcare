@@ -58,6 +58,7 @@
                         @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'sales']))
                             <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
                             <x-menu-item title="Online Orders" icon="o-globe-alt" link="{{ route('online-orders.index') }}" badge="{{ $onlineOrderCount ?: '' }}" badge-classes="badge-error badge-xs" />
+                            <x-menu-item title="Delivery Areas" icon="o-truck" link="{{ route('delivery.zones') }}" />
                         @endif
                         @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager', 'cashier']))
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
@@ -103,6 +104,10 @@
                 @if(array_intersect($roles,['admin', 'pharmacist', 'branch_manager']))
                     <x-menu-separator />
                     <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
+                @endif
+
+                @if(array_intersect($roles,['admin', 'branch_manager', 'auditor', 'sales']))
+                    <x-menu-item title="Delivery Report" icon="o-map" link="{{ route('delivery.report') }}" />
                 @endif
 
                 @if(in_array('admin', $roles))

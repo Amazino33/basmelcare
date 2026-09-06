@@ -83,8 +83,24 @@
 
             <div class="flex justify-between text-sm mb-3">
                 <span class="text-base-content/60">Delivery</span>
-                <span class="text-base-content/60">Calculated at checkout</span>
+                <span class="text-base-content/60">
+                    @if(! $deliveryOffered)
+                        Collection only
+                    @elseif($freeOver > 0 && $subtotal >= $freeOver)
+                        <span class="text-success">Free</span>
+                    @elseif($cheapestDelivery !== null && $cheapestDelivery > 0)
+                        From ₦{{ number_format($cheapestDelivery, 0) }}
+                    @else
+                        Chosen at checkout
+                    @endif
+                </span>
             </div>
+
+            @if($deliveryOffered && $freeOver > 0 && $subtotal < $freeOver)
+                <p class="text-xs text-success mb-3">
+                    ₦{{ number_format($freeOver - $subtotal, 0) }} more for free delivery.
+                </p>
+            @endif
             <div class="border-t border-base-200 pt-3 flex justify-between">
                 <span class="font-bold">Total</span>
                 <span class="font-bold text-lg text-primary">₦{{ number_format($subtotal, 2) }}</span>

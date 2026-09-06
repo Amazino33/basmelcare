@@ -38,6 +38,11 @@ class Cart extends Component
             'requiresPrescription' => $cart->requiresPrescription(),
             'retailSubtotal' => $cart->retailSubtotal(),
             'hasWholesalePricing' => $cart->hasWholesalePricing(),
+            // What delivery is likely to cost, said here rather than sprung
+            // at the last step of checkout.
+            'cheapestDelivery' => \App\Models\DeliveryZone::active()->min('fee'),
+            'deliveryOffered' => \App\Models\DeliveryZone::deliveryOffered(),
+            'freeOver' => \App\Models\DeliveryZone::freeOver(),
         ]);
     }
 }

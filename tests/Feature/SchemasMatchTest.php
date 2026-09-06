@@ -48,11 +48,14 @@ class SchemasMatchTest extends TestCase
             'credit_balance', 'registered_by',
         ],
         'orders' => [
-            'order_number', 'customer_id', 'subtotal', 'delivery_fee', 'total_amount',
+            'order_number', 'public_token', 'customer_id', 'subtotal', 'delivery_fee', 'total_amount',
             'insurance_covered', 'insurance_subscription_id',
             'prescription_path', 'prescription_status',
             'fulfillment_type', 'payment_method', 'payment_status', 'status',
+            'delivery_fee', 'delivery_zone_id', 'delivery_area',
+            'delivery_address', 'delivery_phone',
         ],
+        'delivery_zones' => ['name', 'fee', 'note', 'is_active', 'sort_order'],
         'sale_returns' => [
             'sale_id', 'processed_by', 'reason', 'total_credit',
             'refund_method', 'refunded_at',

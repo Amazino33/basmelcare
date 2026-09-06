@@ -64,6 +64,7 @@
                         @if(array_intersect($roles,['admin', 'branch_manager', 'sales']))
                             <x-menu-item title="POS" icon="o-shopping-cart" link="{{ route('pos.index') }}" />
                             <x-menu-item title="Online Orders" icon="o-globe-alt" link="{{ route('online-orders.index') }}" badge="{{ $onlineOrderCount ?: '' }}" badge-classes="badge-error badge-xs" />
+                            <x-menu-item title="Delivery Areas" icon="o-truck" link="{{ route('delivery.zones') }}" />
                         @endif
                         @if(array_intersect($roles,['admin', 'branch_manager', 'cashier']))
                             <x-menu-item title="Cashier" icon="o-banknotes" link="{{ route('cashier.index') }}" />
@@ -176,6 +177,7 @@
                     <x-menu-sub title="Finance" icon="o-calculator">
                         <x-menu-item title="Financial Records" icon="o-banknotes" link="{{ route('finance.index') }}" />
                         <x-menu-item title="Reports" icon="o-document-chart-bar" link="{{ route('reports.index') }}" />
+                        <x-menu-item title="Delivery Report" icon="o-map" link="{{ route('delivery.report') }}" />
 
                         @if(\App\Services\InsuranceCover::enabled())
                             <x-menu-item title="Cover Report" icon="o-shield-check" link="{{ route('insurance.report') }}" />

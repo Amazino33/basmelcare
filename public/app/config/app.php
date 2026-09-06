@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public Shop URL
+    |--------------------------------------------------------------------------
+    |
+    | The customer-facing site. Read here rather than through env() at the
+    | call site, because env() returns null once the config is cached and a
+    | link built from it would quietly point at nothing.
+    |
+    */
+
+    'public_site_url' => rtrim(env('PUBLIC_SITE_URL', ''), '/'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

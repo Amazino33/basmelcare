@@ -995,7 +995,7 @@
         <dd>Paystack, or pay on delivery. A Paystack payment is verified by the cashier before the order is prepared.</dd>
 
         <dt>Delivery or collection</dt>
-        <dd>Chosen at checkout. Delivery carries a fee; collection does not.</dd>
+        <dd>Chosen at checkout. The customer picks the area they live in and sees that area&rsquo;s charge before they commit; collection is free. See <strong>Delivery areas</strong>.</dd>
       </dl>
     </section>
 
@@ -1015,6 +1015,53 @@
       </ol>
 
       <p>Cancelling an order that was already marked ready puts the stock back, and gives back any monthly cover it had used.</p>
+
+      <p>Every order has a tracking page of its own, on a link only the customer who placed it holds. It shows the stages as they happen &mdash; received, being prepared, packed, on its way, delivered &mdash; and once dispatched it names whoever is carrying it, with a tap-to-call number. That name and number are worth entering properly: it is the number the customer rings instead of ringing the counter.</p>
+
+      <p>A customer who has lost the link finds it again at <strong>/find-order</strong> with their order number and the phone number they gave. Signed-in customers have all of theirs on their account page.</p>
+
+      <h3>Delivery areas</h3>
+
+      <div class="roles"><span class="label">Set by</span><span class="chip key">admin</span><span class="chip key">branch_manager</span><span class="label">Read by</span><span class="chip key">sales</span></div>
+
+      <p>An area is somewhere the shop is willing to deliver to and the charge for getting there &mdash; &ldquo;Ikeja, &#8358;2,000&rdquo;. The customer picks theirs at checkout, so the charge is a decision the pharmacy makes rather than a surprise at the end.</p>
+
+      <dl class="defs">
+        <dt>Adding one</dt>
+        <dd>Name it the way a customer would name where they live. The note is shown under their choice &mdash; &ldquo;same day if ordered before 4pm&rdquo; belongs there. Position decides the order of the list, so put the busy areas at the top.</dd>
+
+        <dt>Stopping one</dt>
+        <dd>Turn it off. It disappears from checkout and everything already sent there is untouched. An area that has taken orders cannot be deleted, because the shop should still be able to say where a delivery went.</dd>
+
+        <dt>Changing a charge</dt>
+        <dd>Only affects orders placed afterwards. Every order keeps its own copy of what was charged and what the area was called at the time.</dd>
+
+        <dt>Free delivery over</dt>
+        <dd>An order value above which nothing is charged for delivery, whichever area it is going to. Zero switches it off. It is read against the goods, not the total, so the delivery fee can never push an order over its own threshold.</dd>
+
+        <dt>Switching delivery off</dt>
+        <dd>Makes the online shop collection only, without losing the list of areas. Use it when there is nobody to ride.</dd>
+      </dl>
+
+      <h3>Delivery report</h3>
+
+      <div class="roles"><span class="label">Who</span><span class="chip key">admin</span><span class="chip key">branch_manager</span><span class="chip key">auditor</span><span class="chip key">sales</span></div>
+
+      <p>What went out over a date range, broken down by area and by whoever carried it, with a CSV export. It is the page for answering whether the delivery charges cover what the riders cost.</p>
+
+      <p>Two figures are kept apart on purpose, and should not be added together:</p>
+
+      <dl class="defs">
+        <dt>Fees earned</dt>
+        <dd>Fees on deliveries that actually arrived. This is the figure to weigh the riders against.</dd>
+
+        <dt>Still out</dt>
+        <dd>Fees on orders a rider has taken but not yet delivered. Real, but not earned &mdash; the run can still fail.</dd>
+      </dl>
+
+      <p>Cancelled deliveries are in neither: a cancelled run earned nothing. Separately from both, the page warns when fees have been earned on orders still marked unpaid &mdash; pay-on-delivery money the rider has not yet handed in.</p>
+
+      <p>Riders are grouped by the name typed at dispatch, not by a staff account. Two spellings of one person show as two riders, so it is only as careful as the typing.</p>
     </section>
 
     <!-- ============================================================ -->

@@ -200,9 +200,31 @@
 
                 <div class="border-t border-base-200 pt-2">
                     <div class="flex justify-between text-sm"><span class="text-base-content/60">Subtotal</span><span>₦{{ number_format($viewOrder->subtotal, 2) }}</span></div>
-                    <div class="flex justify-between text-sm"><span class="text-base-content/60">Delivery</span><span>{{ $viewOrder->delivery_fee > 0 ? '₦' . number_format($viewOrder->delivery_fee, 2) : 'Free' }}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-base-content/60">Delivery{{ $viewOrder->delivery_area ? ' — ' . $viewOrder->delivery_area : '' }}</span><span>{{ $viewOrder->delivery_fee > 0 ? '₦' . number_format($viewOrder->delivery_fee, 2) : 'Free' }}</span></div>
                     <div class="flex justify-between font-bold text-base mt-1"><span>Total</span><span class="text-primary">₦{{ number_format($viewOrder->total_amount, 2) }}</span></div>
                 </div>
+
+                {{-- The link the customer holds. Staff cannot look an order up
+                     for somebody who rings without it, and reading it out is
+                     the only way to get them back to their own order. --}}
+                @if(config('app.public_site_url') && $viewOrder->public_token)
+                    @php $trackUrl = config('app.public_site_url') . '/order/' . $viewOrder->public_token; @endphp
+
+                    <div class="bg-base-200 rounded-lg p-2 text-xs">
+                        <p class="text-base-content/60 mb-1">Customer's tracking link</p>
+                        <div class="flex items-center gap-1">
+                            <input readonly value="{{ $trackUrl }}" class="input input-xs flex-1 font-mono"
+                                   onclick="this.select()" />
+                            <x-button icon="o-clipboard" class="btn-xs btn-ghost"
+                                      onclick="navigator.clipboard.writeText('{{ $trackUrl }}')"
+                                      tooltip="Copy" />
+                        </div>
+                        <p class="text-base-content/50 mt-1">
+                            Or they can use {{ config('app.public_site_url') }}/find-order
+                            with their order number and phone.
+                        </p>
+                    </div>
+                @endif
 
                 @if($viewOrder->prescription_path)
                     {{-- Through a route, not a storage URL: a prescription is a
