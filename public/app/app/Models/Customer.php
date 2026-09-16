@@ -15,18 +15,30 @@ class Customer extends Authenticatable
     protected $fillable = [
         'name', 'type', 'phone', 'phone_normalised', 'email', 'password', 'address', 'notes',
         'otp', 'otp_expires_at', 'otp_attempts', 'otp_sent_at',
-        'credit_balance', 'registered_by',
+        'credit_balance', 'registered_by', 'broadcast_opt_out_at',
     ];
 
     protected $hidden = ['password', 'remember_token', 'otp'];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'otp_expires_at'    => 'datetime',
-        'otp_sent_at'       => 'datetime',
-        'password'          => 'hashed',
-        'credit_balance'    => 'decimal:2',
+        'email_verified_at'     => 'datetime',
+        'otp_expires_at'        => 'datetime',
+        'otp_sent_at'           => 'datetime',
+        'password'              => 'hashed',
+        'credit_balance'        => 'decimal:2',
+        'broadcast_opt_out_at'  => 'datetime',
     ];
+
+    public function firstName(): string
+    {
+        $parts = preg_split('/\s+/', trim((string) $this->name));
+        return $parts[0] ?? '';
+    }
+
+    public function isOptedOutOfBroadcasts(): bool
+    {
+        return $this->broadcast_opt_out_at !== null;
+    }
 
     /**
      * The comparable form of a phone number.

@@ -21,22 +21,66 @@ use App\Models\Sale;
  */
 class BroadcastSender
 {
-    /** Messages per run. Small enough to return, repeated until done. */
-    public const BATCH = 20;
+    /** Messages per run. 5 messages with anti-ban delays fits safely within web requests. */
+    public const BATCH = 5;
+
+    /** Jitter delay in seconds between messages within a batch (0 in unit tests). */
+    protected int $minDelay = 0;
+    protected int $maxDelay = 0;
 
     public function __construct(protected WhatsAppService $whatsapp) {}
 
     /**
+     * Configure human-like jitter delays between messages in a batch.
+     */
+    public function setPacing(int $minSeconds, int $maxSeconds): static
+    {
+        $this->minDelay = max(0, $minSeconds);
+        $this->maxDelay = max($this->minDelay, $maxSeconds);
+
+        return $this;
+    }
+
+    /**
+     * Resolves dynamic template variables ({name}, {first_name}, {pharmacy})
+     * so each message has unique content and hash signatures, preventing bulk-spam detection.
+     */
+    public function personalizeMessage(string $template, ?Customer $customer): string
+    {
+        $name = trim((string) ($customer?->name ?? ''));
+        if ($name !== '') {
+            // Customer names are stored in UPPERCASE by NormalisesName;
+            // format into Title Case so WhatsApp greetings don't appear in all-caps shouting.
+            $fullName = ucwords(strtolower($name));
+            $firstName = ucfirst(strtolower($customer->firstName()));
+        } else {
+            $fullName = 'Valued Customer';
+            $firstName = 'Valued Customer';
+        }
+
+        $replacements = [
+            '{name}'       => $fullName,
+            '{first_name}' => $firstName,
+            '{firstname}'  => $firstName,
+            '{pharmacy}'   => 'Basmelcare',
+            '{store}'      => 'Basmelcare',
+        ];
+
+        return str_ireplace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    /**
      * Who a broadcast goes to.
      *
-     * A customer with no phone number cannot be messaged, so they are left out
-     * rather than counted and then silently failed.
+     * A customer with no phone number cannot be messaged, so they are left out.
+     * Customers who have opted out (broadcast_opt_out_at) are excluded to prevent spam reports.
      */
     public function audience(string $audience)
     {
         $query = Customer::query()
             ->whereNotNull('phone')
-            ->where('phone', '!=', '');
+            ->where('phone', '!=', '')
+            ->whereNull('broadcast_opt_out_at');
 
         return match ($audience) {
             'wholesale' => $query->where('type', 'wholesale'),
@@ -81,7 +125,7 @@ class BroadcastSender
     }
 
     /**
-     * Send the next batch.
+     * Send the next batch with optional anti-ban jitter delays.
      *
      * @return array{sent: int, whatsapp: int, sms: int, failed: int, remaining: int}
      */
@@ -94,16 +138,25 @@ class BroadcastSender
         $imageUrl = $broadcast->imageUrl();
 
         $pending = $broadcast->recipients()
+            ->with('customer')
             ->where('status', 'pending')
             ->limit($limit)
             ->get();
 
         $tally = ['sent' => 0, 'whatsapp' => 0, 'sms' => 0, 'failed' => 0];
 
+        $index = 0;
         foreach ($pending as $recipient) {
+            if ($index > 0 && $this->maxDelay > 0) {
+                sleep(random_int($this->minDelay, $this->maxDelay));
+            }
+            $index++;
+
+            $personalizedMessage = $this->personalizeMessage($broadcast->message, $recipient->customer);
+
             $result = $this->whatsapp->deliverWithImage(
                 $recipient->phone,
-                $broadcast->message,
+                $personalizedMessage,
                 $imageUrl,
             );
 

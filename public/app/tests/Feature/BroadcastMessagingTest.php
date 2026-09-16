@@ -283,4 +283,71 @@ class BroadcastMessagingTest extends TestCase
 
         $this->assertSame(0, Broadcast::count());
     }
+
+    // ── Anti-Ban & Personalization ─────────────────────────────────────
+
+    public function test_opted_out_customers_are_excluded(): void
+    {
+        $active = $this->customer();
+        $optedOut = $this->customer();
+        $optedOut->update(['broadcast_opt_out_at' => now()]);
+
+        $audience = app(BroadcastSender::class)->audience('all')->get();
+
+        $this->assertTrue($audience->contains('id', $active->id));
+        $this->assertFalse($audience->contains('id', $optedOut->id));
+    }
+
+    public function test_message_personalization_replaces_placeholders(): void
+    {
+        $customer = Customer::create([
+            'name'  => 'Adewale Musa',
+            'type'  => 'retail',
+            'phone' => '08012345678',
+        ]);
+
+        $sender = app(BroadcastSender::class);
+        $result = $sender->personalizeMessage('Hello {first_name}, {name} welcome to {pharmacy}!', $customer);
+
+        $this->assertSame('Hello Adewale, Adewale Musa welcome to Basmelcare!', $result);
+    }
+
+    public function test_message_personalization_handles_null_or_empty_customer_gracefully(): void
+    {
+        $sender = app(BroadcastSender::class);
+        $result = $sender->personalizeMessage('Hello {name}, welcome to {store}!', null);
+
+        $this->assertSame('Hello Valued Customer, welcome to Basmelcare!', $result);
+    }
+
+    public function test_opt_out_footer_is_appended_when_enabled(): void
+    {
+        $this->customer();
+
+        $this->page()
+            ->set('message', 'Promo deal today!')
+            ->set('includeOptOut', true)
+            ->call('create');
+
+        $broadcast = Broadcast::firstOrFail();
+        $this->assertStringContainsString('Reply STOP to opt out.', $broadcast->message);
+    }
+
+    public function test_console_command_sends_broadcast(): void
+    {
+        $this->fakeWhatsApp(WhatsAppService::VIA_WHATSAPP);
+
+        $broadcast = $this->prepared(3);
+
+        $this->artisan('broadcast:send', [
+            'id'          => $broadcast->id,
+            '--batch'     => 2,
+            '--min-delay' => 0,
+            '--max-delay' => 0,
+            '--cooldown'  => 0,
+        ])->assertExitCode(0);
+
+        $this->assertSame(0, $broadcast->pendingCount());
+        $this->assertTrue($broadcast->fresh()->isFinished());
+    }
 }

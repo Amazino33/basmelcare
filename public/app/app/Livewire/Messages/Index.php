@@ -26,10 +26,14 @@ class Index extends Component
 
     public string $message = '';
     public string $audience = 'all';
+    public bool $includeOptOut = true;
     public $photo = null;
 
     /** The broadcast being sent, once it exists. */
     public ?int $sendingId = null;
+
+    /** Controls whether the client-side auto-pacer is active */
+    public bool $isAutoPacing = false;
 
     private function canSend(): bool
     {
@@ -46,6 +50,22 @@ class Index extends Component
         return app(BroadcastSender::class)->audience($this->audience)->count();
     }
 
+    public function getMessagePreviewProperty(): string
+    {
+        if (trim($this->message) === '') {
+            return '';
+        }
+
+        $dummy = new \App\Models\Customer(['name' => 'Adewale Musa']);
+        $text = app(BroadcastSender::class)->personalizeMessage($this->message, $dummy);
+
+        if ($this->includeOptOut && ! str_contains(strtolower($text), 'stop')) {
+            $text .= "\n\nReply STOP to opt out.";
+        }
+
+        return $text;
+    }
+
     public function create(): void
     {
         if (! $this->canSend()) {
@@ -60,13 +80,18 @@ class Index extends Component
             'photo'    => 'nullable|image|max:2048',
         ], [], ['photo' => 'image']);
 
+        $messageText = trim($this->message);
+        if ($this->includeOptOut && ! str_contains(strtolower($messageText), 'stop')) {
+            $messageText .= "\n\nReply STOP to opt out.";
+        }
+
         // Stored where the gateway can fetch it: WhatsApp media is sent as a
         // URL, so the file has to be publicly reachable. Fine for a marketing
         // picture, and the reason patient documents never go near this.
         $path = $this->photo?->store('broadcasts', 'public_site');
 
         $broadcast = Broadcast::create([
-            'message'    => trim($this->message),
+            'message'    => $messageText,
             'image_path' => $path,
             'audience'   => $this->audience,
             'user_id'    => auth()->id(),
@@ -82,9 +107,20 @@ class Index extends Component
         }
 
         $this->sendingId = $broadcast->id;
+        $this->isAutoPacing = false;
         $this->reset(['message', 'photo']);
 
         $this->success($count . ' ' . str('recipient')->plural($count) . ' ready. Send when you are.');
+    }
+
+    public function startAutoPacing(): void
+    {
+        $this->isAutoPacing = true;
+    }
+
+    public function pauseAutoPacing(): void
+    {
+        $this->isAutoPacing = false;
     }
 
     public function sendBatch(): void
@@ -94,22 +130,31 @@ class Index extends Component
         }
 
         $broadcast = Broadcast::findOrFail($this->sendingId);
-        $result    = app(BroadcastSender::class)->sendBatch($broadcast);
+        $sender    = app(BroadcastSender::class);
+
+        // Apply safe anti-ban delay (2 to 4 seconds between messages inside the batch of 5)
+        if (! app()->runningUnitTests()) {
+            $sender->setPacing(2, 4);
+        }
+
+        $result = $sender->sendBatch($broadcast);
 
         if ($result['remaining'] > 0) {
             $this->success(
-                $result['sent'] . ' sent. ' . $result['remaining'] . ' to go - press again to continue.'
+                $result['sent'] . ' sent. ' . $result['remaining'] . ' to go.'
             );
 
             return;
         }
 
+        $this->isAutoPacing = false;
         $this->success('Finished. Everyone has been messaged.');
     }
 
     public function done(): void
     {
         $this->sendingId = null;
+        $this->isAutoPacing = false;
     }
 
     public function render()
