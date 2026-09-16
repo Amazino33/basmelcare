@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturn;
 use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,6 +89,12 @@ class ReturnRestocksTest extends TestCase
         }
 
         $page->call('processReturn');
+
+        if ($saleReturn = SaleReturn::latest('id')->first()) {
+            if ($saleReturn->isPending()) {
+                $saleReturn->finalize($this->staff());
+            }
+        }
     }
 
     // ── the shapes a sale can take ──────────────────────────────────────
@@ -283,6 +290,8 @@ class ReturnRestocksTest extends TestCase
             ->call('openReturn', $sale->id)
             ->set('returnQtys.' . $item->id, 1)
             ->call('processReturn');
+
+        SaleReturn::latest('id')->first()->finalize($this->staff());
 
         $this->assertSame(55, $batch->fresh()->quantity,
             'The returned unit never went back on the shelf.');

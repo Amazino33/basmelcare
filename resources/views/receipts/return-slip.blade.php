@@ -67,7 +67,10 @@
 
     <div class="row"><span>Ref #:</span><span class="bold">{{ $ref }}</span></div>
     <div class="row"><span>Date:</span><span>{{ $saleReturn->created_at->format('d/m/Y H:i') }}</span></div>
-    <div class="row"><span>Processed by:</span><span>{{ $saleReturn->processor->name }}</span></div>
+    <div class="row"><span>Requested by:</span><span>{{ $saleReturn->processor?->name ?? '—' }}</span></div>
+    @if($saleReturn->approver)
+        <div class="row"><span>Approved by:</span><span>{{ $saleReturn->approver->name }}</span></div>
+    @endif
     <div class="row"><span>Original invoice:</span><span>{{ $sale->invoice_number ?? '#' . $sale->id }}</span></div>
 
     <div class="line"></div>

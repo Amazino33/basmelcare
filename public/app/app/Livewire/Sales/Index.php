@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Index extends Component
 {
@@ -149,9 +150,20 @@ class Index extends Component
         }
     }
 
+    public function canTriggerReturn(): bool
+    {
+        return (bool) array_intersect(
+            auth()->user()->role ?? [],
+            ['sales', 'branch_manager', 'admin']
+        );
+    }
+
     public function openReturn(int $saleId): void
     {
-        if ($this->denyUnlessElevated()) return;
+        if (! $this->canTriggerReturn()) {
+            $this->error('Only sales staff, branch managers, or admins can trigger returns.');
+            return;
+        }
 
         $sale = Sale::with('saleItems.product', 'saleItems.batch')->findOrFail($saleId);
 
@@ -179,7 +191,9 @@ class Index extends Component
         $this->returnableQtys  = [];
 
         foreach ($sale->saleItems as $item) {
-            $alreadyReturned               = SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+            $alreadyReturned = SaleReturnItem::where('sale_item_id', $item->id)
+                ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                ->sum('quantity_returned');
             $returnable                    = $item->quantity - $alreadyReturned;
             $this->returnableQtys[$item->id] = max(0, $returnable);
             $this->returnQtys[$item->id]     = 0;
@@ -198,7 +212,10 @@ class Index extends Component
 
     public function processReturn(): void
     {
-        if ($this->denyUnlessElevated()) return;
+        if (! $this->canTriggerReturn()) {
+            $this->error('Only sales staff, branch managers, or admins can trigger returns.');
+            return;
+        }
 
         $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
 
@@ -238,14 +255,17 @@ class Index extends Component
                     'reason'        => $this->returnReason ?: null,
                     'total_credit'  => 0,
                     'refund_method' => $method,
-                    'refunded_at'   => now(),
+                    'status'        => SaleReturn::STATUS_PENDING,
+                    'refunded_at'   => null,
                 ]);
 
                 foreach ($sale->saleItems as $item) {
                     $qty = (int) ($this->returnQtys[$item->id] ?? 0);
                     if ($qty <= 0) continue;
 
-                    $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+                    $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)
+                        ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                        ->sum('quantity_returned');
                     $maxReturnable   = $item->quantity - $alreadyReturned;
 
                     if ($qty > $maxReturnable) {
@@ -269,53 +289,28 @@ class Index extends Component
                         'subtotal'          => $subtotal,
                     ]);
 
-                    // batch_id is NOT NULL on sale_items and its foreign key
-                    // cascades, so a line always has a live batch. Refusing
-                    // rather than skipping matters anyway: silently carrying on
-                    // would pay the refund and leave the goods off the shelf,
-                    // which is exactly the fault that is hard to notice.
                     if (! $item->batch) {
                         throw new \RuntimeException(
                             'The batch "' . ($item->product->name ?? 'item') . '" was sold from no longer exists, '
                             . 'so it cannot be put back. Add the stock by hand and record the refund separately.'
                         );
                     }
-
-                    {
-                        $item->batch->increment('quantity', $qty);
-                        StockMovement::create([
-                            'batch_id'  => $item->batch_id,
-                            'quantity'  => $qty,
-                            'type'      => 'return',
-                            'reference' => "Return from Sale #{$sale->id}",
-                            'user_id'   => auth()->id(),
-                        ]);
-                    }
                 }
 
                 $saleReturn->update(['total_credit' => $totalCredit]);
-
-                // Only a credit refund touches the account. Cash has already
-                // left the drawer by the time the slip prints.
-                if ($method === SaleReturn::CREDIT && $sale->customer_id && $totalCredit > 0) {
-                    $sale->customer->increment('credit_balance', $totalCredit);
-                }
-
                 $saleReturnId = $saleReturn->getKey();
             });
         } catch (\RuntimeException $e) {
             $this->returnError = $e->getMessage();
             return;
         } catch (\Throwable $e) {
-            // Logged, because the alternative is what happened here: a return
-            // reported as not working, with nothing recorded to say why.
-            Log::error('[Return] Sale ' . $sale->invoice_number . ' failed: ' . $e->getMessage(), [
+            Log::error('[Return] Sale ' . $sale->invoice_number . ' request failed: ' . $e->getMessage(), [
                 'sale_id' => $sale->id,
                 'user_id' => auth()->id(),
                 'qtys'    => $this->returnQtys,
             ]);
 
-            $this->returnError = 'Return could not be processed, and nothing was changed. '
+            $this->returnError = 'Return request could not be processed, and nothing was changed. '
                 . 'Please try again, or tell an admin to check the logs.';
             return;
         }
@@ -323,30 +318,12 @@ class Index extends Component
         $this->returnModal  = false;
         $this->returnSaleId = null;
         $this->returnQtys   = [];
-        // Say which it was. "Credited to customer account" on a cash refund
-        // would send the cashier looking for a balance that does not exist.
-        $this->success($method === SaleReturn::CASH
-            ? 'Return processed. Give the customer ₦' . number_format($totalCredit, 2) . ' from the till.'
-            : 'Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
 
-        $this->dispatch('open-return-receipt', url: route('return.receipt', $saleReturnId));
-
-        // A cash refund is settled at the counter and needs no message; there
-        // is also no new balance to quote.
-        $phone = $method === SaleReturn::CREDIT ? $sale->customer?->phone : null;
-        if ($phone && $totalCredit > 0) {
-            try {
-                $pharmacyName  = AppSetting::get('pharmacy_name', 'BasmelCare');
-                $newBalance    = $sale->customer->fresh()->credit_balance;
-                $message = "Hi {$sale->customer->name}, a return of \u{20A6}" . number_format($totalCredit, 2)
-                    . " has been credited to your {$pharmacyName} account."
-                    . " Your new credit balance is \u{20A6}" . number_format($newBalance, 2)
-                    . ". Ref: RT-" . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT) . ".";
-                app(WhatsAppService::class)->send($phone, $message);
-            } catch (\Throwable $e) {
-                Log::error('[WhatsApp Return] ' . $e->getMessage());
-            }
-        }
+        $this->success(
+            'Return request RT-' . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT)
+            . ' submitted for ₦' . number_format($totalCredit, 2)
+            . '. Awaiting approval by an Auditor or Branch Manager.'
+        );
     }
 
     private function periodQuery($query)
@@ -363,6 +340,80 @@ class Index extends Component
             ]),
             default => $query,
         };
+    }
+
+    public function exportSoldItems(): StreamedResponse
+    {
+        $scopeFn = fn($q) => $q;
+        $items = SaleItem::with(['sale.user', 'sale.customer', 'product.category', 'batch'])
+            ->whereHas('sale', function ($q) use ($scopeFn) {
+                $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
+            })
+            ->when($this->search, function ($q) {
+                $term = trim($this->search);
+                $q->where(function ($sub) use ($term) {
+                    $sub->whereHas('product', function ($p) use ($term) {
+                        $p->where('name', 'like', "%{$term}%")
+                          ->orWhere('barcode', 'like', "%{$term}%")
+                          ->orWhere('sku', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('sale', function ($s) use ($term) {
+                        $s->where('invoice_number', 'like', "%{$term}%")
+                          ->orWhere('id', $term)
+                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
+                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
+                    })
+                    ->orWhereHas('batch', function ($b) use ($term) {
+                        $b->where('batch_number', 'like', "%{$term}%");
+                    });
+                });
+            })
+            ->latest('id')
+            ->get();
+
+        $periodSlug = $this->period === 'custom'
+            ? ($this->dateFrom . '-to-' . $this->dateTo)
+            : $this->period;
+        $filename = 'products-sold-' . $periodSlug . '.csv';
+
+        return response()->streamDownload(function () use ($items) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'Time Sold',
+                'Product Name',
+                'Category',
+                'Batch Number',
+                'Quantity Sold',
+                'Packaging',
+                'Unit Price (NGN)',
+                'Subtotal (NGN)',
+                'Invoice #',
+                'Sold By',
+                'Customer',
+                'Payment Method',
+            ]);
+
+            foreach ($items as $item) {
+                $saleTime = $item->sale?->paid_at ?? $item->sale?->created_at ?? $item->created_at;
+                fputcsv($handle, [
+                    $saleTime ? $saleTime->format('Y-m-d H:i:s') : '—',
+                    $item->product?->name ?? '—',
+                    $item->product?->category?->name ?? '—',
+                    $item->batch?->batch_number ?? '—',
+                    $item->quantity,
+                    $item->is_pack ? "Pack ({$item->pack_size})" : 'Loose unit',
+                    $item->unit_price,
+                    $item->subtotal,
+                    $item->sale?->invoice_number ?? ('INV-' . str_pad($item->sale_id, 5, '0', STR_PAD_LEFT)),
+                    $item->sale?->user?->name ?? '—',
+                    $item->sale?->customer?->name ?? 'Walk-in',
+                    ucfirst($item->sale?->payment_method ?? '—'),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function render()
@@ -557,6 +608,49 @@ class Index extends Component
             ? Order::with('customer', 'items.product', 'claimedByUser')->find($this->viewOrderId)
             : null;
 
+        // --- Products Sold (Chronological line-by-line items) ---
+        $itemHeaders = [
+            ['key' => 'sold_at', 'label' => 'Time Sold'],
+            ['key' => 'product.name', 'label' => 'Product'],
+            ['key' => 'batch.batch_number', 'label' => 'Batch'],
+            ['key' => 'quantity', 'label' => 'Qty'],
+            ['key' => 'unit_price', 'label' => 'Price'],
+            ['key' => 'subtotal', 'label' => 'Total'],
+            ['key' => 'sale.user.name', 'label' => 'Sold By'],
+            ['key' => 'sale.customer.name', 'label' => 'Customer'],
+            ['key' => 'sale.invoice_number', 'label' => 'Invoice'],
+            ['key' => 'actions', 'label' => ''],
+        ];
+
+        $soldItemsQuery = SaleItem::with(['sale.user', 'sale.customer', 'product.category', 'batch'])
+            ->whereHas('sale', function ($q) use ($scopeFn) {
+                $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
+            })
+            ->when($this->search, function ($q) {
+                $term = trim($this->search);
+                $q->where(function ($sub) use ($term) {
+                    $sub->whereHas('product', function ($p) use ($term) {
+                        $p->where('name', 'like', "%{$term}%")
+                          ->orWhere('barcode', 'like', "%{$term}%")
+                          ->orWhere('sku', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('sale', function ($s) use ($term) {
+                        $s->where('invoice_number', 'like', "%{$term}%")
+                          ->orWhere('id', $term)
+                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
+                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
+                    })
+                    ->orWhereHas('batch', function ($b) use ($term) {
+                        $b->where('batch_number', 'like', "%{$term}%");
+                    });
+                });
+            });
+
+        $soldItemsCount = (int) (clone $soldItemsQuery)->sum('quantity');
+        $soldItemsTotalValue = (float) (clone $soldItemsQuery)->sum('subtotal');
+        $soldDistinctProductsCount = (int) (clone $soldItemsQuery)->distinct('product_id')->count('product_id');
+        $soldItems = (clone $soldItemsQuery)->latest('id')->paginate(30, ['*'], 'itemsPage');
+
         // --- Returns ---
         // The listing itself lives in Sales\Returns, which the whole pharmacy
         // can reach. Only the tab's badge is needed here.
@@ -591,6 +685,11 @@ class Index extends Component
             'handoverSales'        => $handoverSales,
             'pendingHandoverCount' => $pendingHandoverCount,
             'pendingHandoverTotal' => $pendingHandoverTotal,
+            'itemHeaders'                => $itemHeaders,
+            'soldItems'                  => $soldItems,
+            'soldItemsCount'             => $soldItemsCount,
+            'soldItemsTotalValue'        => $soldItemsTotalValue,
+            'soldDistinctProductsCount'  => $soldDistinctProductsCount,
         ]);
     }
 }

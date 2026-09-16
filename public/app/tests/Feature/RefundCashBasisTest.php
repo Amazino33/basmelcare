@@ -85,6 +85,12 @@ class RefundCashBasisTest extends TestCase
             ->set('refundMethod', $method)
             ->set('returnQtys.' . $sale->saleItems->first()->id, 1)
             ->call('processReturn');
+
+        if ($saleReturn = SaleReturn::latest('id')->first()) {
+            if ($saleReturn->isPending()) {
+                $saleReturn->finalize($this->staff());
+            }
+        }
     }
 
     private function figures(): array

@@ -228,6 +228,7 @@ class Index extends Component
                 ->whereIn('sale_id', $sales->pluck('id'))
                 ->whereBetween('created_at', [$from, $to])
                 ->where('refund_method', 'cash')
+                ->when(Schema::hasColumn('sale_returns', 'status'), fn($q) => $q->where('status', 'approved'))
                 ->sum('total_credit')
             : 0.0;
 
@@ -310,6 +311,7 @@ class Index extends Component
             ? (float) DB::table('sale_returns')
                 ->whereIn('sale_id', $settledIds)
                 ->whereBetween('created_at', [$from, $to])
+                ->when(Schema::hasColumn('sale_returns', 'status'), fn($q) => $q->where('status', 'approved'))
                 ->sum('total_credit')
             : 0.0;
 
@@ -323,6 +325,7 @@ class Index extends Component
                 ->whereIn('sale_id', $settledIds)
                 ->whereBetween('created_at', [$from, $to])
                 ->where('refund_method', 'cash')
+                ->when(Schema::hasColumn('sale_returns', 'status'), fn($q) => $q->where('status', 'approved'))
                 ->sum('total_credit')
             : 0.0;
 
@@ -338,6 +341,7 @@ class Index extends Component
                 ->join('sale_items', 'sale_items.id', '=', 'sale_return_items.sale_item_id')
                 ->whereIn('sale_returns.sale_id', $settledIds)
                 ->whereBetween('sale_returns.created_at', [$from, $to])
+                ->when(Schema::hasColumn('sale_returns', 'status'), fn($q) => $q->where('sale_returns.status', 'approved'))
                 ->sum(DB::raw('sale_items.cost_price * sale_return_items.quantity_returned'));
         }
 

@@ -93,9 +93,17 @@ class WalkInReturnTest extends TestCase
             $page->set('refundMethod', $method);
         }
 
-        return $page
+        $ret = $page
             ->set('returnQtys.' . $sale->saleItems->first()->id, 1)
             ->call('processReturn');
+
+        if ($saleReturn = SaleReturn::latest('id')->first()) {
+            if ($saleReturn->isPending()) {
+                $saleReturn->finalize($this->staff());
+            }
+        }
+
+        return $ret;
     }
 
     // ── the walk-in ─────────────────────────────────────────────────────

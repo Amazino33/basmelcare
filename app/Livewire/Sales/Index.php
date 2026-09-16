@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Index extends Component
 {
@@ -36,6 +37,15 @@ class Index extends Component
     public array $returnQtys = [];
     public array $returnableQtys = [];
     public string $returnReason = '';
+
+    /**
+     * How this return is paid back: store credit, or cash out of the till.
+     *
+     * Forced to cash for a walk-in, because there is no account to credit. The
+     * value is re-decided when the return is processed rather than trusted
+     * from here.
+     */
+    public string $refundMethod = SaleReturn::CREDIT;
     public string $returnError  = '';
 
     public function updatedReturnQtys(): void
@@ -63,12 +73,28 @@ class Index extends Component
         $this->detailsDrawer = true;
     }
 
-    private function isElevated(): bool
+    /**
+     * Refunds, Wi-Fi revocation and handover move money or entitlements, so they
+     * are limited to admin and branch_manager. Everyone else may view sales.
+     * (This check existed but was never applied to any action — it is now.)
+     */
+    public function isElevated(): bool
     {
         return (bool) array_intersect(
             auth()->user()->role ?? [],
-            ['admin', 'pharmacist', 'branch_manager']
+            ['admin', 'branch_manager']
         );
+    }
+
+    private function denyUnlessElevated(): bool
+    {
+        if ($this->isElevated()) {
+            return false;
+        }
+
+        $this->error('Only an admin or branch manager can do that.');
+
+        return true;
     }
 
     private function isCashier(): bool
@@ -79,6 +105,8 @@ class Index extends Component
 
     public function completeHandover(int $saleId): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::find($saleId);
 
         if (!$sale || $sale->status !== 'paid') {
@@ -97,6 +125,8 @@ class Index extends Component
      */
     public function revokeWifi($saleId): void
     {
+        if ($this->denyUnlessElevated()) return;
+
         $sale = Sale::find($saleId);
 
         if (! $sale || ! $sale->voucher_redeemed_at) {
@@ -120,13 +150,29 @@ class Index extends Component
         }
     }
 
+    public function canTriggerReturn(): bool
+    {
+        return (bool) array_intersect(
+            auth()->user()->role ?? [],
+            ['sales', 'branch_manager', 'admin']
+        );
+    }
+
     public function openReturn(int $saleId): void
     {
+        if (! $this->canTriggerReturn()) {
+            $this->error('Only sales staff, branch managers, or admins can trigger returns.');
+            return;
+        }
+
         $sale = Sale::with('saleItems.product', 'saleItems.batch')->findOrFail($saleId);
 
-        $requireCustomer = AppSetting::bool('return_require_customer', true);
-        if ($requireCustomer && !$sale->customer_id) {
-            $this->error('This sale has no customer attached. Attach a customer to the sale before processing a return.');
+        // A walk-in has no account for store credit to sit on, so their refund
+        // is cash out of the till. That is allowed unless the pharmacy has
+        // chosen to tie every return to a named person.
+        $requireCustomer = AppSetting::bool('return_require_customer', false);
+        if ($requireCustomer && ! $sale->customer_id) {
+            $this->error('This pharmacy only accepts returns from registered customers. Attach a customer to the sale, or turn the rule off under Settings → Returns.');
             return;
         }
 
@@ -145,7 +191,9 @@ class Index extends Component
         $this->returnableQtys  = [];
 
         foreach ($sale->saleItems as $item) {
-            $alreadyReturned               = SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+            $alreadyReturned = SaleReturnItem::where('sale_item_id', $item->id)
+                ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                ->sum('quantity_returned');
             $returnable                    = $item->quantity - $alreadyReturned;
             $this->returnableQtys[$item->id] = max(0, $returnable);
             $this->returnQtys[$item->id]     = 0;
@@ -154,18 +202,36 @@ class Index extends Component
         $this->returnSaleId = $saleId;
         $this->returnReason = '';
         $this->returnError  = '';
+
+        // Cash is the only refund a walk-in can be given, so it is not offered
+        // as a choice - there is nowhere else for the money to go.
+        $this->refundMethod = $sale->customer_id ? SaleReturn::CREDIT : SaleReturn::CASH;
+
         $this->returnModal  = true;
     }
 
     public function processReturn(): void
     {
-        $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
-
-        $requireCustomer = AppSetting::bool('return_require_customer', true);
-        if ($requireCustomer && !$sale->customer_id) {
-            $this->error('No customer attached to this sale.');
+        if (! $this->canTriggerReturn()) {
+            $this->error('Only sales staff, branch managers, or admins can trigger returns.');
             return;
         }
+
+        $sale = Sale::with('saleItems.product', 'saleItems.batch', 'customer')->findOrFail($this->returnSaleId);
+
+        $requireCustomer = AppSetting::bool('return_require_customer', false);
+        if ($requireCustomer && ! $sale->customer_id) {
+            $this->error('This pharmacy only accepts returns from registered customers.');
+            return;
+        }
+
+        // Decided here rather than trusted from the form: a walk-in cannot be
+        // credited whatever the screen was showing, because there is no account
+        // to credit. Getting this wrong would put goods back on the shelf and
+        // give the customer nothing.
+        $method = $sale->customer_id
+            ? ($this->refundMethod === SaleReturn::CASH ? SaleReturn::CASH : SaleReturn::CREDIT)
+            : SaleReturn::CASH;
 
         $windowHours = (int) AppSetting::get('return_window_hours', 48);
         if ($sale->created_at->diffInHours(now()) > $windowHours) {
@@ -182,19 +248,24 @@ class Index extends Component
         $saleReturnId = null;
 
         try {
-            DB::transaction(function () use ($sale, &$totalCredit, &$saleReturnId) {
+            DB::transaction(function () use ($sale, $method, &$totalCredit, &$saleReturnId) {
                 $saleReturn = SaleReturn::create([
-                    'sale_id'      => $sale->id,
-                    'processed_by' => auth()->id(),
-                    'reason'       => $this->returnReason ?: null,
-                    'total_credit' => 0,
+                    'sale_id'       => $sale->id,
+                    'processed_by'  => auth()->id(),
+                    'reason'        => $this->returnReason ?: null,
+                    'total_credit'  => 0,
+                    'refund_method' => $method,
+                    'status'        => SaleReturn::STATUS_PENDING,
+                    'refunded_at'   => null,
                 ]);
 
                 foreach ($sale->saleItems as $item) {
                     $qty = (int) ($this->returnQtys[$item->id] ?? 0);
                     if ($qty <= 0) continue;
 
-                    $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity_returned');
+                    $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)
+                        ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                        ->sum('quantity_returned');
                     $maxReturnable   = $item->quantity - $alreadyReturned;
 
                     if ($qty > $maxReturnable) {
@@ -218,55 +289,41 @@ class Index extends Component
                         'subtotal'          => $subtotal,
                     ]);
 
-                    if ($item->batch_id) {
-                        $item->batch->increment('quantity', $qty);
-                        StockMovement::create([
-                            'batch_id'  => $item->batch_id,
-                            'quantity'  => $qty,
-                            'type'      => 'return',
-                            'reference' => "Return from Sale #{$sale->id}",
-                            'user_id'   => auth()->id(),
-                        ]);
+                    if (! $item->batch) {
+                        throw new \RuntimeException(
+                            'The batch "' . ($item->product->name ?? 'item') . '" was sold from no longer exists, '
+                            . 'so it cannot be put back. Add the stock by hand and record the refund separately.'
+                        );
                     }
                 }
 
                 $saleReturn->update(['total_credit' => $totalCredit]);
-
-                if ($sale->customer_id && $totalCredit > 0) {
-                    $sale->customer->increment('credit_balance', $totalCredit);
-                }
-
                 $saleReturnId = $saleReturn->getKey();
             });
         } catch (\RuntimeException $e) {
             $this->returnError = $e->getMessage();
             return;
-        } catch (\Throwable) {
-            $this->returnError = 'Return could not be processed. Please try again or contact support.';
+        } catch (\Throwable $e) {
+            Log::error('[Return] Sale ' . $sale->invoice_number . ' request failed: ' . $e->getMessage(), [
+                'sale_id' => $sale->id,
+                'user_id' => auth()->id(),
+                'qtys'    => $this->returnQtys,
+            ]);
+
+            $this->returnError = 'Return request could not be processed, and nothing was changed. '
+                . 'Please try again, or tell an admin to check the logs.';
             return;
         }
 
         $this->returnModal  = false;
         $this->returnSaleId = null;
         $this->returnQtys   = [];
-        $this->success('Return processed. ₦' . number_format($totalCredit, 2) . ' credited to customer account.');
 
-        $this->dispatch('open-return-receipt', url: route('return.receipt', $saleReturnId));
-
-        $phone = $sale->customer?->phone;
-        if ($phone && $totalCredit > 0) {
-            try {
-                $pharmacyName  = AppSetting::get('pharmacy_name', 'BasmelCare');
-                $newBalance    = $sale->customer->fresh()->credit_balance;
-                $message = "Hi {$sale->customer->name}, a return of \u{20A6}" . number_format($totalCredit, 2)
-                    . " has been credited to your {$pharmacyName} account."
-                    . " Your new credit balance is \u{20A6}" . number_format($newBalance, 2)
-                    . ". Ref: RT-" . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT) . ".";
-                app(WhatsAppService::class)->send($phone, $message);
-            } catch (\Throwable $e) {
-                Log::error('[WhatsApp Return] ' . $e->getMessage());
-            }
-        }
+        $this->success(
+            'Return request RT-' . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT)
+            . ' submitted for ₦' . number_format($totalCredit, 2)
+            . '. Awaiting approval by an Auditor or Branch Manager.'
+        );
     }
 
     private function periodQuery($query)
@@ -283,6 +340,80 @@ class Index extends Component
             ]),
             default => $query,
         };
+    }
+
+    public function exportSoldItems(): StreamedResponse
+    {
+        $scopeFn = fn($q) => $q;
+        $items = SaleItem::with(['sale.user', 'sale.customer', 'product.category', 'batch'])
+            ->whereHas('sale', function ($q) use ($scopeFn) {
+                $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
+            })
+            ->when($this->search, function ($q) {
+                $term = trim($this->search);
+                $q->where(function ($sub) use ($term) {
+                    $sub->whereHas('product', function ($p) use ($term) {
+                        $p->where('name', 'like', "%{$term}%")
+                          ->orWhere('barcode', 'like', "%{$term}%")
+                          ->orWhere('sku', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('sale', function ($s) use ($term) {
+                        $s->where('invoice_number', 'like', "%{$term}%")
+                          ->orWhere('id', $term)
+                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
+                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
+                    })
+                    ->orWhereHas('batch', function ($b) use ($term) {
+                        $b->where('batch_number', 'like', "%{$term}%");
+                    });
+                });
+            })
+            ->latest('id')
+            ->get();
+
+        $periodSlug = $this->period === 'custom'
+            ? ($this->dateFrom . '-to-' . $this->dateTo)
+            : $this->period;
+        $filename = 'products-sold-' . $periodSlug . '.csv';
+
+        return response()->streamDownload(function () use ($items) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'Time Sold',
+                'Product Name',
+                'Category',
+                'Batch Number',
+                'Quantity Sold',
+                'Packaging',
+                'Unit Price (NGN)',
+                'Subtotal (NGN)',
+                'Invoice #',
+                'Sold By',
+                'Customer',
+                'Payment Method',
+            ]);
+
+            foreach ($items as $item) {
+                $saleTime = $item->sale?->paid_at ?? $item->sale?->created_at ?? $item->created_at;
+                fputcsv($handle, [
+                    $saleTime ? $saleTime->format('Y-m-d H:i:s') : '—',
+                    $item->product?->name ?? '—',
+                    $item->product?->category?->name ?? '—',
+                    $item->batch?->batch_number ?? '—',
+                    $item->quantity,
+                    $item->is_pack ? "Pack ({$item->pack_size})" : 'Loose unit',
+                    $item->unit_price,
+                    $item->subtotal,
+                    $item->sale?->invoice_number ?? ('INV-' . str_pad($item->sale_id, 5, '0', STR_PAD_LEFT)),
+                    $item->sale?->user?->name ?? '—',
+                    $item->sale?->customer?->name ?? 'Walk-in',
+                    ucfirst($item->sale?->payment_method ?? '—'),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function render()
@@ -311,7 +442,8 @@ class Index extends Component
                 ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
 
         $filteredSales = $this->periodQuery(clone $salesQuery)->whereIn('status', ['paid', 'completed']);
-        $totalRevenue = $filteredSales->sum('total_amount');
+        // Net of discount — total_amount is the pre-discount figure.
+        $totalRevenue = (float) (clone $filteredSales)->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
         $totalTransactions = $filteredSales->count();
 
         $filteredItems = SaleItem::whereHas('sale', function ($q) use ($scopeFn) {
@@ -326,11 +458,99 @@ class Index extends Component
         $totalProfit = $totalRevenue - $totalCost;
         $avgSale = $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0;
 
-        $paymentBreakdown = $this->periodQuery(
-            Sale::whereIn('status', ['paid', 'completed'])->tap($scopeFn)
-            )->selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')
+        // What each method ACTUALLY took, read from payment_details.
+        //
+        // This previously summed total_amount grouped by payment_method, which
+        // is the billed figure: it included discounts never charged and balances
+        // sold on credit, and a split payment put its whole value under "split".
+        // Staff read this row as the drawer, so it has to be money tendered.
+        // Sales with no recorded method still had money taken, but part of it
+        // may never have arrived. Outstanding debt per sale lets that bucket
+        // report cash actually collected rather than the amount billed.
+        $owedPerSale = \App\Models\Debt::query()
+            ->selectRaw('sale_id, SUM(COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)) AS still_owed')
+            ->groupBy('sale_id')
+            ->pluck('still_owed', 'sale_id');
+
+        $collected = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+
+        // Billed on this sale, less anything still outstanding on it.
+        $actuallyTaken = function ($sale) use ($owedPerSale) {
+            $billed = (float) $sale->total_amount - (float) ($sale->coupon_discount ?? 0);
+
+            return max(0, $billed - (float) ($owedPerSale[$sale->id] ?? 0));
+        };
+
+        $creditUsed = 0.0;
+        $changeGiven = 0.0;
+        $unrecorded  = 0.0;
+
+        foreach ((clone $filteredSales)->get(['id', 'total_amount', 'coupon_discount', 'payment_details']) as $paid) {
+            $details = $paid->payment_details;
+            $details = is_string($details) ? json_decode($details, true) : $details;
+
+            if (! is_array($details)) {
+                // Older sales stored no breakdown; report rather than guess.
+                $unrecorded += $actuallyTaken($paid);
+                continue;
+            }
+
+            $matched = false;
+
+            foreach (array_keys($collected) as $method) {
+                if (isset($details[$method]) && is_numeric($details[$method])) {
+                    $collected[$method] += (float) $details[$method];
+                    $matched = true;
+                }
+            }
+
+            if (isset($details['credit']) && is_numeric($details['credit'])) {
+                $creditUsed += (float) $details['credit'];
+            }
+
+            if (isset($details['change_given']) && is_numeric($details['change_given'])) {
+                $changeGiven += (float) $details['change_given'];
+            }
+
+            if (! $matched) {
+                $unrecorded += $actuallyTaken($paid);
+            }
+        }
+
+        // Cash handed back on a return left the drawer just as change does, so
+        // it comes off the cash line and out of the takings. A store-credit
+        // refund does not: nothing was handed over, and the drawer only gets
+        // lighter later, when the customer draws it.
+        $cashRefunded = (float) SaleReturn::whereIn('sale_id', (clone $filteredSales)->select('sales.id'))
+            ->where('refund_method', SaleReturn::CASH)
+            ->sum('total_credit');
+
+        // Change is handed back in cash, so it comes off the cash line itself —
+        // otherwise the three method figures sum to more than Cash Collected.
+        $collected['cash'] -= $changeGiven + $cashRefunded;
+
+        // Repayments on older debts taken during this period are real money in.
+        // The opening part-payment is excluded: it is already counted above from
+        // the sale. Each repayment is attributed to the method it was taken by,
+        // not assumed to be cash.
+        $repaidByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
+
+        $repayments = $this->periodQuery(\App\Models\DebtPayment::query())
+            ->where('at_point_of_sale', false)
+            ->selectRaw('payment_method, SUM(amount) AS total')
             ->groupBy('payment_method')
             ->get();
+
+        foreach ($repayments as $repayment) {
+            $method = strtolower((string) $repayment->payment_method);
+
+            if (array_key_exists($method, $repaidByMethod)) {
+                $repaidByMethod[$method] += (float) $repayment->total;
+                $collected[$method]      += (float) $repayment->total;
+            }
+        }
+
+        $cashCollected = array_sum($collected);
 
         $sales = $this->periodQuery(clone $salesQuery)->latest()->paginate(20);
 
@@ -388,7 +608,56 @@ class Index extends Component
             ? Order::with('customer', 'items.product', 'claimedByUser')->find($this->viewOrderId)
             : null;
 
+        // --- Products Sold (Chronological line-by-line items) ---
+        $itemHeaders = [
+            ['key' => 'sold_at', 'label' => 'Time Sold'],
+            ['key' => 'product.name', 'label' => 'Product'],
+            ['key' => 'batch.batch_number', 'label' => 'Batch'],
+            ['key' => 'quantity', 'label' => 'Qty'],
+            ['key' => 'unit_price', 'label' => 'Price'],
+            ['key' => 'subtotal', 'label' => 'Total'],
+            ['key' => 'sale.user.name', 'label' => 'Sold By'],
+            ['key' => 'sale.customer.name', 'label' => 'Customer'],
+            ['key' => 'sale.invoice_number', 'label' => 'Invoice'],
+            ['key' => 'actions', 'label' => ''],
+        ];
+
+        $soldItemsQuery = SaleItem::with(['sale.user', 'sale.customer', 'product.category', 'batch'])
+            ->whereHas('sale', function ($q) use ($scopeFn) {
+                $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
+            })
+            ->when($this->search, function ($q) {
+                $term = trim($this->search);
+                $q->where(function ($sub) use ($term) {
+                    $sub->whereHas('product', function ($p) use ($term) {
+                        $p->where('name', 'like', "%{$term}%")
+                          ->orWhere('barcode', 'like', "%{$term}%")
+                          ->orWhere('sku', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('sale', function ($s) use ($term) {
+                        $s->where('invoice_number', 'like', "%{$term}%")
+                          ->orWhere('id', $term)
+                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
+                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
+                    })
+                    ->orWhereHas('batch', function ($b) use ($term) {
+                        $b->where('batch_number', 'like', "%{$term}%");
+                    });
+                });
+            });
+
+        $soldItemsCount = (int) (clone $soldItemsQuery)->sum('quantity');
+        $soldItemsTotalValue = (float) (clone $soldItemsQuery)->sum('subtotal');
+        $soldDistinctProductsCount = (int) (clone $soldItemsQuery)->distinct('product_id')->count('product_id');
+        $soldItems = (clone $soldItemsQuery)->latest('id')->paginate(30, ['*'], 'itemsPage');
+
+        // --- Returns ---
+        // The listing itself lives in Sales\Returns, which the whole pharmacy
+        // can reach. Only the tab's badge is needed here.
+        $returnsCount = $this->periodQuery(SaleReturn::query())->count();
+
         return view('livewire.sales.index', [
+            'returnsCount'         => $returnsCount,
             'returnableSale'       => $returnableSale,
             'returnWindowHours'    => $returnWindowHours,
             'elevated'             => $elevated,
@@ -401,7 +670,11 @@ class Index extends Component
             'totalTransactions'    => $totalTransactions,
             'totalItemsSold'       => $totalItemsSold,
             'avgSale'              => $avgSale,
-            'paymentBreakdown'     => $paymentBreakdown,
+            'collected'            => $collected,
+            'cashCollected'        => $cashCollected,
+            'cashRefunded'         => $cashRefunded,
+            'creditUsed'           => $creditUsed,
+            'unrecordedCash'       => $unrecorded,
             'onlineHeaders'        => $onlineHeaders,
             'onlineOrders'         => $onlineOrders,
             'viewOrder'            => $viewOrder,
@@ -412,6 +685,11 @@ class Index extends Component
             'handoverSales'        => $handoverSales,
             'pendingHandoverCount' => $pendingHandoverCount,
             'pendingHandoverTotal' => $pendingHandoverTotal,
+            'itemHeaders'                => $itemHeaders,
+            'soldItems'                  => $soldItems,
+            'soldItemsCount'             => $soldItemsCount,
+            'soldItemsTotalValue'        => $soldItemsTotalValue,
+            'soldDistinctProductsCount'  => $soldDistinctProductsCount,
         ]);
     }
 }

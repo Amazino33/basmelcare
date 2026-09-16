@@ -27,6 +27,11 @@
             @class(['tab', 'tab-active' => $tab === 'pos'])>
             POS Sales
         </button>
+        <button role="tab" wire:click="$set('tab','items')"
+            @class(['tab', 'tab-active' => $tab === 'items'])>
+            <x-icon name="o-cube" class="w-4 h-4 mr-1 inline" />
+            Products Sold
+        </button>
         <button role="tab" wire:click="$set('tab','handover')"
             @class(['tab', 'tab-active' => $tab === 'handover'])>
             Awaiting Handover
@@ -158,13 +163,147 @@
 
             @scope('actions', $sale, $returnWindowHours)
                 {{-- @scope does not inherit view variables — resolve the role here. --}}
-                @php $canRefund = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']); @endphp
+                @php $canRefund = (bool) array_intersect(auth()->user()->role ?? [], ['sales', 'admin', 'branch_manager']); @endphp
                 <div class="flex gap-1">
                     <x-button icon="o-eye" wire:click="viewDetails({{ $sale->id }})" class="btn-xs btn-ghost" tooltip="Details" />
                     <x-button icon="o-printer" link="{{ route('invoice.show', $sale->id) }}" class="btn-xs btn-ghost" tooltip="Invoice" external />
                     @if($canRefund && in_array($sale->status, ['completed', 'paid']) && $sale->created_at->diffInHours(now()) <= $returnWindowHours)
                         <x-button icon="o-arrow-uturn-left" wire:click="openReturn({{ $sale->id }})" class="btn-xs btn-ghost text-warning" tooltip="Return items" />
                     @endif
+                </div>
+            @endscope
+        </x-table>
+
+    @elseif($tab === 'items')
+        <!-- Products Sold Summary Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <x-stat
+                title="Units Sold"
+                value="{{ number_format($soldItemsCount) }}"
+                description="in selected period"
+                icon="o-shopping-bag"
+                color="text-primary"
+            />
+            <x-stat
+                title="Total Value"
+                value="₦{{ number_format($soldItemsTotalValue, 2) }}"
+                description="from sold products"
+                icon="o-banknotes"
+                color="text-success"
+            />
+            <x-stat
+                title="Distinct Products"
+                value="{{ number_format($soldDistinctProductsCount) }}"
+                description="unique items sold"
+                icon="o-cube"
+                color="text-info"
+            />
+        </div>
+
+        <!-- Action Bar -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 bg-base-100 p-3 rounded-lg border border-base-200">
+            <div>
+                <div class="font-semibold text-sm">Chronological Products Sold Log</div>
+                <div class="text-xs text-base-content/60">Real-time record showing every product sold and the exact time it was sold</div>
+            </div>
+            <x-button
+                label="Export CSV"
+                icon="o-arrow-down-tray"
+                wire:click="exportSoldItems"
+                class="btn-sm btn-outline"
+                spinner="exportSoldItems"
+            />
+        </div>
+
+        <!-- Products Sold Table -->
+        <x-table :headers="$itemHeaders" :rows="$soldItems" with-pagination>
+            @scope('cell_sold_at', $item)
+                @php $soldTime = $item->sale?->paid_at ?? $item->sale?->created_at ?? $item->created_at; @endphp
+                <div class="space-y-0.5">
+                    <div class="font-semibold text-xs text-base-content whitespace-nowrap flex items-center gap-1">
+                        <x-icon name="o-clock" class="w-3.5 h-3.5 text-primary inline" />
+                        {{ $soldTime ? $soldTime->format('h:i:s A') : '—' }}
+                    </div>
+                    <div class="text-[11px] text-base-content/60 whitespace-nowrap">
+                        {{ $soldTime ? $soldTime->format('M d, Y') : '—' }}
+                    </div>
+                    @if($soldTime)
+                        <div class="text-[10px] text-primary/80 font-mono">
+                            {{ $soldTime->diffForHumans() }}
+                        </div>
+                    @endif
+                </div>
+            @endscope
+
+            @scope('cell_product.name', $item)
+                <div>
+                    <div class="font-medium text-sm text-base-content">
+                        {{ $item->product?->name ?? 'Unknown Product' }}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1 mt-1">
+                        @if($item->product?->category)
+                            <span class="badge badge-ghost badge-xs">{{ $item->product->category->name }}</span>
+                        @endif
+                        @if($item->is_pack)
+                            <span class="badge badge-info badge-outline badge-xs">Pack of {{ $item->pack_size }}</span>
+                        @endif
+                    </div>
+                </div>
+            @endscope
+
+            @scope('cell_batch.batch_number', $item)
+                @if($item->batch)
+                    <div>
+                        <span class="font-mono text-xs font-semibold">{{ $item->batch->batch_number }}</span>
+                        @if($item->batch->expiry_date)
+                            <div class="text-[10px] text-base-content/60">Exp: {{ $item->batch->expiry_date->format('M Y') }}</div>
+                        @endif
+                    </div>
+                @else
+                    <span class="text-base-content/40 text-xs">—</span>
+                @endif
+            @endscope
+
+            @scope('cell_quantity', $item)
+                <span class="badge badge-neutral font-bold tabular-nums px-2.5 py-1 text-xs">
+                    {{ number_format($item->quantity) }}
+                </span>
+            @endscope
+
+            @scope('cell_unit_price', $item)
+                <span class="text-xs tabular-nums text-base-content/80">
+                    ₦{{ number_format($item->unit_price, 2) }}
+                </span>
+            @endscope
+
+            @scope('cell_subtotal', $item)
+                <span class="font-bold text-sm tabular-nums text-success">
+                    ₦{{ number_format($item->subtotal, 2) }}
+                </span>
+            @endscope
+
+            @scope('cell_sale.user.name', $item)
+                <span class="text-xs text-base-content/80 font-medium">
+                    {{ $item->sale?->user?->name ?? '—' }}
+                </span>
+            @endscope
+
+            @scope('cell_sale.customer.name', $item)
+                <span class="text-xs">
+                    {{ $item->sale?->customer?->name ?? 'Walk-in' }}
+                </span>
+            @endscope
+
+            @scope('cell_sale.invoice_number', $item)
+                <button wire:click="viewDetails({{ $item->sale_id }})" class="btn btn-ghost btn-xs font-mono text-primary underline underline-offset-2">
+                    {{ $item->sale?->invoice_number ?? ('#' . $item->sale_id) }}
+                </button>
+            @endscope
+
+            @scope('actions', $item)
+                <div class="flex gap-1">
+                    <x-button icon="o-eye" wire:click="viewDetails({{ $item->sale_id }})" class="btn-xs btn-ghost" tooltip="View Sale Details" />
+                    <x-button icon="o-printer" link="{{ route('invoice.show', $item->sale_id) }}" class="btn-xs btn-ghost" tooltip="Print Invoice" external />
                 </div>
             @endscope
         </x-table>
@@ -419,13 +558,18 @@
                         </span>
                         <span class="text-lg font-bold text-success">₦{{ number_format($liveTotal, 2) }}</span>
                     </div>
+
+                    <div class="text-xs text-base-content/70 bg-base-200/60 p-2.5 rounded-lg border border-base-300">
+                        <x-icon name="o-information-circle" class="w-4 h-4 inline mr-1 text-primary" />
+                        Return requests require review and approval by an Auditor or Branch Manager before stock is restocked and money/credit is disbursed.
+                    </div>
                 @endif
             </div>
 
             <x-slot:actions>
                 <x-button label="Cancel" wire:click="$set('returnModal', false)" class="btn-ghost" />
                 <x-button
-                    label="Process Return"
+                    label="Submit Return Request"
                     wire:click="processReturn"
                     class="btn-error"
                     icon="o-arrow-uturn-left"
