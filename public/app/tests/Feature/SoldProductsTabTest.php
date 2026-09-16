@@ -143,4 +143,20 @@ class SoldProductsTabTest extends TestCase
         $response = $component->call('exportSoldItems');
         $this->assertNotNull($response);
     }
+
+    public function test_clicking_invoice_opens_drawer_with_sale_details_on_products_sold_tab(): void
+    {
+        $user = $this->staffUser('sales');
+        [$product, $batch, $sale] = $this->createSoldProduct('ANTACID SUSPENSION', 1800, 2, 'paid');
+
+        Livewire::actingAs($user)
+            ->test(\App\Livewire\Sales\Index::class)
+            ->set('tab', 'items')
+            ->call('viewDetails', $sale->id)
+            ->assertSet('detailsDrawer', true)
+            ->assertSet('viewSaleId', $sale->id)
+            ->assertSee('ANTACID SUSPENSION')
+            ->assertSee('Print Invoice')
+            ->assertSee(number_format(3600, 2));
+    }
 }

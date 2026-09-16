@@ -581,8 +581,8 @@
     </x-modal>
 
     <!-- Sale / Order Details Drawer -->
-    <x-drawer wire:model="detailsDrawer" title="{{ $tab === 'online' ? 'Order ' . $viewOrder?->order_number : 'Sale #' . $viewSale?->id }}" right class="w-96 lg:w-1/3">
-        @if(in_array($tab, ['pos', 'handover']) && $viewSale)
+    <x-drawer wire:model="detailsDrawer" title="{{ $viewOrder ? 'Order ' . $viewOrder->order_number : ($viewSale ? ($viewSale->invoice_number ?? ('Sale #' . $viewSale->id)) : 'Sale Details') }}" right class="w-96 lg:w-1/3">
+        @if($viewSale)
             <div class="space-y-2 mb-4">
                 <div class="flex justify-between"><span class="text-base-content/60">Date:</span> <span>{{ $viewSale->created_at->format('M d, Y H:i') }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Cashier:</span> <span>{{ $viewSale->user->name }}</span></div>
@@ -662,7 +662,7 @@
                 </div>
             @endif
 
-        @elseif($tab === 'online' && $viewOrder)
+        @elseif($viewOrder)
             <div class="space-y-2 mb-4">
                 <div class="flex justify-between"><span class="text-base-content/60">Date:</span> <span>{{ $viewOrder->created_at->format('M d, Y H:i') }}</span></div>
                 <div class="flex justify-between">
