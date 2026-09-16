@@ -307,9 +307,23 @@
                 @endunless
             </div>
 
+            @if($errors->any())
+                <div class="alert alert-error text-xs py-2 mt-3">
+                    <x-icon name="o-exclamation-circle" class="w-4 h-4 shrink-0" />
+                    <div>
+                        <span class="font-semibold">Please correct the following:</span>
+                        <ul class="list-disc list-inside mt-0.5">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            @endif
+
             <x-slot:actions>
-                <x-button :label="$productId ? 'Cancel' : 'Done'" @click="$wire.productModal = false" />
-                <x-button label="Save" type="submit" class="btn-primary" />
+                <x-button label="Cancel" @click="$wire.productModal = false" class="btn-ghost" />
+                <x-button label="Save Product" type="submit" class="btn-primary" spinner="saveProduct" icon="o-check" />
             </x-slot:actions>
         </x-form>
     </x-modal>

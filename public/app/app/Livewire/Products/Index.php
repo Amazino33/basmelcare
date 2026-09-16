@@ -315,9 +315,24 @@ class Index extends Component
     {
         if ($this->blockedFromCatalogue()) return;
 
+        // Auto-calculate selling price if user only entered cost price hint
+        if ($this->canSetPrices() && (trim((string) $this->selling_price) === '') && (float) $this->cost_price_hint > 0) {
+            $this->selling_price = $this->calculateSellingPrice((float) $this->cost_price_hint);
+        }
+
+        // Clean up empty strings for optional numeric/integer fields
+        if ($this->reorder_level === '' || $this->reorder_level === null) {
+            $this->reorder_level = 0;
+        }
+        if ($this->wholesale_price === '') $this->wholesale_price = null;
+        if ($this->wholesale_min_qty === '') $this->wholesale_min_qty = null;
+        if ($this->wholesale_markup_percent === '') $this->wholesale_markup_percent = null;
+        if ($this->pack_size === '') $this->pack_size = null;
+        if ($this->pack_price === '') $this->pack_price = null;
+
         $this->validate([
             'name' => ['required', 'string', 'max:255', function ($attr, $value, $fail) {
-                $exists = Product::whereRaw('LOWER(name) = ?', [strtolower($value)])
+                $exists = Product::whereRaw('LOWER(name) = ?', [strtolower(trim($value))])
                     ->when($this->productId, fn($q) => $q->where('id', '!=', $this->productId))
                     ->exists();
                 if ($exists) {
@@ -343,10 +358,10 @@ class Index extends Component
         $isNew = !$this->productId;
 
         $data = [
-            'name' => $this->name,
+            'name' => trim($this->name),
             'unit' => $this->unit ?: null,
             'show_in_shop' => $this->show_in_shop,
-            'sku' => $this->sku,
+            'sku' => $this->sku ?: null,
             'category_id' => $this->category_id,
             'wholesale_min_qty' => $this->wholesale_min_qty ?: null,
             'has_pack' => $this->has_pack,
@@ -356,16 +371,16 @@ class Index extends Component
             'wholesale_markup_percent' => $this->wholesale_markup_percent === null || $this->wholesale_markup_percent === ''
                 ? null
                 : (float) $this->wholesale_markup_percent,
-            'reorder_level' => $this->reorder_level,
-            'description' => $this->description,
-            'barcode' => $this->barcode,
+            'reorder_level' => (int) $this->reorder_level,
+            'description' => $this->description ?: null,
+            'barcode' => $this->barcode ?: null,
         ];
 
         // Prices are a commercial decision. Non-pricing roles may add a product
         // so a delivery isn't blocked, but it saves unpriced for admin to set.
         if ($this->canSetPrices()) {
-            $data['selling_price']   = $this->selling_price;
-            $data['wholesale_price'] = $this->wholesale_price ?: null;
+            $data['selling_price']   = (float) $this->selling_price;
+            $data['wholesale_price'] = $this->wholesale_price ? (float) $this->wholesale_price : null;
         } elseif (!$this->productId) {
             $data['selling_price'] = 0;
         }
@@ -381,21 +396,18 @@ class Index extends Component
             $data['image'] = $this->photo->store('products', 'product_images');
         }
 
-        Product::updateOrCreate(
+        $product = Product::updateOrCreate(
             ['id' => $this->productId],
             $data
         );
 
+        $savedName = $product->name;
+
         $this->show_in_shop = true;
         $this->reset(['name', 'unit', 'sku', 'category_id', 'selling_price', 'cost_price_hint', 'wholesale_price', 'wholesale_min_qty', 'wholesale_markup_percent', 'has_pack', 'pack_size', 'pack_price', 'reorder_level', 'description', 'barcode', 'photo', 'existingImage', 'productId']);
+        $this->productModal = false;
 
-        if ($isNew) {
-            $this->success('Product saved. Add another or click Done.');
-            $this->dispatch('focus-product-name');
-        } else {
-            $this->productModal = false;
-            $this->success('Product updated.');
-        }
+        $this->success($isNew ? "Product \"{$savedName}\" added to catalogue." : "Product \"{$savedName}\" updated.");
     }
 
     /**
