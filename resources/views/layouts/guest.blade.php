@@ -22,12 +22,19 @@
     <div class="min-h-screen flex items-center justify-center p-4">
         <div class="w-full max-w-md">
             <div class="text-center mb-8">
-                <div class="text-3xl font-bold text-primary">BasmelCare</div>
-                <div class="text-sm text-base-content/60">Pharmacy Management System</div>
+                <a href="/" class="inline-flex flex-col items-center group transition-transform hover:scale-105">
+                    <div class="w-16 h-16 rounded-2xl bg-base-100 shadow-sm border border-base-200/80 p-2.5 flex items-center justify-center">
+                        <img src="/logo.png" class="h-12 w-auto object-contain" alt="BasmelCare">
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-2xl font-black tracking-tight text-primary">BasmelCare</div>
+                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Pharmacy Management System</div>
+                    </div>
+                </a>
             </div>
 
-            <div class="card bg-base-100 shadow-xl">
-                <div class="card-body">
+            <div class="card bg-base-100 shadow-xl border border-base-200/80 rounded-2xl overflow-hidden">
+                <div class="card-body p-6 sm:p-8">
                     {{ $slot }}
                 </div>
             </div>

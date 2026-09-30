@@ -15,9 +15,13 @@ class Login extends Component
     use Toast;
 
     public string $identifier = '';
+
     public string $otp = '';
+
     public bool $otpSent = false;
+
     public bool $usePassword = false;
+
     public string $password = '';
 
     private function findCustomer(): ?Customer
@@ -36,8 +40,9 @@ class Login extends Component
 
         $customer = $this->findCustomer();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->addError('identifier', 'No account found with this email or phone.');
+
             return;
         }
 
@@ -52,25 +57,33 @@ class Login extends Component
         $this->success('OTP sent to your WhatsApp!');
     }
 
+    public function changeIdentifier(): void
+    {
+        $this->otpSent = false;
+        $this->otp = '';
+        $this->resetErrorBag();
+    }
+
     public function verifyOtp()
     {
         $this->validate(['otp' => 'required|string|size:6']);
 
         $customer = $this->findCustomer();
 
-        if (!$customer || !$customer->verifyOtp($this->otp)) {
-            $this->addError('otp', 'Invalid or expired OTP.');
+        if (! $customer || ! $customer->verifyOtp($this->otp)) {
+            $this->addError('otp', 'Invalid or expired OTP code.');
+
             return;
         }
 
         $customer->clearOtp();
 
-        if (!$customer->email_verified_at) {
+        if (! $customer->email_verified_at) {
             $customer->update(['email_verified_at' => now()]);
         }
 
         Auth::guard('customer')->login($customer, true);
-        $this->redirect('/account');
+        $this->redirect('/account', navigate: true);
     }
 
     public function loginWithPassword()
@@ -84,7 +97,7 @@ class Login extends Component
 
         if ($customer && Auth::guard('customer')->attempt(['email' => $customer->email, 'password' => $this->password], true)) {
             session()->regenerate();
-            $this->redirect('/account');
+            $this->redirect('/account', navigate: true);
         } else {
             $this->addError('password', 'Invalid credentials.');
         }

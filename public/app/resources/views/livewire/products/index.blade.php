@@ -1,7 +1,7 @@
 <div>
     <x-header title="Products" subtitle="Manage products and batches">
         <x-slot:middle class="!justify-end">
-            <x-input icon="o-magnifying-glass" placeholder="Search by name or barcode..." wire:model.live.debounce="search" clearable />
+            <x-input icon="o-magnifying-glass" placeholder="Search by name or barcode..." wire:model.live.debounce="search" clearable class="w-72 sm:w-80" />
         </x-slot:middle>
         <x-slot:actions>
             @if($this->canEditCatalogue())
@@ -30,7 +30,8 @@
         </div>
 
         {{-- Normal table --}}
-        <x-table :headers="$headers" :rows="$products" with-pagination>
+        <div class="bg-base-100 rounded-xl border border-base-300 shadow-xs overflow-hidden">
+            <x-table :headers="$headers" :rows="$products" with-pagination>
             @scope('cell_image', $product)
                 @if($product->image)
                     <img src="{{ $product->imageUrl('thumb') }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
@@ -73,23 +74,21 @@
             @scope('actions', $product)
                 {{-- @scope does not inherit view variables — resolve the role here. --}}
                 @php $mayEditCatalogue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager', 'inventory_manager']); @endphp
-                <div class="flex gap-1">
-                    <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
+                <div class="flex gap-1.5 items-center justify-end">
+                    <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost btn-square border border-base-200 hover:border-base-300 hover:bg-base-200" tooltip="View Batches" />
                     @if($mayEditCatalogue)
-                    {{-- One tap rather than opening the form: doing this
-                         product by product through a modal is not something
-                         anybody would sit and do. --}}
                     <x-button icon="{{ $product->show_in_shop ? 'o-globe-alt' : 'o-eye-slash' }}"
                               wire:click="toggleShopVisibility({{ $product->id }})"
-                              class="btn-xs btn-ghost {{ $product->show_in_shop ? 'text-success' : 'text-base-content/40' }}"
+                              class="btn-xs btn-ghost btn-square border border-base-200 hover:border-base-300 {{ $product->show_in_shop ? 'text-success hover:bg-success/10' : 'text-base-content/40 hover:bg-base-200' }}"
                               tooltip="{{ $product->show_in_shop ? 'On the online shop — tap to hide' : 'Hidden from the online shop — tap to show' }}" />
-                    <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
-                    <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
-                    <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
+                    <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost btn-square text-success border border-base-200 hover:border-base-300 hover:bg-success/10" tooltip="Add Batch" />
+                    <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost btn-square text-info border border-base-200 hover:border-base-300 hover:bg-info/10" tooltip="Edit" />
+                    <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost btn-square text-error border border-base-200 hover:border-base-300 hover:bg-error/10" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
                     @endif
                 </div>
             @endscope
         </x-table>
+        </div>
 
     <!-- Quick Add Modal -->
     <x-modal wire:model="quickModal" title="Quick Add Product" box-class="max-w-lg">

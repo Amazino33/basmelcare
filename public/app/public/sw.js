@@ -1,4 +1,4 @@
-const CACHE = 'basmelcare-staff-v1';
+const CACHE = 'basmelcare-staff-v3';
 
 const STATIC_ASSETS = [
     '/',

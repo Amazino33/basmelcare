@@ -15,9 +15,13 @@ class Register extends Component
     use Toast;
 
     public string $name = '';
+
     public string $email = '';
+
     public string $phone = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
 
     public function register()
@@ -29,13 +33,30 @@ class Register extends Component
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        $customer = Customer::create([
-            'name' => $this->name,
-            'email' => $this->email,
-            'phone' => $this->phone,
-            'password' => $this->password,
-            'type' => 'retail',
-        ]);
+        $existing = Customer::findByPhone($this->phone);
+
+        if ($existing) {
+            if ($existing->password) {
+                $this->addError('phone', 'An account with this phone number already exists. Please sign in.');
+
+                return;
+            }
+
+            $existing->update([
+                'name' => $this->name,
+                'email' => $this->email,
+                'password' => $this->password,
+            ]);
+            $customer = $existing;
+        } else {
+            $customer = Customer::create([
+                'name' => $this->name,
+                'email' => $this->email,
+                'phone' => $this->phone,
+                'password' => $this->password,
+                'type' => 'retail',
+            ]);
+        }
 
         $otp = $customer->generateOtp();
 
@@ -43,7 +64,7 @@ class Register extends Component
         $whatsapp->send($this->phone, "Welcome to BasmelCare! Your verification code is: {$otp}\n\nThis code expires in 10 minutes.");
 
         Auth::guard('customer')->login($customer, true);
-        $this->redirect('/account');
+        $this->redirect('/account', navigate: true);
     }
 
     public function render()

@@ -47,7 +47,7 @@
                     class="checkbox checkbox-warning checkbox-sm"
                 />
                 <span class="text-xs font-medium">
-                    Auto-apply markup formula <span class="text-base-content/50">(cost × 1.4 → nearest ₦100)</span>
+                    Auto-apply markup formula <span class="text-base-content/50">(cost × 1.4 &rarr; nearest ₦100)</span>
                     @if($bulkApplyMarkup)
                         <span class="text-warning font-semibold ml-1">— ON: overwrites all selling prices</span>
                     @endif
@@ -150,7 +150,8 @@
 
     @else
         {{-- Normal table --}}
-        <x-table :headers="$headers" :rows="$products" with-pagination>
+        <div class="bg-base-100 rounded-xl border border-base-300 shadow-xs overflow-hidden">
+            <x-table :headers="$headers" :rows="$products" with-pagination>
             @scope('cell_image', $product)
                 @if($product->image)
                     <img src="{{ $product->imageUrl('thumb') }}" alt="{{ $product->name }}" class="w-10 h-10 rounded object-cover" />
@@ -178,14 +179,15 @@
             @endscope
 
             @scope('actions', $product)
-                <div class="flex gap-1">
-                    <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost" tooltip="View Batches" />
-                    <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost text-success" tooltip="Add Batch" />
-                    <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
-                    <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
+                <div class="flex gap-1.5 items-center justify-end">
+                    <x-button icon="o-eye" wire:click="viewBatches({{ $product->id }})" class="btn-xs btn-ghost btn-square border border-base-200 hover:border-base-300 hover:bg-base-200" tooltip="View Batches" />
+                    <x-button icon="o-plus-circle" wire:click="openBatchModal({{ $product->id }})" class="btn-xs btn-ghost btn-square text-success border border-base-200 hover:border-base-300 hover:bg-success/10" tooltip="Add Batch" />
+                    <x-button icon="o-pencil" wire:click="editProduct({{ $product->id }})" class="btn-xs btn-ghost btn-square text-info border border-base-200 hover:border-base-300 hover:bg-info/10" tooltip="Edit" />
+                    <x-button icon="o-trash" wire:click="deleteProduct({{ $product->id }})" class="btn-xs btn-ghost btn-square text-error border border-base-200 hover:border-base-300 hover:bg-error/10" wire:confirm="Delete this product and all its batches?" tooltip="Delete" />
                 </div>
             @endscope
         </x-table>
+        </div>
     @endif
 
     <!-- Quick Add Modal -->
@@ -282,7 +284,7 @@
                         prefix="₦"
                         type="number"
                         step="0.01"
-                        hint="Auto-filled from cost × 1.4 → nearest ₦100 · type to override"
+                        hint="Auto-filled from cost × 1.4 &rarr; nearest ₦100 · type to override"
                     />
                     <div class="price-warn alert alert-warning py-1.5 text-xs mt-1 gap-1" style="display:none">
                         <x-icon name="o-exclamation-triangle" class="w-3.5 h-3.5 shrink-0" />

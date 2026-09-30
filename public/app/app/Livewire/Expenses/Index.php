@@ -3,7 +3,6 @@
 namespace App\Livewire\Expenses;
 
 use App\Livewire\Concerns\DeniesAuditorWrites;
-
 use App\Models\Expense;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -16,6 +15,7 @@ class Index extends Component
 
     public string $search = '';
     public string $categoryFilter = '';
+    public string $paymentMethodFilter = '';
     public string $dateFrom = '';
     public string $dateTo = '';
 
@@ -44,6 +44,7 @@ class Index extends Component
     public string $category = '';
     public string $description = '';
     public string $amount = '';
+    public string $payment_method = 'cash';
     public string $expense_date = '';
 
     public function mount(): void
@@ -59,6 +60,7 @@ class Index extends Component
 
     public function updatedSearch(): void { $this->resetPage(); }
     public function updatedCategoryFilter(): void { $this->resetPage(); }
+    public function updatedPaymentMethodFilter(): void { $this->resetPage(); }
 
     public function openCreate(): void
     {
@@ -67,6 +69,7 @@ class Index extends Component
         if (! $this->canManage) return;
 
         $this->reset(['editId', 'category', 'description', 'amount']);
+        $this->payment_method = 'cash';
         $this->expense_date = today()->toDateString();
         $this->modal = true;
     }
@@ -79,6 +82,7 @@ class Index extends Component
         $this->category = $expense->category;
         $this->description = $expense->description;
         $this->amount = (string) $expense->amount;
+        $this->payment_method = $expense->payment_method ?? 'cash';
         $this->expense_date = $expense->expense_date->toDateString();
         $this->modal = true;
     }
@@ -93,17 +97,19 @@ class Index extends Component
         if (! $this->canManage) return;
 
         $this->validate([
-            'category'     => 'required|string',
-            'description'  => 'required|string|max:500',
-            'amount'       => 'required|numeric|min:0.01',
-            'expense_date' => 'required|date',
+            'category'       => 'required|string',
+            'description'    => 'required|string|max:500',
+            'amount'         => 'required|numeric|min:0.01',
+            'payment_method' => 'required|in:cash,transfer',
+            'expense_date'   => 'required|date',
         ]);
 
         $data = [
-            'category'     => $this->category,
-            'description'  => $this->description,
-            'amount'       => $this->amount,
-            'expense_date' => $this->expense_date,
+            'category'       => $this->category,
+            'description'    => $this->description,
+            'amount'         => $this->amount,
+            'payment_method' => $this->payment_method,
+            'expense_date'   => $this->expense_date,
         ];
 
         if ($this->editId) {
@@ -131,6 +137,7 @@ class Index extends Component
         $query = Expense::with(['user', 'branch'])
             ->when($this->search, fn($q) => $q->where('description', 'like', "%{$this->search}%"))
             ->when($this->categoryFilter, fn($q) => $q->where('category', $this->categoryFilter))
+            ->when($this->paymentMethodFilter, fn($q) => $q->where('payment_method', $this->paymentMethodFilter))
             // whereDate rather than whereBetween: a bare upper bound excludes any
             // row stored with a time component, which is how SQLite keeps a
             // 'date' cast. MySQL happens not to, but the query should not
@@ -146,8 +153,22 @@ class Index extends Component
             ->whereYear('expense_date', today()->year)
             ->sum('amount');
 
+        $dateFilter = fn($q) => $q->whereDate('expense_date', '>=', $this->dateFrom ?: '2000-01-01')
+            ->whereDate('expense_date', '<=', $this->dateTo ?: today()->toDateString());
+
         $totalFiltered = Expense::when($this->categoryFilter, fn($q) => $q->where('category', $this->categoryFilter))
-            ->whereBetween('expense_date', [$this->dateFrom ?: '2000-01-01', $this->dateTo ?: today()->toDateString()])
+            ->when($this->paymentMethodFilter, fn($q) => $q->where('payment_method', $this->paymentMethodFilter))
+            ->tap($dateFilter)
+            ->sum('amount');
+
+        $totalCash = Expense::where('payment_method', 'cash')
+            ->when($this->categoryFilter, fn($q) => $q->where('category', $this->categoryFilter))
+            ->tap($dateFilter)
+            ->sum('amount');
+
+        $totalTransfer = Expense::where('payment_method', 'transfer')
+            ->when($this->categoryFilter, fn($q) => $q->where('category', $this->categoryFilter))
+            ->tap($dateFilter)
             ->sum('amount');
 
         $byCategory = Expense::selectRaw('category, SUM(amount) as total')
@@ -156,12 +177,15 @@ class Index extends Component
             ->pluck('total', 'category');
 
         return view('livewire.expenses.index', [
-            'expenses'      => $expenses,
-            'totalToday'    => $totalToday,
-            'totalMonth'    => $totalMonth,
-            'totalFiltered' => $totalFiltered,
-            'byCategory'    => $byCategory,
-            'categories'    => Expense::categories(),
+            'expenses'       => $expenses,
+            'totalToday'     => $totalToday,
+            'totalMonth'     => $totalMonth,
+            'totalFiltered'  => $totalFiltered,
+            'totalCash'      => $totalCash,
+            'totalTransfer'  => $totalTransfer,
+            'byCategory'     => $byCategory,
+            'categories'     => Expense::categories(),
+            'paymentMethods' => Expense::paymentMethods(),
         ]);
     }
 }

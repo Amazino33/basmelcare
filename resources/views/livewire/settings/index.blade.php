@@ -93,7 +93,7 @@
                 <x-form wire:submit="saveIncentives">
                     <div>
                         <x-input label="API Key" wire:model="hifastlink_api_key" readonly
-                            hint="Paste this into HifastLink → Network Settings → Pharmacy Integration" />
+                            hint="Paste this into HifastLink &rarr; Network Settings &rarr; Pharmacy Integration" />
                         <div class="mt-2">
                             <x-button label="Generate New Key" wire:click="regenerateApiKey" class="btn-warning btn-sm"
                                 icon="o-arrow-path"

@@ -10,7 +10,7 @@ class Expense extends Model
 {
     use BelongsToBranch;
 
-    protected $fillable = ['branch_id', 'user_id', 'category', 'description', 'amount', 'expense_date'];
+    protected $fillable = ['branch_id', 'user_id', 'category', 'description', 'amount', 'payment_method', 'expense_date'];
 
     protected $casts = [
         'expense_date' => 'date',
@@ -32,6 +32,14 @@ class Expense extends Model
             'maintenance' => 'Maintenance',
             'petty_cash'  => 'Petty Cash',
             'other'       => 'Other',
+        ];
+    }
+
+    public static function paymentMethods(): array
+    {
+        return [
+            'cash'     => 'Cash',
+            'transfer' => 'Transfer',
         ];
     }
 }

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Expenses\Index;
+use App\Models\AuditLog;
 use App\Models\Expense;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,11 +32,11 @@ class AuditorExpensesTest extends TestCase
     private function expense(float $amount = 15000): Expense
     {
         return Expense::create([
-            'category'    => 'Utilities',
+            'category' => 'Utilities',
             'description' => 'GENERATOR DIESEL',
-            'amount'      => $amount,
+            'amount' => $amount,
             'expense_date' => now()->toDateString(),
-            'user_id'     => $this->user(['admin'])->id,
+            'user_id' => $this->user(['admin'])->id,
         ]);
     }
 
@@ -52,7 +54,7 @@ class AuditorExpensesTest extends TestCase
         $this->expense();
 
         Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->assertOk()
             ->assertSee('GENERATOR DIESEL');
     }
@@ -71,7 +73,7 @@ class AuditorExpensesTest extends TestCase
     public function test_an_auditor_cannot_record_an_expense(): void
     {
         Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->set('category', 'Utilities')
             ->set('description', 'INVENTED')
             ->set('amount', 5000)
@@ -88,7 +90,7 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense();
 
         Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('delete', $expense->id);
 
         $this->assertDatabaseHas('expenses', ['id' => $expense->id]);
@@ -99,7 +101,7 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense();
 
         Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('openEdit', $expense->id)
             ->set('amount', 1)
             ->call('save');
@@ -112,7 +114,7 @@ class AuditorExpensesTest extends TestCase
         // It did nothing when clicked, with no message - a dead control for
         // cashiers as well as auditors.
         $page = Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class);
+            ->test(Index::class);
 
         $this->assertFalse($page->instance()->canManage);
         $page->call('openCreate')->assertSet('modal', false);
@@ -126,7 +128,7 @@ class AuditorExpensesTest extends TestCase
         // and hiding a dead control was mistaken for deciding she should not
         // have one.
         $page = Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class);
+            ->test(Index::class);
 
         $this->assertTrue($page->instance()->canManage);
 
@@ -136,7 +138,7 @@ class AuditorExpensesTest extends TestCase
     public function test_a_cashier_can_actually_record_one(): void
     {
         Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('openCreate')
             ->set('category', 'Transport')
             ->set('description', 'KEKE TO WHOLESALER')
@@ -152,7 +154,7 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense(15000);
 
         Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('openEdit', $expense->id)
             ->assertSet('modal', true)
             ->set('amount', 1500)
@@ -169,7 +171,7 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense();
 
         Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('delete', $expense->id);
 
         $this->assertDatabaseHas('expenses', ['id' => $expense->id]);
@@ -178,7 +180,7 @@ class AuditorExpensesTest extends TestCase
     public function test_the_delete_control_is_not_offered_to_a_cashier(): void
     {
         $page = Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class);
+            ->test(Index::class);
 
         $this->assertFalse($page->instance()->canDelete);
     }
@@ -191,7 +193,7 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense(15000);
 
         Livewire::actingAs($this->user(['auditor']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->set('editId', $expense->id)
             ->set('category', 'Utilities')
             ->set('description', 'CHANGED')
@@ -209,12 +211,12 @@ class AuditorExpensesTest extends TestCase
         $expense = $this->expense(15000);
 
         Livewire::actingAs($this->user(['cashier']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->call('openEdit', $expense->id)
             ->set('amount', 40000)
             ->call('save');
 
-        $entry = \App\Models\AuditLog::where('field', 'amount')->latest('id')->first();
+        $entry = AuditLog::where('field', 'amount')->latest('id')->first();
 
         $this->assertNotNull($entry, 'An expense was edited with nothing recording it.');
         $this->assertEquals(15000, $entry->old_value);
@@ -224,7 +226,7 @@ class AuditorExpensesTest extends TestCase
     public function test_a_branch_manager_still_can(): void
     {
         $page = Livewire::actingAs($this->user(['branch_manager']))
-            ->test(\App\Livewire\Expenses\Index::class);
+            ->test(Index::class);
 
         $this->assertTrue($page->instance()->canManage);
         $page->call('openCreate')->assertSet('modal', true);
@@ -235,7 +237,7 @@ class AuditorExpensesTest extends TestCase
         // An auditor who is also a branch manager is not made read-only by the
         // auditor tag alone.
         Livewire::actingAs($this->user(['auditor', 'branch_manager']))
-            ->test(\App\Livewire\Expenses\Index::class)
+            ->test(Index::class)
             ->set('category', 'Utilities')
             ->set('description', 'LEGITIMATE')
             ->set('amount', 5000)
@@ -243,5 +245,103 @@ class AuditorExpensesTest extends TestCase
             ->call('save');
 
         $this->assertDatabaseHas('expenses', ['description' => 'LEGITIMATE']);
+    }
+
+    public function test_an_expense_records_cash_payment_method_by_default(): void
+    {
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openCreate')
+            ->assertSet('payment_method', 'cash')
+            ->set('category', 'Utilities')
+            ->set('description', 'CASH DIESEL PURCHASE')
+            ->set('amount', 5000)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $expense = Expense::where('description', 'CASH DIESEL PURCHASE')->first();
+        $this->assertNotNull($expense);
+        $this->assertEquals('cash', $expense->payment_method);
+    }
+
+    public function test_an_expense_can_be_recorded_as_transfer(): void
+    {
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openCreate')
+            ->set('payment_method', 'transfer')
+            ->set('category', 'maintenance')
+            ->set('description', 'BANK TRANSFER ROOF REPAIR')
+            ->set('amount', 25000)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $expense = Expense::where('description', 'BANK TRANSFER ROOF REPAIR')->first();
+        $this->assertNotNull($expense);
+        $this->assertEquals('transfer', $expense->payment_method);
+    }
+
+    public function test_expenses_can_be_filtered_by_payment_method(): void
+    {
+        $admin = $this->user(['admin']);
+        Expense::create([
+            'category'       => 'utilities',
+            'description'    => 'CASH ENTRY ONE',
+            'amount'         => 3000,
+            'payment_method' => 'cash',
+            'expense_date'   => now()->toDateString(),
+            'user_id'        => $admin->id,
+        ]);
+
+        Expense::create([
+            'category'       => 'other',
+            'description'    => 'TRANSFER ENTRY TWO',
+            'amount'         => 7000,
+            'payment_method' => 'transfer',
+            'expense_date'   => now()->toDateString(),
+            'user_id'        => $admin->id,
+        ]);
+
+        // Filter by transfer
+        Livewire::actingAs($this->user(['auditor']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->set('paymentMethodFilter', 'transfer')
+            ->assertSee('TRANSFER ENTRY TWO')
+            ->assertDontSee('CASH ENTRY ONE');
+
+        // Filter by cash
+        Livewire::actingAs($this->user(['auditor']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->set('paymentMethodFilter', 'cash')
+            ->assertSee('CASH ENTRY ONE')
+            ->assertDontSee('TRANSFER ENTRY TWO');
+    }
+
+    public function test_changing_payment_method_leaves_an_audit_trail(): void
+    {
+        $admin = $this->user(['admin']);
+        $expense = Expense::create([
+            'category'       => 'utilities',
+            'description'    => 'MISTAKEN SOURCE',
+            'amount'         => 8000,
+            'payment_method' => 'cash',
+            'expense_date'   => now()->toDateString(),
+            'user_id'        => $admin->id,
+        ]);
+
+        Livewire::actingAs($this->user(['cashier']))
+            ->test(\App\Livewire\Expenses\Index::class)
+            ->call('openEdit', $expense->id)
+            ->assertSet('payment_method', 'cash')
+            ->set('payment_method', 'transfer')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertEquals('transfer', $expense->fresh()->payment_method);
+
+        $entry = \App\Models\AuditLog::where('field', 'payment_method')->latest('id')->first();
+        $this->assertNotNull($entry, 'Changing payment_method did not create an audit log entry.');
+        $this->assertEquals('cash', $entry->old_value);
+        $this->assertEquals('transfer', $entry->new_value);
     }
 }

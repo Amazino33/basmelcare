@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Customer\Login;
+use App\Livewire\Customer\Register;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -27,8 +29,8 @@ class CustomerAuthTest extends TestCase
     private function customer(array $attributes = []): Customer
     {
         return Customer::create(array_merge([
-            'name'  => 'ADAEZE OKON',
-            'type'  => 'retail',
+            'name' => 'ADAEZE OKON',
+            'type' => 'retail',
             'email' => 'adaeze@example.com',
             'phone' => '08031234567',
         ], $attributes));
@@ -69,7 +71,7 @@ class CustomerAuthTest extends TestCase
 
     public function test_a_code_is_only_sent_to_an_account_that_exists(): void
     {
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', 'nobody@example.com')
             ->call('sendOtp')
             ->assertHasErrors('identifier');
@@ -84,7 +86,7 @@ class CustomerAuthTest extends TestCase
         // their account hit a fatal error before a code was ever sent.
         $customer = $this->customer();
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', $customer->email)
             ->call('sendOtp')
             ->assertHasNoErrors()
@@ -98,7 +100,7 @@ class CustomerAuthTest extends TestCase
         $customer = $this->customer();
         $customer->generateOtp();
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', $customer->email)
             ->set('otp', '000000')
             ->call('verifyOtp')
@@ -110,9 +112,9 @@ class CustomerAuthTest extends TestCase
     public function test_the_right_code_signs_them_in_and_is_then_spent(): void
     {
         $customer = $this->customer();
-        $otp      = $customer->generateOtp();
+        $otp = $customer->generateOtp();
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', $customer->email)
             ->set('otp', $otp)
             ->call('verifyOtp')
@@ -124,7 +126,7 @@ class CustomerAuthTest extends TestCase
         // history as a reusable key to their order history.
         Auth::guard('customer')->logout();
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', $customer->email)
             ->set('otp', $otp)
             ->call('verifyOtp')
@@ -136,9 +138,9 @@ class CustomerAuthTest extends TestCase
         // People give their number, not their email, at the counter - so that
         // is what they will type here.
         $customer = $this->customer();
-        $otp      = $customer->generateOtp();
+        $otp = $customer->generateOtp();
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('identifier', '08031234567')
             ->set('otp', $otp)
             ->call('verifyOtp')
@@ -153,7 +155,7 @@ class CustomerAuthTest extends TestCase
     {
         $this->customer(['password' => Hash::make('correct-horse')]);
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('usePassword', true)
             ->set('identifier', 'adaeze@example.com')
             ->set('password', 'not-it')
@@ -167,7 +169,7 @@ class CustomerAuthTest extends TestCase
     {
         $customer = $this->customer(['password' => Hash::make('correct-horse')]);
 
-        Livewire::test(\App\Livewire\Customer\Login::class)
+        Livewire::test(Login::class)
             ->set('usePassword', true)
             ->set('identifier', 'adaeze@example.com')
             ->set('password', 'correct-horse')
@@ -181,7 +183,7 @@ class CustomerAuthTest extends TestCase
 
     public function test_a_new_customer_can_open_an_account(): void
     {
-        Livewire::test(\App\Livewire\Customer\Register::class)
+        Livewire::test(Register::class)
             ->set('name', 'Uche Nwosu')
             ->set('email', 'uche@example.com')
             ->set('phone', '08039998888')
@@ -199,7 +201,7 @@ class CustomerAuthTest extends TestCase
         // purchase history splits in two without either of them knowing.
         $this->customer();
 
-        Livewire::test(\App\Livewire\Customer\Register::class)
+        Livewire::test(Register::class)
             ->set('name', 'Someone Else')
             ->set('email', 'adaeze@example.com')
             ->set('phone', '08037776666')
@@ -213,7 +215,7 @@ class CustomerAuthTest extends TestCase
 
     public function test_a_mistyped_confirmation_stops_the_registration(): void
     {
-        Livewire::test(\App\Livewire\Customer\Register::class)
+        Livewire::test(Register::class)
             ->set('name', 'Uche Nwosu')
             ->set('email', 'uche@example.com')
             ->set('phone', '08039998888')
@@ -223,5 +225,24 @@ class CustomerAuthTest extends TestCase
             ->assertHasErrors('password');
 
         $this->assertSame(0, Customer::count());
+    }
+
+    public function test_customer_register_and_login_redirect_from_legacy_urls(): void
+    {
+        $this->get('/customer/register')->assertRedirect('/register');
+        $this->get('/customer/login')->assertRedirect('/login');
+    }
+
+    public function test_registration_and_login_pages_display_correct_logo(): void
+    {
+        $this->get(route('customer.login'))
+            ->assertOk()
+            ->assertSee('/logo.png')
+            ->assertDontSee('/images/logo.svg');
+
+        $this->get(route('customer.register'))
+            ->assertOk()
+            ->assertSee('/logo.png')
+            ->assertDontSee('/images/logo.svg');
     }
 }

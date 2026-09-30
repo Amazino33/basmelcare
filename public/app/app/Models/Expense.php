@@ -17,10 +17,10 @@ class Expense extends Model
      * correct one. Every field on it moves money, so every field is audited -
      * a figure quietly edited afterwards would otherwise leave no trace.
      */
-    protected array $audited = ['category', 'description', 'amount', 'expense_date'];
+    protected array $audited = ['category', 'description', 'amount', 'payment_method', 'expense_date'];
     protected string $auditLabel = 'description';
 
-    protected $fillable = ['branch_id', 'user_id', 'category', 'description', 'amount', 'expense_date'];
+    protected $fillable = ['branch_id', 'user_id', 'category', 'description', 'amount', 'payment_method', 'expense_date'];
 
     protected $casts = [
         'expense_date' => 'date',
@@ -42,6 +42,14 @@ class Expense extends Model
             'maintenance' => 'Maintenance',
             'petty_cash'  => 'Petty Cash',
             'other'       => 'Other',
+        ];
+    }
+
+    public static function paymentMethods(): array
+    {
+        return [
+            'cash'     => 'Cash',
+            'transfer' => 'Transfer',
         ];
     }
 }
