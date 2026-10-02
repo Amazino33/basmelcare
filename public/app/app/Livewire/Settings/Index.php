@@ -32,6 +32,7 @@ class Index extends Component
     public string $wawp_instance_id = '';
     public string $wawp_access_token = '';
     public bool $wawp_enabled = false;
+    public int $broadcast_daily_limit = 100;
 
     // KudiSMS
     public bool   $kudisms_enabled   = false;
@@ -100,6 +101,7 @@ class Index extends Component
         $this->wawp_instance_id = AppSetting::get('wawp_instance_id', '');
         $this->wawp_access_token = AppSetting::get('wawp_access_token', '');
         $this->wawp_enabled = AppSetting::bool('wawp_enabled', false);
+        $this->broadcast_daily_limit = (int) AppSetting::get('broadcast_daily_limit', 100);
 
         $this->kudisms_enabled   = AppSetting::bool('kudisms_enabled', false);
         $this->kudisms_token     = AppSetting::get('kudisms_token', '');
@@ -279,13 +281,15 @@ class Index extends Component
     public function saveWhatsApp()
     {
         $this->validate([
-            'wawp_instance_id'  => 'nullable|string|max:255',
-            'wawp_access_token' => 'nullable|string|max:255',
+            'wawp_instance_id'      => 'nullable|string|max:255',
+            'wawp_access_token'     => 'nullable|string|max:255',
+            'broadcast_daily_limit' => 'required|integer|min:10|max:5000',
         ]);
 
         AppSetting::set('wawp_instance_id', $this->wawp_instance_id);
         AppSetting::set('wawp_access_token', $this->wawp_access_token);
         AppSetting::set('wawp_enabled', $this->wawp_enabled ? '1' : '0');
+        AppSetting::set('broadcast_daily_limit', $this->broadcast_daily_limit);
 
         $this->success('WhatsApp settings saved.');
     }

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Messages\Index;
+use App\Models\AppSetting;
 use App\Models\Batch;
 use App\Models\Broadcast;
 use App\Models\BroadcastRecipient;
@@ -14,7 +16,6 @@ use App\Models\User;
 use App\Services\BroadcastSender;
 use App\Services\WhatsAppService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -42,16 +43,16 @@ class BroadcastMessagingTest extends TestCase
     private function customer(string $type = 'retail', ?string $phone = null): Customer
     {
         return Customer::create([
-            'name'  => 'CUSTOMER ' . random_int(1000, 9999),
-            'type'  => $type,
-            'phone' => $phone ?? ('080' . random_int(10000000, 99999999)),
+            'name' => 'CUSTOMER '.random_int(1000, 9999),
+            'type' => $type,
+            'phone' => $phone ?? ('080'.random_int(10000000, 99999999)),
         ]);
     }
 
     private function page(?User $as = null)
     {
         return Livewire::actingAs($as ?? $this->user(['admin']))
-            ->test(\App\Livewire\Messages\Index::class);
+            ->test(Index::class);
     }
 
     /** Pretend the gateway answered a certain way. */
@@ -191,7 +192,7 @@ class BroadcastMessagingTest extends TestCase
         $this->fakeWhatsApp(WhatsAppService::VIA_WHATSAPP);
 
         $broadcast = $this->prepared(3);
-        $sender    = app(BroadcastSender::class);
+        $sender = app(BroadcastSender::class);
 
         $sender->sendBatch($broadcast, limit: 2);
         $second = $sender->sendBatch($broadcast, limit: 2);
@@ -301,8 +302,8 @@ class BroadcastMessagingTest extends TestCase
     public function test_message_personalization_replaces_placeholders(): void
     {
         $customer = Customer::create([
-            'name'  => 'Adewale Musa',
-            'type'  => 'retail',
+            'name' => 'Adewale Musa',
+            'type' => 'retail',
             'phone' => '08012345678',
         ]);
 
@@ -340,14 +341,129 @@ class BroadcastMessagingTest extends TestCase
         $broadcast = $this->prepared(3);
 
         $this->artisan('broadcast:send', [
-            'id'          => $broadcast->id,
-            '--batch'     => 2,
+            'id' => $broadcast->id,
+            '--batch' => 2,
             '--min-delay' => 0,
             '--max-delay' => 0,
-            '--cooldown'  => 0,
+            '--cooldown' => 0,
         ])->assertExitCode(0);
 
         $this->assertSame(0, $broadcast->pendingCount());
         $this->assertTrue($broadcast->fresh()->isFinished());
+    }
+
+    public function test_spintax_is_evaluated_and_randomized(): void
+    {
+        $sender = app(BroadcastSender::class);
+        $template = '{Hello|Hi|Greetings} customer';
+
+        $results = [];
+        for ($i = 0; $i < 30; $i++) {
+            $parsed = $sender->parseSpintax($template);
+            $this->assertContains($parsed, ['Hello customer', 'Hi customer', 'Greetings customer']);
+            $results[$parsed] = true;
+        }
+
+        // Over 30 trials with 3 options, we should get at least 2 distinct variations
+        $this->assertGreaterThan(1, count($results));
+    }
+
+    public function test_incoming_whatsapp_webhook_opts_out_customer_on_stop(): void
+    {
+        $this->mock(WhatsAppService::class, function ($mock) {
+            $mock->shouldReceive('send')->once()->andReturn(true);
+        });
+
+        $customer = $this->customer('retail', '08031234567');
+        $this->assertFalse($customer->isOptedOutOfBroadcasts());
+
+        $response = $this->postJson('/api/webhooks/whatsapp', [
+            'data' => [
+                'from' => '2348031234567@s.whatsapp.net',
+                'body' => 'STOP',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['status' => 'opted_out']);
+        $this->assertTrue($customer->fresh()->isOptedOutOfBroadcasts());
+    }
+
+    public function test_incoming_whatsapp_webhook_resubscribes_customer_on_start(): void
+    {
+        $this->mock(WhatsAppService::class, function ($mock) {
+            $mock->shouldReceive('send')->once()->andReturn(true);
+        });
+
+        $customer = $this->customer('retail', '08031234567');
+        $customer->update(['broadcast_opt_out_at' => now()]);
+        $this->assertTrue($customer->isOptedOutOfBroadcasts());
+
+        $response = $this->postJson('/api/webhooks/whatsapp', [
+            'data' => [
+                'from' => '2348031234567@s.whatsapp.net',
+                'body' => 'START',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['status' => 'opted_in']);
+        $this->assertFalse($customer->fresh()->isOptedOutOfBroadcasts());
+    }
+
+    public function test_incoming_whatsapp_webhook_handles_meta_challenge(): void
+    {
+        $response = $this->get('/api/webhooks/whatsapp?hub_challenge=meta_challenge_123');
+
+        $response->assertStatus(200);
+        $this->assertSame('meta_challenge_123', $response->getContent());
+    }
+
+    public function test_daily_broadcast_limit_blocks_sending_when_exceeded(): void
+    {
+        $this->fakeWhatsApp(WhatsAppService::VIA_WHATSAPP);
+
+        AppSetting::set('broadcast_daily_limit', 2);
+        $broadcast = $this->prepared(3);
+        $sender = app(BroadcastSender::class);
+
+        // First batch of 5 should be capped at quota of 2
+        $result1 = $sender->sendBatch($broadcast, 5, true);
+        $this->assertSame(2, $result1['sent']);
+        $this->assertSame(1, $result1['remaining']);
+
+        // Second batch should be blocked completely as quota is exhausted
+        $result2 = $sender->sendBatch($broadcast, 5, true);
+        $this->assertSame(0, $result2['sent']);
+        $this->assertTrue($result2['daily_limit_reached']);
+    }
+
+    public function test_staff_can_manually_toggle_customer_broadcast_opt_out(): void
+    {
+        $customer = $this->customer('retail', '08099887766');
+        $this->assertFalse($customer->isOptedOutOfBroadcasts());
+
+        Livewire::actingAs($this->user(['admin']))
+            ->test(\App\Livewire\Customers\Index::class)
+            ->call('toggleBroadcastOptOut', $customer->id);
+
+        $this->assertTrue($customer->fresh()->isOptedOutOfBroadcasts());
+
+        Livewire::actingAs($this->user(['admin']))
+            ->test(\App\Livewire\Customers\Index::class)
+            ->call('toggleBroadcastOptOut', $customer->id);
+
+        $this->assertFalse($customer->fresh()->isOptedOutOfBroadcasts());
+    }
+
+    public function test_promoters_cannot_toggle_customer_broadcast_opt_out(): void
+    {
+        $customer = $this->customer('retail', '08099887766');
+
+        Livewire::actingAs($this->user(['promoter']))
+            ->test(\App\Livewire\Customers\Index::class)
+            ->call('toggleBroadcastOptOut', $customer->id);
+
+        $this->assertFalse($customer->fresh()->isOptedOutOfBroadcasts());
     }
 }

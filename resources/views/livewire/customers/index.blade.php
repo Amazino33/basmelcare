@@ -16,32 +16,182 @@
             ]) />
         @endscope
 
+        @scope('cell_phone', $customer)
+            <div class="flex items-center gap-1.5">
+                <span>{{ $customer->phone ?? '—' }}</span>
+                @if($customer->isOptedOutOfBroadcasts())
+                    <span class="badge badge-error badge-outline badge-xs" title="Opted out of marketing broadcasts">Opted Out</span>
+                @endif
+            </div>
+        @endscope
+
+        @scope('cell_registered_by_name', $customer)
+            <span class="text-sm {{ $customer->registeredBy ? '' : 'text-base-content/40' }}">
+                {{ $customer->registeredBy?->name ?? '—' }}
+            </span>
+        @endscope
+
         @scope('actions', $customer)
+            {{-- @scope does not inherit view variables — resolve the role here. --}}
+            @php
+                $actorRoles = auth()->user()->role ?? [];
+                $actorIsPromoter = in_array('promoter', $actorRoles)
+                    && ! array_intersect($actorRoles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+            @endphp
             <div class="flex gap-1">
                 <x-button icon="o-eye" wire:click="viewProfile({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Profile" />
-                <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
-                <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
+                @unless($actorIsPromoter)
+                    <x-button icon="o-pencil" wire:click="edit({{ $customer->id }})" class="btn-xs btn-ghost" tooltip="Edit" />
+                    <x-button icon="o-trash" wire:click="delete({{ $customer->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this customer?" tooltip="Delete" />
+                @endunless
             </div>
         @endscope
     </x-table>
 
-    <!-- Create/Edit Modal -->
-    <x-modal wire:model="modal" title="{{ $customerId ? 'Edit Customer' : 'New Customer' }}">
+    {{--
+        ONE dialog for the whole promoter flow: details -> OTP -> Wi-Fi code.
+
+        These were three separate <x-modal>s. Each MaryUI modal carries
+        x-trap="open", so closing one and opening another in the same Livewire
+        response handed Alpine's focus trap over mid-tick — the next dialog
+        appeared but would not accept typing. A single dialog has a single trap.
+    --}}
+    @php
+        $flowStep = $codeModal ? 'code' : ($otpModal ? 'otp' : 'form');
+    @endphp
+
+    <x-modal
+        wire:model="modal"
+        :title="match($flowStep) {
+            'otp'   => 'Verify Customer Phone',
+            'code'  => $noSmartDevice ? 'No Smartphone' : ($codeRedeemed ? 'Connected' : 'Wi-Fi Code Issued'),
+            default => $customerId ? 'Edit Customer' : 'New Customer',
+        }"
+        :box-class="$flowStep === 'form' ? null : 'max-w-sm'"
+        :persistent="$flowStep !== 'form'"
+    >
+
+    @if($flowStep === 'form')
         <x-form wire:submit="save">
             <x-input label="Name" wire:model="name" />
             <x-select label="Customer Type" wire:model="type" :options="[
                 ['id' => 'retail', 'name' => 'Retail'],
                 ['id' => 'wholesale', 'name' => 'Wholesale'],
             ]" option-value="id" option-label="name" />
-            <x-input label="Phone" wire:model="phone" />
+            <x-input label="Phone" wire:model="phone"
+                :hint="in_array('promoter', auth()->user()->role ?? []) && !$customerId ? 'Required — OTP will be sent here to verify the customer' : ''" />
             <x-input label="Email" wire:model="email" type="email" />
             <x-textarea label="Address" wire:model="address" rows="2" />
             <x-textarea label="Notes" wire:model="notes" rows="2" />
+            @unless($isPromoter)
+                <div class="pt-2">
+                    <x-toggle label="Opt out of marketing broadcasts"
+                              hint="Exclude from bulk WhatsApp and SMS marketing campaigns"
+                              wire:model="broadcast_opt_out" />
+                </div>
+            @endunless
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.modal = false" />
                 <x-button label="Save" type="submit" class="btn-primary" />
             </x-slot:actions>
         </x-form>
+    @endif
+
+    @if($flowStep === 'otp')
+        <div class="space-y-4">
+            <div class="flex items-start gap-3 p-3 bg-info/10 rounded-lg">
+                <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-info shrink-0 mt-0.5" />
+                <p class="text-sm text-base-content/80">
+                    An OTP was sent to <span class="font-bold">{{ $pendingPhone }}</span>.
+                    Ask the customer for the code they received.
+                </p>
+            </div>
+            <div>
+                <x-input label="Enter OTP" wire:model="otpCode" placeholder="000000"
+                    maxlength="6" inputmode="numeric"
+                    hint="6-digit code from the customer's phone"
+                    wire:keydown.enter="confirmOtp"
+                    x-init="$nextTick(() => $el.querySelector('input')?.focus())" />
+                @if($otpError)
+                    <p class="text-error text-xs mt-1">{{ $otpError }}</p>
+                @endif
+            </div>
+        </div>
+        <x-slot:actions>
+            <x-button label="Skip (no code)" wire:click="skipOtp" class="btn-ghost btn-sm text-base-content/40 mr-auto" />
+            <x-button label="Resend" wire:click="resendOtp" class="btn-outline btn-sm" spinner="resendOtp" />
+            <x-button label="Verify & Issue Code" wire:click="confirmOtp" class="btn-primary btn-sm" spinner="confirmOtp" />
+        </x-slot:actions>
+    @endif
+
+    @if($flowStep === 'code')
+        <div class="space-y-4" @if(!$codeRedeemed) wire:poll.3s="checkRedemption" @endif>
+
+            @unless($noSmartDevice)
+                <div class="text-center py-2">
+                    <p class="text-xs text-base-content/60 uppercase tracking-wide mb-1">Wi-Fi code</p>
+                    <p class="text-3xl font-mono font-bold tracking-[0.2em] text-primary">{{ $issuedCode }}</p>
+                </div>
+            @endunless
+
+            @if($noSmartDevice)
+                <div class="flex items-start gap-3 p-3 bg-info/10 rounded-lg">
+                    <x-icon name="o-device-phone-mobile" class="w-5 h-5 text-info shrink-0 mt-0.5" />
+                    <div>
+                        <p class="text-sm font-semibold">This phone can't use the Wi-Fi</p>
+                        <p class="text-xs text-base-content/70 mt-0.5">
+                            The message went by SMS, so there's no WhatsApp on
+                            <span class="font-semibold">{{ $pendingPhone }}</span>.
+                            No Wi-Fi code was issued — it would be no use to them.
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="flex items-start gap-2 p-2 rounded-lg {{ $codeSent ? 'bg-success/10' : 'bg-warning/10' }}">
+                    <x-icon name="{{ $codeSent ? 'o-check-circle' : 'o-exclamation-triangle' }}"
+                            class="w-4 h-4 shrink-0 mt-0.5 {{ $codeSent ? 'text-success' : 'text-warning' }}" />
+                    <p class="text-xs text-base-content/80">
+                        @if($codeSent)
+                            Sent to <span class="font-semibold">{{ $pendingPhone }}</span>.
+                        @else
+                            Could not send by WhatsApp/SMS — read the code out to the customer.
+                        @endif
+                    </p>
+                </div>
+            @endif
+
+            @if($codeRedeemed)
+                <div class="flex items-center gap-3 p-3 bg-success/10 rounded-lg">
+                    <x-icon name="o-check-badge" class="w-6 h-6 text-success shrink-0" />
+                    <div>
+                        <p class="text-sm font-bold text-success">
+                            {{ $noSmartDevice ? 'Counted — no connection needed' : 'Customer is online' }}
+                        </p>
+                        <p class="text-xs text-base-content/70">
+                            ₦{{ number_format($earnedAmount, 2) }} commission earned.
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg">
+                    <span class="loading loading-spinner loading-sm text-primary shrink-0"></span>
+                    <div>
+                        <p class="text-sm font-semibold">Waiting for customer to connect…</p>
+                        <p class="text-xs text-base-content/60">
+                            Have them join the Wi-Fi and enter this code. You earn once they're online.
+                        </p>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        <x-slot:actions>
+            <x-button label="{{ $codeRedeemed ? 'Done' : 'Close' }}"
+                      wire:click="closeCodeModal"
+                      class="{{ $codeRedeemed ? 'btn-primary' : 'btn-ghost' }} btn-sm" />
+        </x-slot:actions>
+    @endif
+
     </x-modal>
 
     <!-- Customer Profile Drawer -->
@@ -57,6 +207,37 @@
                 <div class="flex justify-between"><span class="text-base-content/60">Address:</span> <span>{{ $viewCustomer->address ?? '—' }}</span></div>
             </div>
 
+            <!-- Marketing Broadcast Status -->
+            <div class="flex items-center justify-between p-3 rounded-lg {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'bg-error/10 border border-error/20' : 'bg-success/10 border border-success/20' }} mb-4">
+                <div class="flex items-center gap-2.5">
+                    <x-icon name="{{ $viewCustomer->isOptedOutOfBroadcasts() ? 'o-no-symbol' : 'o-megaphone' }}"
+                            class="w-5 h-5 shrink-0 {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'text-error' : 'text-success' }}" />
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'text-error' : 'text-success' }}">
+                            {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'Opted Out of Broadcasts' : 'Marketing Broadcasts Active' }}
+                        </div>
+                        <div class="text-xs text-base-content/60 mt-0.5">
+                            {{ $viewCustomer->isOptedOutOfBroadcasts()
+                                ? 'Opted out ' . ($viewCustomer->broadcast_opt_out_at ? $viewCustomer->broadcast_opt_out_at->diffForHumans() : 'previously')
+                                : 'Will receive WhatsApp/SMS campaigns' }}
+                        </div>
+                    </div>
+                </div>
+                @unless($isPromoter)
+                    <x-button
+                        label="{{ $viewCustomer->isOptedOutOfBroadcasts() ? 'Resubscribe' : 'Opt Out' }}"
+                        wire:click="toggleBroadcastOptOut({{ $viewCustomer->id }})"
+                        class="btn-xs {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'btn-success' : 'btn-outline btn-error' }}"
+                        spinner="toggleBroadcastOptOut" />
+                @endunless
+            </div>
+
+            @if($isPromoter)
+                <div class="flex items-start gap-2 p-3 bg-base-200 rounded-lg text-sm text-base-content/60">
+                    <x-icon name="o-lock-closed" class="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>Purchase history, medical records and account balances are not available to promoters.</span>
+                </div>
+            @else
             <!-- Quick Stats -->
             <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="bg-base-200 rounded p-2 text-center">
@@ -72,17 +253,22 @@
                     <div class="text-xs text-base-content/60">Debt</div>
                 </div>
                 <div class="bg-base-200 rounded p-2 text-center">
-                    <div class="text-lg font-bold">{{ $viewCustomer->medicalRecords->count() }}</div>
+                    <div class="text-lg font-bold">
+                        {{ $canViewRecords ? $viewCustomer->medicalRecords->count() : '—' }}
+                    </div>
                     <div class="text-xs text-base-content/60">Records</div>
                 </div>
             </div>
 
             <x-hr />
 
+            @if($canViewRecords)
             <!-- Medical Records -->
             <div class="flex justify-between items-center mb-3">
                 <div class="text-sm font-semibold text-base-content/60 uppercase">Medical Records</div>
-                <x-button label="Add Record" wire:click="openMedicalRecord" icon="o-plus" class="btn-xs btn-primary" />
+                @if($canEditRecords)
+                    <x-button label="Add Record" wire:click="openMedicalRecord" icon="o-plus" class="btn-xs btn-primary" />
+                @endif
             </div>
 
             @forelse($viewCustomer->medicalRecords as $record)
@@ -111,13 +297,16 @@
                             @if($record->file_path)
                                 <x-button icon="o-arrow-down-tray" link="{{ asset('storage/' . $record->file_path) }}" class="btn-xs btn-ghost" tooltip="Download" external />
                             @endif
-                            <x-button icon="o-trash" wire:click="deleteMedicalRecord({{ $record->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this record?" />
+                            @if($canEditRecords)
+                                <x-button icon="o-trash" wire:click="deleteMedicalRecord({{ $record->id }})" class="btn-xs btn-ghost text-error" wire:confirm="Delete this record?" />
+                            @endif
                         </div>
                     </div>
                 </div>
             @empty
                 <div class="text-center py-4 text-base-content/60 text-sm">No medical records yet.</div>
             @endforelse
+            @endif
 
             <x-hr />
 
@@ -145,6 +334,25 @@
                             <div class="text-sm font-semibold">{{ $order->order_number }}</div>
                             <div class="text-xs text-base-content/60">{{ $order->created_at->format('M d, Y') }} | {{ ucfirst($order->fulfillment_type) }}</div>
                             <div class="text-xs text-base-content/60">{{ $order->items->count() }} items</div>
+
+                            @if($order->prescription_path)
+                                {{-- The file the customer uploaded with this order. Their own
+                                     medical records stay pharmacist-only; this is the document
+                                     they attached to a purchase the sales desk already handles. --}}
+                                <a href="{{ route('prescriptions.file', $order->id) }}" target="_blank"
+                                   class="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                                    <x-icon name="o-document-text" class="w-3 h-3" />
+                                    Prescription
+                                </a>
+
+                                @if($order->prescriptionRejected())
+                                    <span class="badge badge-error badge-xs ml-1">Rejected</span>
+                                @elseif($order->awaitingPrescriptionReview())
+                                    <span class="badge badge-warning badge-xs ml-1">Awaiting pharmacist</span>
+                                @elseif($order->prescriptionApproved())
+                                    <span class="badge badge-success badge-xs ml-1">Approved</span>
+                                @endif
+                            @endif
                         </div>
                         <div class="text-right">
                             <span class="font-bold">₦{{ number_format($order->total_amount, 2) }}</span>
@@ -205,6 +413,7 @@
                         <span class="font-bold text-error">₦{{ number_format($debt->balance, 2) }}</span>
                     </div>
                 @endforeach
+            @endif
             @endif
         @endif
     </x-drawer>

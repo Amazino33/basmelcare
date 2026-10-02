@@ -16,6 +16,15 @@
             ]) />
         @endscope
 
+        @scope('cell_phone', $customer)
+            <div class="flex items-center gap-1.5">
+                <span>{{ $customer->phone ?? '—' }}</span>
+                @if($customer->isOptedOutOfBroadcasts())
+                    <span class="badge badge-error badge-outline badge-xs" title="Opted out of marketing broadcasts">Opted Out</span>
+                @endif
+            </div>
+        @endscope
+
         @scope('cell_registered_by_name', $customer)
             <span class="text-sm {{ $customer->registeredBy ? '' : 'text-base-content/40' }}">
                 {{ $customer->registeredBy?->name ?? '—' }}
@@ -74,6 +83,13 @@
             <x-input label="Email" wire:model="email" type="email" />
             <x-textarea label="Address" wire:model="address" rows="2" />
             <x-textarea label="Notes" wire:model="notes" rows="2" />
+            @unless($isPromoter)
+                <div class="pt-2">
+                    <x-toggle label="Opt out of marketing broadcasts"
+                              hint="Exclude from bulk WhatsApp and SMS marketing campaigns"
+                              wire:model="broadcast_opt_out" />
+                </div>
+            @endunless
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.modal = false" />
                 <x-button label="Save" type="submit" class="btn-primary" />
@@ -189,6 +205,31 @@
                 <div class="flex justify-between"><span class="text-base-content/60">Phone:</span> <span>{{ $viewCustomer->phone ?? '—' }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Email:</span> <span>{{ $viewCustomer->email ?? '—' }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Address:</span> <span>{{ $viewCustomer->address ?? '—' }}</span></div>
+            </div>
+
+            <!-- Marketing Broadcast Status -->
+            <div class="flex items-center justify-between p-3 rounded-lg {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'bg-error/10 border border-error/20' : 'bg-success/10 border border-success/20' }} mb-4">
+                <div class="flex items-center gap-2.5">
+                    <x-icon name="{{ $viewCustomer->isOptedOutOfBroadcasts() ? 'o-no-symbol' : 'o-megaphone' }}"
+                            class="w-5 h-5 shrink-0 {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'text-error' : 'text-success' }}" />
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'text-error' : 'text-success' }}">
+                            {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'Opted Out of Broadcasts' : 'Marketing Broadcasts Active' }}
+                        </div>
+                        <div class="text-xs text-base-content/60 mt-0.5">
+                            {{ $viewCustomer->isOptedOutOfBroadcasts()
+                                ? 'Opted out ' . ($viewCustomer->broadcast_opt_out_at ? $viewCustomer->broadcast_opt_out_at->diffForHumans() : 'previously')
+                                : 'Will receive WhatsApp/SMS campaigns' }}
+                        </div>
+                    </div>
+                </div>
+                @unless($isPromoter)
+                    <x-button
+                        label="{{ $viewCustomer->isOptedOutOfBroadcasts() ? 'Resubscribe' : 'Opt Out' }}"
+                        wire:click="toggleBroadcastOptOut({{ $viewCustomer->id }})"
+                        class="btn-xs {{ $viewCustomer->isOptedOutOfBroadcasts() ? 'btn-success' : 'btn-outline btn-error' }}"
+                        spinner="toggleBroadcastOptOut" />
+                @endunless
             </div>
 
             @if($isPromoter)

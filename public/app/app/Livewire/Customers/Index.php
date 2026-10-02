@@ -26,6 +26,7 @@ class Index extends Component
     public string $address = '';
     public string $notes = '';
     public ?int $customerId = null;
+    public bool $broadcast_opt_out = false;
     public bool $modal = false;
 
     // OTP verification for promoter commissions
@@ -84,7 +85,7 @@ class Index extends Component
 
     public function create()
     {
-        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId', 'broadcast_opt_out']);
         $this->modal = true;
     }
 
@@ -139,14 +140,21 @@ class Index extends Component
         ];
 
         if ($this->customerId) {
-            Customer::findOrFail($this->customerId)->update($data);
+            $customer = Customer::findOrFail($this->customerId);
+            $data['broadcast_opt_out_at'] = $this->broadcast_opt_out
+                ? ($customer->broadcast_opt_out_at ?? now())
+                : null;
+            $customer->update($data);
             $this->modal = false;
             $this->success('Customer updated.');
-            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId', 'broadcast_opt_out']);
             return;
         }
 
-        $customer = Customer::create(array_merge($data, ['registered_by' => auth()->id()]));
+        $customer = Customer::create(array_merge($data, [
+            'registered_by'        => auth()->id(),
+            'broadcast_opt_out_at' => $this->broadcast_opt_out ? now() : null,
+        ]));
 
         if ($isPromoter) {
             $otp  = $customer->generateOtp();
@@ -158,7 +166,7 @@ class Index extends Component
             // steps INSIDE one dialog. Closing one modal and opening another in
             // the same response hands Alpine's focus trap over mid-tick, which
             // leaves the next dialog visible but unable to accept typing.
-            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+            $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId', 'broadcast_opt_out']);
 
             if (! $sent) {
                 $this->modal = false;
@@ -178,7 +186,7 @@ class Index extends Component
 
         $this->modal = false;
         $this->success('Customer added.');
-        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId']);
+        $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId', 'broadcast_opt_out']);
     }
 
     public function confirmOtp(): void
@@ -466,7 +474,26 @@ class Index extends Component
         $this->email = $customer->email ?? '';
         $this->address = $customer->address ?? '';
         $this->notes = $customer->notes ?? '';
+        $this->broadcast_opt_out = $customer->isOptedOutOfBroadcasts();
         $this->modal = true;
+    }
+
+    public function toggleBroadcastOptOut(int $customerId): void
+    {
+        if ($this->isPromoter()) {
+            $this->error('Promoters cannot modify broadcast preferences.');
+            return;
+        }
+
+        $customer = Customer::findOrFail($customerId);
+
+        if ($customer->isOptedOutOfBroadcasts()) {
+            $customer->update(['broadcast_opt_out_at' => null]);
+            $this->success("{$customer->name} has been resubscribed to marketing broadcasts.");
+        } else {
+            $customer->update(['broadcast_opt_out_at' => now()]);
+            $this->info("{$customer->name} has been opted out of marketing broadcasts.");
+        }
     }
 
     public function delete($id)

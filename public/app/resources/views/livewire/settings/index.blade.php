@@ -199,6 +199,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <x-input label="WAWP Instance ID" wire:model="wawp_instance_id" />
                         <x-input label="WAWP Access Token" wire:model="wawp_access_token" type="password" />
+                        <x-input label="Daily Broadcast Limit" wire:model="broadcast_daily_limit" type="number" min="10" max="5000"
+                                 hint="Daily safety quota of WhatsApp broadcasts (default 100). Prevents Meta volume spikes and bans." />
                     </div>
 
                     @if(!$wawp_enabled)
@@ -209,6 +211,28 @@
                         <x-button label="Save WhatsApp Settings" type="submit" class="btn-primary" />
                     </x-slot:actions>
                 </x-form>
+            </x-card>
+
+            <x-card title="Meta / WhatsApp Webhook (Anti-Ban Auto Opt-Out)" class="mt-4">
+                <p class="text-sm text-base-content/70 mb-3">
+                    Configure this webhook in your WAWP or WhatsApp Gateway dashboard. Incoming replies like <strong>STOP</strong> or <strong>UNSUBSCRIBE</strong> will automatically opt customers out immediately, preventing Meta from banning your number due to spam reports.
+                </p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="label"><span class="label-text font-semibold text-xs">Webhook URL</span></label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" readonly value="{{ url('/api/webhooks/whatsapp') }}" class="input input-bordered input-sm font-mono w-full bg-base-200" id="webhookUrlInput" />
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ url('/api/webhooks/whatsapp') }}'); alert('Webhook URL copied to clipboard!');" class="btn btn-sm btn-outline">
+                                Copy
+                            </button>
+                        </div>
+                        <p class="text-xs text-base-content/60 mt-1">Events to subscribe: <code>messages.upsert</code>, <code>messages-receive</code>, <code>incoming-message</code></p>
+                    </div>
+                    <div class="p-3 bg-success/10 rounded-lg text-xs text-base-content/80 flex items-start gap-2">
+                        <x-icon name="o-shield-check" class="w-4 h-4 text-success shrink-0 mt-0.5" />
+                        <span>Supported triggers: <code>STOP</code>, <code>UNSUBSCRIBE</code>, <code>CANCEL</code>, <code>QUIT</code> (opts out), and <code>START</code>, <code>SUBSCRIBE</code> (resubscribes). Handshake <code>hub_challenge</code> verification is active.</span>
+                    </div>
+                </div>
             </x-card>
 
             <x-card title="SMS Fallback (KudiSMS)" class="mt-4">

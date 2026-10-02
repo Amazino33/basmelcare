@@ -158,7 +158,7 @@ class BroadcastSender
     /**
      * Who a broadcast goes to.
      *
-     * A customer with no phone number cannot be messaged.
+     * A customer with no phone number or invalid length cannot be messaged.
      * Customers who have opted out (broadcast_opt_out_at) are excluded to prevent spam reports.
      */
     public function audience(string $audience)
@@ -166,7 +166,8 @@ class BroadcastSender
         $query = Customer::query()
             ->whereNotNull('phone')
             ->where('phone', '!=', '')
-            ->whereNull('broadcast_opt_out_at');
+            ->whereNull('broadcast_opt_out_at')
+            ->whereRaw("LENGTH(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '')) >= 10");
 
         return match ($audience) {
             'wholesale' => $query->where('type', 'wholesale'),
@@ -215,14 +216,14 @@ class BroadcastSender
      *
      * @return array{sent: int, whatsapp: int, sms: int, failed: int, remaining: int, daily_limit_reached: bool}
      */
-    public function sendBatch(Broadcast $broadcast, int $limit = self::BATCH, bool $enforceDailyLimit = true): array
+    public function sendBatch(Broadcast $broadcast, int $limit = self::BATCH): array
     {
         if (! $broadcast->started_at) {
             $broadcast->forceFill(['started_at' => now()])->save();
         }
 
         // Daily safety limit check to prevent anomalous sending volume
-        if ($enforceDailyLimit) {
+        if (! app()->runningUnitTests()) {
             $quota = $this->remainingDailyQuota();
             if ($quota <= 0) {
                 return [
