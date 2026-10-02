@@ -14,6 +14,8 @@ use App\Models\PurchaseOrder;
 use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Support\TopProducts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -399,8 +401,40 @@ class Dashboard extends Component
             ->whereNotBetween('debts.created_at', [$from, $to])
             ->sum('debt_payments.amount');
 
-        // 4. What actually reached the drawer.
-        $cashCollectedToday = $totalSalesToday - $owedFromPeriod + $oldDebtRepaid;
+        // Returns for the period (scoped to current branch via whereHas('sale') with BranchScope)
+        $periodApprovedReturns = SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_APPROVED)
+            ->where(function ($q) use ($from, $to) {
+                $q->whereBetween('approved_at', [$from, $to])
+                  ->orWhere(fn ($sq) => $sq->whereNull('approved_at')->whereBetween('created_at', [$from, $to]));
+            });
+
+        $returnsCountToday   = (clone $periodApprovedReturns)->count();
+        $returnsTotalToday   = (float) (clone $periodApprovedReturns)->sum('total_credit');
+        $cashRefundedToday   = (float) (clone $periodApprovedReturns)->where('refund_method', SaleReturn::CASH)->sum('total_credit');
+        $creditRefundedToday = (float) (clone $periodApprovedReturns)->where('refund_method', SaleReturn::CREDIT)->sum('total_credit');
+
+        // Returned stock cost (credited back to reduce COGS)
+        $returnedCostToday = 0.0;
+        if (Schema::hasTable('sale_return_items')) {
+            $returnedCostToday = (float) DB::table('sale_return_items')
+                ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
+                ->join('sale_items', 'sale_items.id', '=', 'sale_return_items.sale_item_id')
+                ->whereIn('sale_returns.id', (clone $periodApprovedReturns)->select('sale_returns.id'))
+                ->sum(DB::raw('sale_items.cost_price * sale_return_items.quantity_returned'));
+        }
+
+        // Pending returns awaiting manager/auditor review
+        $pendingReturnsCount = SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_PENDING)
+            ->count();
+        $pendingReturnsTotal = (float) SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_PENDING)
+            ->sum('total_credit');
+
+        // 4. What actually reached the drawer:
+        // Cash refunds directly reduce drawer takings. Credit refunds do not (liability, drawn later).
+        $cashCollectedToday = $totalSalesToday - $owedFromPeriod - $cashRefundedToday + $oldDebtRepaid;
         $salesCountToday = $todaySales->count();
 
         $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']));
@@ -409,7 +443,8 @@ class Dashboard extends Component
         foreach ((clone $todayItems)->get() as $item) {
             $todayCost += $item->cost_price * $item->quantity;
         }
-        $todayProfit = $todayRevenue - $todayCost;
+        // Profit nets all refunds and credits back returned goods cost
+        $todayProfit = ($todayRevenue - $returnsTotalToday) - ($todayCost - $returnedCostToday);
 
         $totalProducts = Product::count();
         $totalStock = Batch::sum('quantity');
@@ -453,10 +488,17 @@ class Dashboard extends Component
         // itself as stock moves rather than waiting for this page to be
         // reloaded.
 
-        $recentSales = Sale::with('user', 'customer')
+        $recentSales = Sale::with(['user', 'customer', 'returns'])
             ->whereIn('status', ['paid', 'completed'])
             ->whereBetween('created_at', [$from, $to])
             ->latest()
+            ->limit(5)
+            ->get();
+
+        $recentReturns = SaleReturn::with(['sale.customer', 'processor', 'approver'])
+            ->whereHas('sale')
+            ->whereBetween('created_at', [$from, $to])
+            ->latest('id')
             ->limit(5)
             ->get();
 
@@ -486,6 +528,13 @@ class Dashboard extends Component
             'discountsGiven'     => $discountsGiven,
             'owedFromPeriod'     => $owedFromPeriod,
             'oldDebtRepaid'      => $oldDebtRepaid,
+            'returnsCountToday'   => $returnsCountToday,
+            'returnsTotalToday'   => $returnsTotalToday,
+            'cashRefundedToday'   => $cashRefundedToday,
+            'creditRefundedToday' => $creditRefundedToday,
+            'returnedCostToday'   => $returnedCostToday,
+            'pendingReturnsCount' => $pendingReturnsCount,
+            'pendingReturnsTotal' => $pendingReturnsTotal,
             'salesCountToday' => $salesCountToday,
             'todayProfit' => $todayProfit,
             'totalProducts' => $totalProducts,
@@ -497,6 +546,7 @@ class Dashboard extends Component
             'expiringBatches' => $expiringBatches,
             'expiredBatches' => $expiredBatches,
             'recentSales' => $recentSales,
+            'recentReturns' => $recentReturns,
             'todayOnlineRevenue' => $todayOnlineRevenue,
             'todayOnlineCount' => $todayOnlineCount,
             'pendingOnlineOrders' => $pendingOnlineOrders,

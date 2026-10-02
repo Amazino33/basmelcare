@@ -440,12 +440,28 @@
         </x-card>
     @endif
 
+    <!-- Pending Returns Alert (admin, branch_manager, auditor) -->
+    @if($pendingReturnsCount > 0 && array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager', 'auditor']))
+        <div class="alert alert-warning mb-4 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-2">
+                <x-icon name="o-arrow-path-rounded-square" class="w-5 h-5 shrink-0" />
+                <div>
+                    <div class="font-semibold text-sm">{{ $pendingReturnsCount }} return {{ $pendingReturnsCount === 1 ? 'request' : 'requests' }} awaiting approval (₦{{ number_format($pendingReturnsTotal, 2) }})</div>
+                    <div class="text-xs opacity-80">Review requested items and approve restocking or refunds.</div>
+                </div>
+            </div>
+            <a href="{{ route('returns.index', ['statusFilter' => 'pending']) }}" class="btn btn-sm btn-warning shrink-0">
+                Review Returns <x-icon name="o-arrow-right" class="w-4 h-4 inline" />
+            </a>
+        </div>
+    @endif
+
     @php $seesRevenue = (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']); @endphp
 
     @if($seesRevenue)
         {{-- The money story, left to right, in the order it happens:
-             expected → less discounts → less owed → what reached the drawer. --}}
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-2">
+             expected → less discounts → less owed → what reached the drawer → returns & profit. --}}
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-2">
             <x-stat
                 title="Expected Sales"
                 value="₦{{ number_format($expectedSales, 2) }}"
@@ -484,12 +500,23 @@
                 class="text-sm h-full {{ $stat }}"
             />
 
+            <a href="{{ route('returns.index') }}" class="block">
+                <x-stat
+                    title="Returns"
+                    value="₦{{ number_format($returnsTotalToday, 2) }}"
+                    description="{{ $returnsCountToday }} {{ \Illuminate\Support\Str::plural('return', $returnsCountToday) }} approved"
+                    icon="o-arrow-path-rounded-square"
+                    color="{{ $returnsCountToday > 0 ? 'text-warning' : 'text-base-content/40' }}"
+                    class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
+                />
+            </a>
+
             @if(array_intersect(auth()->user()->role ?? [],['admin', 'pharmacist', 'branch_manager']))
                 <a href="{{ route('reports.index') }}" class="block">
                     <x-stat
                         title="Profit"
                         value="₦{{ number_format($todayProfit, 2) }}"
-                        description="after cost of goods"
+                        description="after cost & returns"
                         icon="{{ $todayProfit >= 0 ? 'o-arrow-trending-up' : 'o-arrow-trending-down' }}"
                         color="{{ $todayProfit >= 0 ? 'text-success' : 'text-error' }}"
                         class="text-sm hover:bg-base-200 transition-colors cursor-pointer h-full {{ $stat }}"
@@ -504,6 +531,9 @@
             ₦{{ number_format($expectedSales, 2) }} expected
             − ₦{{ number_format($discountsGiven, 2) }} discount
             − ₦{{ number_format($owedFromPeriod, 2) }} owed
+            @if($cashRefundedToday > 0)
+                − ₦{{ number_format($cashRefundedToday, 2) }} cash refunded
+            @endif
             @if($oldDebtRepaid > 0)
                 + ₦{{ number_format($oldDebtRepaid, 2) }} older debt repaid
             @endif
@@ -669,7 +699,12 @@
             @forelse($recentSales as $sale)
                 <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
                     <div class="min-w-0 flex-1">
-                        <div class="font-semibold text-xs sm:text-sm">{{ $sale->invoice_number ?? 'Sale #' . $sale->id }}</div>
+                        <div class="font-semibold text-xs sm:text-sm">
+                            {{ $sale->invoice_number ?? 'Sale #' . $sale->id }}
+                            @if($sale->returns && $sale->returns->where('status', 'approved')->isNotEmpty())
+                                <span class="badge badge-warning badge-xs ml-1">Returned</span>
+                            @endif
+                        </div>
                         <div class="text-xs text-base-content/60 truncate">{{ $sale->created_at->format('M d, H:i') }} | {{ $sale->customer?->name ?? 'Walk-in' }}</div>
                     </div>
                     <div class="text-right ml-2 shrink-0">
@@ -713,6 +748,49 @@
             @endforelse
             <div class="mt-2">
                 <x-button label="All Online Orders" link="{{ route('online-orders.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+            </div>
+        </x-card>
+        @endif
+
+        @if(array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager', 'sales', 'cashier']))
+        <!-- Returns Activity Card -->
+        <x-card title="Returns · {{ $periodLabel }}">
+            @forelse($recentReturns as $ret)
+                <div class="flex justify-between items-center p-2 border-b border-base-200 last:border-0">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-xs sm:text-sm">
+                            RT-{{ str_pad($ret->id, 5, '0', STR_PAD_LEFT) }}
+                            <span class="text-xs text-base-content/50 font-normal">
+                                ({{ $ret->sale?->invoice_number ?? 'Sale #' . $ret->sale_id }})
+                            </span>
+                        </div>
+                        <div class="text-xs text-base-content/60 truncate">
+                            {{ $ret->created_at->format('M d, H:i') }} |
+                            {{ $ret->sale?->customer?->name ?? 'Walk-in' }}
+                            @if($ret->processor) · By {{ $ret->processor->name }} @endif
+                        </div>
+                    </div>
+                    <div class="text-right ml-2 shrink-0 space-y-1">
+                        <div class="font-bold text-sm text-warning">₦{{ number_format($ret->total_credit, 2) }}</div>
+                        <div class="flex items-center justify-end gap-1">
+                            <x-badge :value="ucfirst($ret->refund_method)" class="badge-xs badge-ghost" />
+                            <x-badge :value="ucfirst($ret->status)" @class([
+                                'badge-xs',
+                                'badge-warning' => $ret->status === 'pending',
+                                'badge-success' => $ret->status === 'approved',
+                                'badge-error'   => $ret->status === 'rejected',
+                            ]) />
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <div class="text-center py-4 text-base-content/60 text-sm">No returns in this period.</div>
+            @endforelse
+            <div class="mt-2 flex justify-between items-center">
+                <x-button label="All Returns" link="{{ route('returns.index') }}" class="btn-xs btn-ghost" icon="o-arrow-right" />
+                @if($pendingReturnsCount > 0)
+                    <span class="badge badge-warning badge-sm">{{ $pendingReturnsCount }} pending</span>
+                @endif
             </div>
         </x-card>
         @endif

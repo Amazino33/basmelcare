@@ -2,12 +2,23 @@
 
 namespace App\Livewire;
 
+use App\Models\Appointment;
 use App\Models\AppSetting;
 use App\Models\Batch;
+use App\Models\Customer;
+use App\Models\MedicalRecord;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\PromoterCode;
+use App\Models\PurchaseOrder;
+use App\Models\ReferralCommission;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
+use App\Support\TopProducts;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -133,13 +144,297 @@ class Dashboard extends Component
         ];
     }
 
+    /**
+     * Roles that entitle someone to the full pharmacy dashboard. Pharmacist is
+     * deliberately absent — it is a clinical role and sees no revenue or profit.
+     */
+    private const OPERATIONAL = ['admin', 'branch_manager', 'sales', 'cashier'];
+
+    /** Focused roles, in the order their panels should stack. */
+    private const SPECIALIST = ['auditor', 'pharmacist', 'inventory_manager', 'promoter', 'content'];
+
+    private function roles(): array
+    {
+        return array_unique(auth()->user()->role ?? []);
+    }
+
+    /**
+     * Panels to stack for someone who holds only focused roles. Anyone with an
+     * operational role does wider work and gets the full dashboard instead, so
+     * this returns nothing for them.
+     */
+    private function specialistPanels(): array
+    {
+        if (array_intersect($this->roles(), self::OPERATIONAL)) {
+            return [];
+        }
+
+        return array_values(array_intersect(self::SPECIALIST, $this->roles()));
+    }
+
+    private function contentData(): array
+    {
+        $total   = Product::count();
+        $missing = Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))->count();
+        $done    = $total - $missing;
+
+        return [
+            'contentTotal'    => $total,
+            'contentDone'     => $done,
+            'contentMissing'  => $missing,
+            'contentPercent'  => $total > 0 ? (int) round(($done / $total) * 100) : 0,
+            'contentAddedToday' => Product::whereDate('updated_at', today())
+                ->whereNotNull('image')->where('image', '!=', '')->count(),
+            'contentQueue'    => Product::where(fn($q) => $q->whereNull('image')->orWhere('image', ''))
+                ->latest()->limit(8)->get(),
+        ];
+    }
+
+    /**
+     * Month-to-date money for the auditor, mirroring the Financial Records page
+     * so the two can never disagree.
+     */
+    private function auditorData(): array
+    {
+        $from = today()->startOfMonth()->startOfDay();
+        $to   = today()->endOfDay();
+
+        $revenue = (float) Sale::whereIn('status', ['paid', 'completed'])
+            ->whereBetween('created_at', [$from, $to])
+            ->sum(DB::raw('total_amount - COALESCE(coupon_discount, 0)'));
+
+        $cogs = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->whereIn('sales.status', ['paid', 'completed'])
+            ->whereBetween('sales.created_at', [$from, $to])
+            ->sum(DB::raw('sale_items.cost_price * sale_items.quantity'));
+
+        $expenses = Schema::hasTable('expenses')
+            ? (float) DB::table('expenses')
+                ->whereDate('expense_date', '>=', $from)->whereDate('expense_date', '<=', $to)->sum('amount')
+            : 0.0;
+
+        return [
+            'audRevenue'  => $revenue,
+            'audCogs'     => $cogs,
+            'audGross'    => $revenue - $cogs,
+            'audMargin'   => $revenue > 0 ? (($revenue - $cogs) / $revenue) * 100 : 0.0,
+            'audExpenses' => $expenses,
+            'audNet'      => $revenue - $cogs - $expenses,
+            'audSales'    => Sale::whereIn('status', ['paid', 'completed'])
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'audPeriod'   => $from->format('j M') . ' – ' . $to->format('j M Y'),
+        ];
+    }
+
+    /**
+     * Clinical view: patients and drug safety. No revenue, profit or stock value.
+     */
+    private function pharmacistData(): array
+    {
+        $expiring = Batch::with('product')
+            ->where('quantity', '>', 0)
+            ->whereBetween('expiry_date', [now(), now()->addDays(90)])
+            ->orderBy('expiry_date')
+            ->limit(6)
+            ->get();
+
+        return [
+            'phNewPatients'   => Customer::whereDate('created_at', today())->count(),
+            'phTotalPatients' => Customer::count(),
+            'phRecordsToday'  => MedicalRecord::whereDate('created_at', today())->count(),
+            'phAppointments'  => Appointment::whereDate('scheduled_at', today())
+                ->whereIn('status', ['scheduled', 'confirmed'])->count(),
+
+            'phExpired'       => Batch::where('quantity', '>', 0)
+                ->where('expiry_date', '<', now())->count(),
+            'phExpiringSoon'  => $expiring->count(),
+            'phExpiringList'  => $expiring,
+
+            'phOutOfStock'    => Product::withSum('batches as stock', 'quantity')->get()
+                ->filter(fn($p) => (int) ($p->stock ?? 0) === 0)->count(),
+
+            'phTodayAppointments' => Appointment::with('customer', 'staff')
+                ->whereDate('scheduled_at', today())
+                ->orderBy('scheduled_at')
+                ->limit(6)
+                ->get(),
+        ];
+    }
+
+    private function promoterData(): array
+    {
+        $user   = auth()->user();
+        $userId = $user->id;
+
+        $earned = (float) ReferralCommission::where('user_id', $userId)->sum('amount');
+        $paid   = (float) ReferralCommission::where('user_id', $userId)->whereNotNull('paid_at')->sum('amount');
+
+        return [
+            'myProgress'        => $user->promoterProgressOn(today()),
+            'myTotalEarned'     => $earned,
+            'myPending'         => $earned - $paid,
+            'myRecentCodes'     => PromoterCode::with('customer')
+                ->where('user_id', $userId)
+                ->whereDate('created_at', today())
+                ->latest()
+                ->limit(8)
+                ->get(),
+        ];
+    }
+
+    /**
+     * Stock-focused view: no revenue, no profit — only what the person
+     * responsible for inventory needs to act on.
+     */
+    private function inventoryData(): array
+    {
+        // One query with a subquery sum, rather than loading every batch.
+        $products = Product::withSum('batches as stock', 'quantity')->get();
+
+        $outOfStock = $products->filter(fn($p) => (int) ($p->stock ?? 0) === 0);
+        $lowStock   = $products->filter(
+            fn($p) => (int) ($p->stock ?? 0) > 0 && (int) $p->stock <= (int) $p->reorder_level
+        );
+
+        $inStockBatches = Batch::where('quantity', '>', 0);
+
+        return [
+            'invProducts'   => $products->count(),
+            'invStockUnits' => (int) Batch::sum('quantity'),
+            'invOutOfStock' => $outOfStock->count(),
+            'invLowStock'   => $lowStock->count(),
+
+            'invStockValue' => (float) (clone $inStockBatches)->sum(DB::raw('quantity * cost_price')),
+            'invExpired'    => (clone $inStockBatches)->where('expiry_date', '<', now())->count(),
+            'invExpiringSoon' => (clone $inStockBatches)
+                ->whereBetween('expiry_date', [now(), now()->addDays(90)])->count(),
+            'invAwaitingDelivery' => PurchaseOrder::whereIn('status', ['sent', 'partially_received'])->count(),
+
+            'invExpiringBatches' => Batch::with('product')
+                ->where('quantity', '>', 0)
+                ->whereBetween('expiry_date', [now(), now()->addDays(90)])
+                ->orderBy('expiry_date')
+                ->limit(6)
+                ->get(),
+            'invLowStockList' => $lowStock->sortBy('stock')->take(6)->values(),
+        ];
+    }
+
+
+    /**
+     * Best sellers, measured three ways.
+     *
+     * Units, revenue and profit rank differently, and the gap is the point: the
+     * drug that moves most can be the one that earns least. Reporting a single
+     * number would hide that, so all three are shown.
+     *
+     * "Times sold" separates steady demand from a single bulk order — 25 units
+     * across one sale is not a popular product.
+     */
+    private function hotProducts($from, $to): array
+    {
+        // Shared with the printed Top Products report - see App\Support\TopProducts.
+        return TopProducts::between($from, $to);
+    }
+
+    /** Searches at the till that found nothing — demand we could not meet. */
+    private function missedDemand($from, $to)
+    {
+        if (! Schema::hasTable('failed_searches')) {
+            return collect();
+        }
+
+        return \App\Models\FailedSearch::whereBetween('last_searched_at', [$from, $to])
+            ->orderByDesc('times')
+            ->limit(6)
+            ->get();
+    }
+
     public function render()
     {
+        // Focused roles get their own stacked panels and none of the sales
+        // queries below. Someone holding two focused roles gets both panels.
+        if ($panels = $this->specialistPanels()) {
+            $data = ['panels' => $panels];
+
+            if (in_array('auditor', $panels))           $data += $this->auditorData();
+            if (in_array('pharmacist', $panels))        $data += $this->pharmacistData();
+            if (in_array('inventory_manager', $panels)) $data += $this->inventoryData();
+            if (in_array('promoter', $panels))          $data += $this->promoterData();
+            if (in_array('content', $panels))           $data += $this->contentData();
+
+            return view('livewire.dashboard.index', $data);
+        }
+
         [$from, $to] = $this->getDateRange();
         $periodLabel  = $this->getPeriodLabel();
 
         $todaySales = Sale::whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']);
-        $totalSalesToday = $todaySales->sum('total_amount');
+        // The money story for the period, in the order it happens:
+        //
+        //   expected  −  discounts  −  still owed  +  old debts repaid  =  collected
+        //
+        // Each figure is one step, so the gap between what was expected and what
+        // is in the drawer explains itself instead of looking like an error.
+
+        // 1. What the sales came to before anything was taken off.
+        $expectedSales = (float) (clone $todaySales)->sum('total_amount');
+
+        // 2. What was given away.
+        $discountsGiven = (float) (clone $todaySales)->sum(DB::raw('COALESCE(coupon_discount, 0)'));
+
+        // Billed, i.e. what customers were actually charged.
+        $totalSalesToday = $expectedSales - $discountsGiven;
+
+        // 3. Of those charges, what is still outstanding.
+        $owedFromPeriod = (float) DB::table('debts')
+            ->whereBetween('created_at', [$from, $to])
+            ->sum(DB::raw('COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)'));
+
+        // Repayments of debts raised earlier are money in today, but they belong
+        // to no sale in this period — shown separately so the sum still ties.
+        $oldDebtRepaid = (float) DB::table('debt_payments')
+            ->where('at_point_of_sale', false)
+            ->whereBetween('debt_payments.created_at', [$from, $to])
+            ->join('debts', 'debts.id', '=', 'debt_payments.debt_id')
+            ->whereNotBetween('debts.created_at', [$from, $to])
+            ->sum('debt_payments.amount');
+
+        // Returns for the period (scoped to current branch via whereHas('sale') with BranchScope)
+        $periodApprovedReturns = SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_APPROVED)
+            ->where(function ($q) use ($from, $to) {
+                $q->whereBetween('approved_at', [$from, $to])
+                  ->orWhere(fn ($sq) => $sq->whereNull('approved_at')->whereBetween('created_at', [$from, $to]));
+            });
+
+        $returnsCountToday   = (clone $periodApprovedReturns)->count();
+        $returnsTotalToday   = (float) (clone $periodApprovedReturns)->sum('total_credit');
+        $cashRefundedToday   = (float) (clone $periodApprovedReturns)->where('refund_method', SaleReturn::CASH)->sum('total_credit');
+        $creditRefundedToday = (float) (clone $periodApprovedReturns)->where('refund_method', SaleReturn::CREDIT)->sum('total_credit');
+
+        // Returned stock cost (credited back to reduce COGS)
+        $returnedCostToday = 0.0;
+        if (Schema::hasTable('sale_return_items')) {
+            $returnedCostToday = (float) DB::table('sale_return_items')
+                ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
+                ->join('sale_items', 'sale_items.id', '=', 'sale_return_items.sale_item_id')
+                ->whereIn('sale_returns.id', (clone $periodApprovedReturns)->select('sale_returns.id'))
+                ->sum(DB::raw('sale_items.cost_price * sale_return_items.quantity_returned'));
+        }
+
+        // Pending returns awaiting manager/auditor review
+        $pendingReturnsCount = SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_PENDING)
+            ->count();
+        $pendingReturnsTotal = (float) SaleReturn::whereHas('sale')
+            ->where('status', SaleReturn::STATUS_PENDING)
+            ->sum('total_credit');
+
+        // 4. What actually reached the drawer:
+        // Cash refunds directly reduce drawer takings. Credit refunds do not (liability, drawn later).
+        $cashCollectedToday = $totalSalesToday - $owedFromPeriod - $cashRefundedToday + $oldDebtRepaid;
         $salesCountToday = $todaySales->count();
 
         $todayItems = SaleItem::whereHas('sale', fn($q) => $q->whereBetween('created_at', [$from, $to])->whereIn('status', ['paid', 'completed']));
@@ -148,20 +443,34 @@ class Dashboard extends Component
         foreach ((clone $todayItems)->get() as $item) {
             $todayCost += $item->cost_price * $item->quantity;
         }
-        $todayProfit = $todayRevenue - $todayCost;
+        // Profit nets all refunds and credits back returned goods cost
+        $todayProfit = ($todayRevenue - $returnsTotalToday) - ($todayCost - $returnedCostToday);
 
         $totalProducts = Product::count();
         $totalStock = Batch::sum('quantity');
 
-        $lowStockProducts = Product::with('category', 'batches')
-            ->get()
-            ->filter(fn($p) => $p->batches->sum('quantity') <= $p->reorder_level && $p->batches->sum('quantity') > 0)
-            ->take(5);
+        // Counted in the database, by the same rule the Products page filters
+        // on. Both tiles link straight to that page, so a definition that drifts
+        // here sends somebody to a list that does not match the number they
+        // just clicked. It also used to load every product and every batch into
+        // memory, twice, to produce two numbers.
+        $held    = '(SELECT COALESCE(SUM(quantity), 0) FROM batches WHERE batches.product_id = products.id)';
+        $lowRule = fn ($q) => $q->whereRaw($held . ' > 0')->whereRaw($held . ' <= products.reorder_level');
 
-        $outOfStock = Product::with('batches')
-            ->get()
-            ->filter(fn($p) => $p->batches->sum('quantity') == 0)
-            ->count();
+        $lowStockCount = $lowRule(Product::query())->count();
+
+        $lowStockProducts = $lowRule(Product::with('category')->withSum('batches as stock', 'quantity'))
+            ->orderByRaw($held . ' ASC')
+            ->limit(5)
+            ->get();
+
+        // Anything with no unit on the shelf, whether it ran out or was never
+        // stocked. Counted apart below, because they need different action:
+        // one is a reorder, the other is a product somebody set up and never
+        // received.
+        $outOfStock = Product::whereDoesntHave('batches', fn ($q) => $q->where('quantity', '>', 0))->count();
+
+        $neverStocked = Product::doesntHave('batches')->count();
 
         $expiringBatches = Batch::with('product')
             ->where('quantity', '>', 0)
@@ -175,22 +484,21 @@ class Dashboard extends Component
             ->where('expiry_date', '<', now())
             ->count();
 
-        $potentialRevenue = 0;
-        $potentialCost = 0;
-        foreach (Product::with('batches')->get() as $product) {
-            foreach ($product->batches as $batch) {
-                if ($batch->quantity > 0 && $batch->expiry_date->isFuture()) {
-                    $potentialRevenue += $product->selling_price * $batch->quantity;
-                    $potentialCost += $batch->cost_price * $batch->quantity;
-                }
-            }
-        }
-        $potentialProfit = $potentialRevenue - $potentialCost;
+        // The shelf's value lives in Dashboard\PotentialProfit, which refreshes
+        // itself as stock moves rather than waiting for this page to be
+        // reloaded.
 
-        $recentSales = Sale::with('user', 'customer')
+        $recentSales = Sale::with(['user', 'customer', 'returns'])
             ->whereIn('status', ['paid', 'completed'])
             ->whereBetween('created_at', [$from, $to])
             ->latest()
+            ->limit(5)
+            ->get();
+
+        $recentReturns = SaleReturn::with(['sale.customer', 'processor', 'approver'])
+            ->whereHas('sale')
+            ->whereBetween('created_at', [$from, $to])
+            ->latest('id')
             ->limit(5)
             ->get();
 
@@ -212,25 +520,40 @@ class Dashboard extends Component
         $setupProgress = $this->getSetupProgress();
 
         return view('livewire.dashboard.index', [
+            'panels' => [],
             'periodLabel' => $periodLabel,
             'totalSalesToday' => $totalSalesToday,
+            'cashCollectedToday' => $cashCollectedToday,
+            'expectedSales'      => $expectedSales,
+            'discountsGiven'     => $discountsGiven,
+            'owedFromPeriod'     => $owedFromPeriod,
+            'oldDebtRepaid'      => $oldDebtRepaid,
+            'returnsCountToday'   => $returnsCountToday,
+            'returnsTotalToday'   => $returnsTotalToday,
+            'cashRefundedToday'   => $cashRefundedToday,
+            'creditRefundedToday' => $creditRefundedToday,
+            'returnedCostToday'   => $returnedCostToday,
+            'pendingReturnsCount' => $pendingReturnsCount,
+            'pendingReturnsTotal' => $pendingReturnsTotal,
             'salesCountToday' => $salesCountToday,
             'todayProfit' => $todayProfit,
             'totalProducts' => $totalProducts,
             'totalStock' => $totalStock,
             'outOfStock' => $outOfStock,
+            'neverStocked' => $neverStocked,
+            'lowStockCount' => $lowStockCount,
             'lowStockProducts' => $lowStockProducts,
             'expiringBatches' => $expiringBatches,
             'expiredBatches' => $expiredBatches,
-            'potentialProfit' => $potentialProfit,
-            'potentialRevenue' => $potentialRevenue,
-            'potentialCost' => $potentialCost,
             'recentSales' => $recentSales,
+            'recentReturns' => $recentReturns,
             'todayOnlineRevenue' => $todayOnlineRevenue,
             'todayOnlineCount' => $todayOnlineCount,
             'pendingOnlineOrders' => $pendingOnlineOrders,
             'recentOnlineOrders' => $recentOnlineOrders,
-            'setupProgress' => $setupProgress,
+            'setupProgress'      => $setupProgress,
+            'hot'                => $this->hotProducts($from, $to),
+            'missedDemand'       => $this->missedDemand($from, $to),
         ]);
     }
 }

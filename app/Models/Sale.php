@@ -13,7 +13,7 @@ class Sale extends Model
     use BelongsToBranch;
 
     protected $fillable = [
-        'invoice_number', 'wifi_code', 'user_id', 'cashier_id', 'confirmed_by', 'customer_id',
+        'branch_id', 'invoice_number', 'wifi_code', 'user_id', 'cashier_id', 'confirmed_by', 'customer_id',
         'total_amount', 'payment_method', 'payment_details',
         'status', 'paid_at', 'confirmed_at', 'note',
         'voucher_redeemed_at', 'voucher_revoked_at',
@@ -80,6 +80,11 @@ class Sale extends Model
     public function debt()
     {
         return $this->hasOne(Debt::class);
+    }
+
+    public function returns()
+    {
+        return $this->hasMany(SaleReturn::class);
     }
 
     /**
