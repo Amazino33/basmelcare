@@ -84,6 +84,9 @@
                 @if($debt->status !== 'paid')
                     <x-button icon="o-banknotes" wire:click="openPayment({{ $debt->id }})" class="btn-xs btn-ghost text-success" tooltip="Record Payment" />
                 @endif
+                @if($this->canManage())
+                    <x-button icon="o-pencil" wire:click="openAdjustDebt({{ $debt->id }})" class="btn-xs btn-ghost text-warning" tooltip="Adjust Debt" />
+                @endif
             </div>
         @endscope
     </x-table>
@@ -117,6 +120,21 @@
         </x-form>
     </x-modal>
 
+    <!-- Adjust Debt Modal -->
+    <x-modal wire:model="adjustDebtModal" title="Adjust Debt Amount" box-class="max-w-sm">
+        <x-form wire:submit="saveAdjustDebt">
+            <p class="text-xs text-base-content/70 mb-3">
+                Adjust the total amount owed for this debt record. An audit entry will be recorded.
+            </p>
+            <x-input label="New Amount Owed" wire:model="new_amount_owed" prefix="₦" type="number" step="0.01" />
+            <x-textarea label="Reason for Adjustment" wire:model="debt_adjust_reason" placeholder="e.g. Correcting pricing error, settlement agreement..." rows="2" />
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.adjustDebtModal = false" />
+                <x-button label="Save Adjustment" type="submit" class="btn-warning" icon="o-check" />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
+
     @script
     <script>
         $wire.on('open-debt-receipt', ({ id }) => {
@@ -143,7 +161,20 @@
             </div>
 
             <div class="bg-base-200 rounded-lg p-3 mb-4">
-                <div class="flex justify-between text-sm"><span>Owed:</span> <span>₦{{ number_format($viewDebt->amount_owed, 2) }}</span></div>
+                <div class="flex justify-between items-center text-sm">
+                    <span>Owed:</span>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-semibold">₦{{ number_format($viewDebt->amount_owed, 2) }}</span>
+                        @if($this->canManage())
+                            <x-button
+                                icon="o-pencil"
+                                wire:click="openAdjustDebt({{ $viewDebt->id }})"
+                                class="btn-xs btn-ghost text-warning tooltip"
+                                data-tip="Adjust amount owed"
+                            />
+                        @endif
+                    </div>
+                </div>
                 <div class="flex justify-between text-sm"><span>Paid:</span> <span class="text-success">₦{{ number_format($viewDebt->amount_paid, 2) }}</span></div>
                 <div class="flex justify-between font-bold mt-1 pt-1 border-t border-base-300"><span>Balance:</span> <span class="text-error">₦{{ number_format($viewDebt->balance, 2) }}</span></div>
             </div>
@@ -166,13 +197,29 @@
             @forelse($viewDebt->payments as $payment)
                 <div class="flex justify-between items-center p-2 bg-base-200 rounded mb-2">
                     <div>
-                        <div class="font-semibold text-sm text-success">₦{{ number_format($payment->amount, 2) }}</div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-sm {{ $payment->amount > 0 ? 'text-success' : 'text-base-content/60' }}">
+                                ₦{{ number_format($payment->amount, 2) }}
+                            </span>
+                            @if(str_contains($payment->note ?? '', 'VOIDED'))
+                                <span class="badge badge-error badge-xs">Voided</span>
+                            @endif
+                        </div>
                         <div class="text-xs text-base-content/60">{{ ucfirst($payment->payment_method) }} | {{ $payment->receiver->name }}</div>
                         <div class="text-xs text-base-content/60">{{ $payment->created_at->format('M d, Y H:i') }}</div>
                         @if($payment->note)
                             <div class="text-xs italic mt-1">{{ $payment->note }}</div>
                         @endif
                     </div>
+                    @if($this->canManage() && $payment->amount > 0 && !str_starts_with($payment->note ?? '', '[VOIDED]'))
+                        <x-button
+                            icon="o-x-mark"
+                            wire:click="voidDebtPayment({{ $payment->id }})"
+                            wire:confirm="Void this payment of ₦{{ number_format($payment->amount, 2) }}? This will restore the debt balance."
+                            class="btn-xs btn-ghost text-error tooltip"
+                            data-tip="Void payment"
+                        />
+                    @endif
                 </div>
             @empty
                 <div class="text-center py-4 text-base-content/60">No payments recorded.</div>

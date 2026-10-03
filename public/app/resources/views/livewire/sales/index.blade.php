@@ -587,12 +587,31 @@
                 <div class="flex justify-between"><span class="text-base-content/60">Date:</span> <span>{{ $viewSale->created_at->format('M d, Y H:i') }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Cashier:</span> <span>{{ $viewSale->user->name }}</span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Customer:</span> <span>{{ $viewSale->customer?->name ?? 'Walk-in' }}</span></div>
-                <div class="flex justify-between"><span class="text-base-content/60">Payment:</span> <span>{{ ucfirst($viewSale->payment_method) }}</span></div>
-                @if($viewSale->payment_method === 'split' && $viewSale->payment_details)
-                    <div class="bg-base-200 rounded p-2 mt-1">
-                        @foreach($viewSale->payment_details as $method => $amount)
-                            <div class="flex justify-between text-sm"><span class="text-base-content/60">{{ ucfirst($method) }}:</span> <span>₦{{ number_format($amount, 2) }}</span></div>
-                        @endforeach
+                <div class="flex justify-between items-center"><span class="text-base-content/60">Payment:</span> <span class="font-semibold">{{ ucfirst($viewSale->payment_method) }}</span></div>
+                @if($viewSale->payment_details)
+                    <div class="bg-base-200 rounded-lg p-2.5 mt-1 space-y-1 text-xs">
+                        <div class="font-bold text-base-content/60 uppercase tracking-wider text-[10px]">Payment Breakdown</div>
+                        @if(isset($viewSale->payment_details['cash']) && is_numeric($viewSale->payment_details['cash']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Cash:</span> <span>₦{{ number_format($viewSale->payment_details['cash'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['card']) && is_numeric($viewSale->payment_details['card']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Card:</span> <span>₦{{ number_format($viewSale->payment_details['card'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['transfer']) && is_numeric($viewSale->payment_details['transfer']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Transfer:</span> <span>₦{{ number_format($viewSale->payment_details['transfer'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['credit']) && is_numeric($viewSale->payment_details['credit']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Credit Used:</span> <span class="text-warning">₦{{ number_format($viewSale->payment_details['credit'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['change_given']) && is_numeric($viewSale->payment_details['change_given']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Change Given (Cash):</span> <span class="text-info font-medium">₦{{ number_format($viewSale->payment_details['change_given'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['stored_credit']) && is_numeric($viewSale->payment_details['stored_credit']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Stored Change (Credit):</span> <span class="text-warning font-semibold">₦{{ number_format($viewSale->payment_details['stored_credit'], 2) }}</span></div>
+                        @endif
+                        @if(isset($viewSale->payment_details['shortfall']) && is_numeric($viewSale->payment_details['shortfall']))
+                            <div class="flex justify-between"><span class="text-base-content/60">Shortfall (Debt):</span> <span class="text-error">₦{{ number_format($viewSale->payment_details['shortfall'], 2) }}</span></div>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -635,8 +654,17 @@
                 <div class="mt-3 text-sm text-base-content/60">Note: {{ $viewSale->note }}</div>
             @endif
 
-            <div class="mt-4">
+            <div class="mt-4 space-y-2">
                 <x-button label="Print Invoice" link="{{ route('invoice.show', $viewSale->id) }}" class="btn-primary btn-block" icon="o-printer" external />
+                @if($this->isElevated())
+                    <x-button
+                        label="Edit Payment & Notes"
+                        wire:click="openEditSale({{ $viewSale->id }})"
+                        class="btn-warning btn-outline btn-block btn-sm"
+                        icon="o-pencil-square"
+                        spinner="openEditSale"
+                    />
+                @endif
             </div>
 
             {{-- HiFastLink Wi-Fi access tied to this receipt --}}
@@ -735,4 +763,62 @@
             @endif
         @endif
     </x-drawer>
+
+    <!-- Edit Sale Modal -->
+    <x-modal wire:model="editSaleModal" title="Correct Sale Payment & Notes" box-class="max-w-md">
+        @if($this->editSaleId)
+            <x-form wire:submit="saveEditSale">
+                <x-select
+                    wire:model="editPaymentMethod"
+                    label="Payment Method"
+                    :options="[
+                        ['id' => 'cash', 'name' => 'Cash'],
+                        ['id' => 'transfer', 'name' => 'Transfer'],
+                        ['id' => 'card', 'name' => 'Card'],
+                        ['id' => 'split', 'name' => 'Split (Multiple Methods)'],
+                    ]"
+                    required
+                />
+
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <x-input wire:model="editCash" label="Cash (₦)" type="number" step="0.01" min="0" prefix="₦" />
+                    <x-input wire:model="editTransfer" label="Transfer (₦)" type="number" step="0.01" min="0" prefix="₦" />
+                    <x-input wire:model="editCard" label="Card (₦)" type="number" step="0.01" min="0" prefix="₦" />
+                    <x-input wire:model="editChangeGiven" label="Change Given (₦)" type="number" step="0.01" min="0" prefix="₦" />
+                </div>
+
+                <div class="mt-2">
+                    <x-input
+                        wire:model="editStoredCredit"
+                        label="Stored as Credit / Change Owed (₦)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        prefix="₦"
+                        hint="If modified, customer's credit balance will automatically adjust."
+                    />
+                </div>
+
+                <div class="mt-2">
+                    <x-input wire:model="editNote" label="Sale Note" placeholder="General cashier notes..." />
+                </div>
+
+                <div class="mt-2">
+                    <x-textarea
+                        wire:model="editReason"
+                        label="Reason for Correction"
+                        placeholder="e.g., Mistakenly entered ₦400 change, customer actually paid exact cash"
+                        hint="Required for audit and accountability"
+                        rows="2"
+                        required
+                    />
+                </div>
+
+                <x-slot:actions>
+                    <x-button label="Cancel" @click="$wire.editSaleModal = false" />
+                    <x-button label="Save Correction" type="submit" class="btn-warning" icon="o-check" spinner="saveEditSale" />
+                </x-slot:actions>
+            </x-form>
+        @endif
+    </x-modal>
 </div>

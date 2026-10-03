@@ -3,13 +3,16 @@
 namespace App\Livewire\Sales;
 
 use App\Models\AppSetting;
+use App\Models\CreditPayout;
+use App\Models\Debt;
+use App\Models\DebtPayment;
 use App\Models\Order;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
-use App\Models\StockMovement;
-use App\Services\WhatsAppService;
+use App\Services\HifastlinkService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -19,23 +22,46 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Index extends Component
 {
-    use WithPagination;
     use Toast;
+    use WithPagination;
 
     public string $search = '';
+
     public string $period = 'today';
+
     public string $dateFrom = '';
+
     public string $dateTo = '';
+
     public string $tab = 'pos';
+
     public bool $detailsDrawer = false;
+
     public ?int $viewSaleId = null;
+
     public ?int $viewOrderId = null;
+
+    // Edit / Correct Sale Payment & Notes
+    public bool $editSaleModal = false;
+    public ?int $editSaleId = null;
+    public string $editPaymentMethod = 'cash';
+    public string $editCash = '';
+    public string $editCard = '';
+    public string $editTransfer = '';
+    public string $editChangeGiven = '';
+    public string $editStoredCredit = '';
+    public string $editNote = '';
+    public string $editReason = '';
 
     // Return
     public bool $returnModal = false;
+
     public ?int $returnSaleId = null;
+
     public array $returnQtys = [];
+
     public array $returnableQtys = [];
+
     public string $returnReason = '';
 
     /**
@@ -46,7 +72,8 @@ class Index extends Component
      * from here.
      */
     public string $refundMethod = SaleReturn::CREDIT;
-    public string $returnError  = '';
+
+    public string $returnError = '';
 
     public function updatedReturnQtys(): void
     {
@@ -99,18 +126,21 @@ class Index extends Component
 
     private function isCashier(): bool
     {
-        return !$this->isElevated()
+        return ! $this->isElevated()
             && in_array('cashier', auth()->user()->role ?? []);
     }
 
     public function completeHandover(int $saleId): void
     {
-        if ($this->denyUnlessElevated()) return;
+        if ($this->denyUnlessElevated()) {
+            return;
+        }
 
         $sale = Sale::find($saleId);
 
-        if (!$sale || $sale->status !== 'paid') {
+        if (! $sale || $sale->status !== 'paid') {
             $this->error('Sale not found or already completed.');
+
             return;
         }
 
@@ -125,29 +155,143 @@ class Index extends Component
      */
     public function revokeWifi($saleId): void
     {
-        if ($this->denyUnlessElevated()) return;
+        if ($this->denyUnlessElevated()) {
+            return;
+        }
 
         $sale = Sale::find($saleId);
 
         if (! $sale || ! $sale->voucher_redeemed_at) {
             $this->error('This receipt has no active internet access to revoke.');
+
             return;
         }
 
         if ($sale->voucher_revoked_at) {
             $this->warning('This receipt\'s internet access is already revoked.');
+
             return;
         }
 
         $sale->update(['voucher_revoked_at' => now()]);
 
-        $pushed = \App\Services\HifastlinkService::revoke($sale->wifi_code ?? $sale->invoice_number);
+        $pushed = HifastlinkService::revoke($sale->wifi_code ?? $sale->invoice_number);
 
         if ($pushed) {
             $this->success('Internet access revoked. The device can no longer reconnect.');
         } else {
             $this->warning('Access revoked here, but HiFastLink could not be reached — verify the integration settings.');
         }
+    }
+
+    public function openEditSale(int $saleId): void
+    {
+        if ($this->denyUnlessElevated()) return;
+
+        $sale = Sale::with('customer')->findOrFail($saleId);
+
+        $this->editSaleId         = $sale->id;
+        $this->editPaymentMethod  = $sale->payment_method ?? 'cash';
+        $details                  = $sale->payment_details ?? [];
+
+        $this->editCash           = isset($details['cash']) ? (string) $details['cash'] : '';
+        $this->editCard           = isset($details['card']) ? (string) $details['card'] : '';
+        $this->editTransfer       = isset($details['transfer']) ? (string) $details['transfer'] : '';
+        $this->editChangeGiven    = isset($details['change_given']) ? (string) $details['change_given'] : '';
+        $this->editStoredCredit   = isset($details['stored_credit']) ? (string) $details['stored_credit'] : '';
+        $this->editNote           = $sale->note ?? '';
+        $this->editReason         = '';
+
+        $this->editSaleModal      = true;
+    }
+
+    public function saveEditSale(): void
+    {
+        if ($this->denyUnlessElevated()) return;
+
+        $sale = Sale::with('customer')->findOrFail($this->editSaleId);
+
+        $this->validate([
+            'editPaymentMethod' => 'required|in:cash,card,transfer,split',
+            'editCash'          => 'nullable|numeric|min:0',
+            'editCard'          => 'nullable|numeric|min:0',
+            'editTransfer'      => 'nullable|numeric|min:0',
+            'editChangeGiven'   => 'nullable|numeric|min:0',
+            'editStoredCredit'  => 'nullable|numeric|min:0',
+            'editReason'        => 'required|string|max:255',
+            'editNote'          => 'nullable|string|max:500',
+        ]);
+
+        $details = $sale->payment_details ?? [];
+
+        $oldStoredCredit = (float) ($details['stored_credit'] ?? 0);
+        $newStoredCredit = $this->editStoredCredit !== '' ? round((float) $this->editStoredCredit, 2) : 0.0;
+        $storedCreditDiff = $newStoredCredit - $oldStoredCredit;
+
+        // Update payment details array
+        if ($this->editCash !== '' && (float) $this->editCash > 0) {
+            $details['cash'] = round((float) $this->editCash, 2);
+        } else {
+            unset($details['cash']);
+        }
+
+        if ($this->editCard !== '' && (float) $this->editCard > 0) {
+            $details['card'] = round((float) $this->editCard, 2);
+        } else {
+            unset($details['card']);
+        }
+
+        if ($this->editTransfer !== '' && (float) $this->editTransfer > 0) {
+            $details['transfer'] = round((float) $this->editTransfer, 2);
+        } else {
+            unset($details['transfer']);
+        }
+
+        if ($this->editChangeGiven !== '' && (float) $this->editChangeGiven > 0) {
+            $details['change_given'] = round((float) $this->editChangeGiven, 2);
+        } else {
+            unset($details['change_given']);
+        }
+
+        if ($newStoredCredit > 0) {
+            $details['stored_credit'] = $newStoredCredit;
+        } else {
+            unset($details['stored_credit']);
+        }
+
+        $managerName = auth()->user()->name ?? 'Branch Manager';
+        $auditNote = trim($this->editNote);
+        $correctionLog = "[Corrected by {$managerName} on " . now()->format('d M Y H:i') . ": {$this->editReason}]";
+        $finalNote = $auditNote ? $auditNote . ' | ' . $correctionLog : $correctionLog;
+
+        DB::transaction(function () use ($sale, $details, $finalNote, $storedCreditDiff, $oldStoredCredit, $newStoredCredit, $managerName) {
+            // If stored credit changed and sale has customer, adjust customer's credit balance
+            if ($sale->customer && abs($storedCreditDiff) > 0.001) {
+                $customer = $sale->customer;
+                $oldCustBalance = (float) $customer->credit_balance;
+                $newCustBalance = max(0, $oldCustBalance + $storedCreditDiff);
+                $customer->update(['credit_balance' => $newCustBalance]);
+
+                CreditPayout::create([
+                    'customer_id'    => $customer->id,
+                    'amount'         => 0.00,
+                    'balance_before' => $oldCustBalance,
+                    'balance_after'  => $newCustBalance,
+                    'cashier_id'     => auth()->id(),
+                    'note'           => "Sale #{$sale->invoice_number} correction by {$managerName}: {$this->editReason} (Stored credit changed from ₦" . number_format($oldStoredCredit, 2) . " to ₦" . number_format($newStoredCredit, 2) . ")",
+                ]);
+            }
+
+            $sale->update([
+                'payment_method'  => $this->editPaymentMethod,
+                'payment_details' => $details,
+                'note'            => $finalNote,
+            ]);
+        });
+
+        $this->editSaleModal = false;
+        $this->reset(['editSaleId', 'editCash', 'editCard', 'editTransfer', 'editChangeGiven', 'editStoredCredit', 'editNote', 'editReason']);
+        $this->success("Sale #{$sale->invoice_number} payment details and notes corrected.");
     }
 
     public function canTriggerReturn(): bool
@@ -162,6 +306,7 @@ class Index extends Component
     {
         if (! $this->canTriggerReturn()) {
             $this->error('Only sales staff, branch managers, or admins can trigger returns.');
+
             return;
         }
 
@@ -173,47 +318,51 @@ class Index extends Component
         $requireCustomer = AppSetting::bool('return_require_customer', false);
         if ($requireCustomer && ! $sale->customer_id) {
             $this->error('This pharmacy only accepts returns from registered customers. Attach a customer to the sale, or turn the rule off under Settings → Returns.');
+
             return;
         }
 
-        if (!in_array($sale->status, ['completed', 'paid'])) {
+        if (! in_array($sale->status, ['completed', 'paid'])) {
             $this->error('Returns can only be processed on paid or completed sales.');
+
             return;
         }
 
         $windowHours = (int) AppSetting::get('return_window_hours', 48);
         if ($sale->created_at->diffInHours(now()) > $windowHours) {
             $this->error("Returns are only allowed within {$windowHours} hours of the sale.");
+
             return;
         }
 
-        $this->returnQtys      = [];
-        $this->returnableQtys  = [];
+        $this->returnQtys = [];
+        $this->returnableQtys = [];
 
         foreach ($sale->saleItems as $item) {
             $alreadyReturned = SaleReturnItem::where('sale_item_id', $item->id)
-                ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                ->whereHas('saleReturn', fn ($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
                 ->sum('quantity_returned');
-            $returnable                    = $item->quantity - $alreadyReturned;
+            $returnable = $item->quantity - $alreadyReturned;
             $this->returnableQtys[$item->id] = max(0, $returnable);
-            $this->returnQtys[$item->id]     = 0;
+            $this->returnQtys[$item->id] = 0;
         }
 
         $this->returnSaleId = $saleId;
         $this->returnReason = '';
-        $this->returnError  = '';
+        $this->returnError = '';
 
         // Cash is the only refund a walk-in can be given, so it is not offered
         // as a choice - there is nowhere else for the money to go.
         $this->refundMethod = $sale->customer_id ? SaleReturn::CREDIT : SaleReturn::CASH;
 
-        $this->returnModal  = true;
+        $this->returnModal = true;
     }
 
     public function processReturn(): void
     {
         if (! $this->canTriggerReturn()) {
             $this->error('Only sales staff, branch managers, or admins can trigger returns.');
+
             return;
         }
 
@@ -222,6 +371,7 @@ class Index extends Component
         $requireCustomer = AppSetting::bool('return_require_customer', false);
         if ($requireCustomer && ! $sale->customer_id) {
             $this->error('This pharmacy only accepts returns from registered customers.');
+
             return;
         }
 
@@ -236,37 +386,41 @@ class Index extends Component
         $windowHours = (int) AppSetting::get('return_window_hours', 48);
         if ($sale->created_at->diffInHours(now()) > $windowHours) {
             $this->error("Return window of {$windowHours} hours has passed.");
+
             return;
         }
 
-        if (collect($this->returnQtys)->sum(fn($v) => (int) $v) <= 0) {
+        if (collect($this->returnQtys)->sum(fn ($v) => (int) $v) <= 0) {
             $this->returnError = 'Select at least one item to return.';
+
             return;
         }
 
-        $totalCredit  = 0.0;
+        $totalCredit = 0.0;
         $saleReturnId = null;
 
         try {
             DB::transaction(function () use ($sale, $method, &$totalCredit, &$saleReturnId) {
                 $saleReturn = SaleReturn::create([
-                    'sale_id'       => $sale->id,
-                    'processed_by'  => auth()->id(),
-                    'reason'        => $this->returnReason ?: null,
-                    'total_credit'  => 0,
+                    'sale_id' => $sale->id,
+                    'processed_by' => auth()->id(),
+                    'reason' => $this->returnReason ?: null,
+                    'total_credit' => 0,
                     'refund_method' => $method,
-                    'status'        => SaleReturn::STATUS_PENDING,
-                    'refunded_at'   => null,
+                    'status' => SaleReturn::STATUS_PENDING,
+                    'refunded_at' => null,
                 ]);
 
                 foreach ($sale->saleItems as $item) {
                     $qty = (int) ($this->returnQtys[$item->id] ?? 0);
-                    if ($qty <= 0) continue;
+                    if ($qty <= 0) {
+                        continue;
+                    }
 
                     $alreadyReturned = (int) SaleReturnItem::where('sale_item_id', $item->id)
-                        ->whereHas('saleReturn', fn($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
+                        ->whereHas('saleReturn', fn ($q) => $q->where('status', '!=', SaleReturn::STATUS_REJECTED))
                         ->sum('quantity_returned');
-                    $maxReturnable   = $item->quantity - $alreadyReturned;
+                    $maxReturnable = $item->quantity - $alreadyReturned;
 
                     if ($qty > $maxReturnable) {
                         throw new \RuntimeException(
@@ -276,23 +430,23 @@ class Index extends Component
                         );
                     }
 
-                    $subtotal     = $qty * (float) $item->unit_price;
+                    $subtotal = $qty * (float) $item->unit_price;
                     $totalCredit += $subtotal;
 
                     SaleReturnItem::create([
-                        'sale_return_id'    => $saleReturn->id,
-                        'sale_item_id'      => $item->id,
-                        'product_id'        => $item->product_id,
-                        'batch_id'          => $item->batch_id,
+                        'sale_return_id' => $saleReturn->id,
+                        'sale_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'batch_id' => $item->batch_id,
                         'quantity_returned' => $qty,
-                        'unit_price'        => $item->unit_price,
-                        'subtotal'          => $subtotal,
+                        'unit_price' => $item->unit_price,
+                        'subtotal' => $subtotal,
                     ]);
 
                     if (! $item->batch) {
                         throw new \RuntimeException(
-                            'The batch "' . ($item->product->name ?? 'item') . '" was sold from no longer exists, '
-                            . 'so it cannot be put back. Add the stock by hand and record the refund separately.'
+                            'The batch "'.($item->product->name ?? 'item').'" was sold from no longer exists, '
+                            .'so it cannot be put back. Add the stock by hand and record the refund separately.'
                         );
                     }
                 }
@@ -302,41 +456,43 @@ class Index extends Component
             });
         } catch (\RuntimeException $e) {
             $this->returnError = $e->getMessage();
+
             return;
         } catch (\Throwable $e) {
-            Log::error('[Return] Sale ' . $sale->invoice_number . ' request failed: ' . $e->getMessage(), [
+            Log::error('[Return] Sale '.$sale->invoice_number.' request failed: '.$e->getMessage(), [
                 'sale_id' => $sale->id,
                 'user_id' => auth()->id(),
-                'qtys'    => $this->returnQtys,
+                'qtys' => $this->returnQtys,
             ]);
 
             $this->returnError = 'Return request could not be processed, and nothing was changed. '
-                . 'Please try again, or tell an admin to check the logs.';
+                .'Please try again, or tell an admin to check the logs.';
+
             return;
         }
 
-        $this->returnModal  = false;
+        $this->returnModal = false;
         $this->returnSaleId = null;
-        $this->returnQtys   = [];
+        $this->returnQtys = [];
 
         $this->success(
-            'Return request RT-' . str_pad($saleReturnId, 5, '0', STR_PAD_LEFT)
-            . ' submitted for ₦' . number_format($totalCredit, 2)
-            . '. Awaiting approval by an Auditor or Branch Manager.'
+            'Return request RT-'.str_pad($saleReturnId, 5, '0', STR_PAD_LEFT)
+            .' submitted for ₦'.number_format($totalCredit, 2)
+            .'. Awaiting approval by an Auditor or Branch Manager.'
         );
     }
 
     private function periodQuery($query)
     {
         return match ($this->period) {
-            'today'     => $query->whereDate('created_at', today()),
+            'today' => $query->whereDate('created_at', today()),
             'yesterday' => $query->whereDate('created_at', today()->subDay()),
-            'week'      => $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]),
-            'month'     => $query->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year),
-            'year'      => $query->whereYear('created_at', now()->year),
-            'custom'    => $query->whereBetween('created_at', [
-                ($this->dateFrom ? \Carbon\Carbon::parse($this->dateFrom)->startOfDay() : now()->startOfDay()),
-                ($this->dateTo   ? \Carbon\Carbon::parse($this->dateTo)->endOfDay()     : now()->endOfDay()),
+            'week' => $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]),
+            'month' => $query->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year),
+            'year' => $query->whereYear('created_at', now()->year),
+            'custom' => $query->whereBetween('created_at', [
+                ($this->dateFrom ? Carbon::parse($this->dateFrom)->startOfDay() : now()->startOfDay()),
+                ($this->dateTo ? Carbon::parse($this->dateTo)->endOfDay() : now()->endOfDay()),
             ]),
             default => $query,
         };
@@ -344,7 +500,7 @@ class Index extends Component
 
     public function exportSoldItems(): StreamedResponse
     {
-        $scopeFn = fn($q) => $q;
+        $scopeFn = fn ($q) => $q;
         $items = SaleItem::with(['sale.user', 'sale.customer', 'product.category', 'batch'])
             ->whereHas('sale', function ($q) use ($scopeFn) {
                 $this->periodQuery($q)->whereIn('status', ['paid', 'completed'])->tap($scopeFn);
@@ -354,27 +510,27 @@ class Index extends Component
                 $q->where(function ($sub) use ($term) {
                     $sub->whereHas('product', function ($p) use ($term) {
                         $p->where('name', 'like', "%{$term}%")
-                          ->orWhere('barcode', 'like', "%{$term}%")
-                          ->orWhere('sku', 'like', "%{$term}%");
+                            ->orWhere('barcode', 'like', "%{$term}%")
+                            ->orWhere('sku', 'like', "%{$term}%");
                     })
-                    ->orWhereHas('sale', function ($s) use ($term) {
-                        $s->where('invoice_number', 'like', "%{$term}%")
-                          ->orWhere('id', $term)
-                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
-                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
-                    })
-                    ->orWhereHas('batch', function ($b) use ($term) {
-                        $b->where('batch_number', 'like', "%{$term}%");
-                    });
+                        ->orWhereHas('sale', function ($s) use ($term) {
+                            $s->where('invoice_number', 'like', "%{$term}%")
+                                ->orWhere('id', $term)
+                                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$term}%"))
+                                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+                        })
+                        ->orWhereHas('batch', function ($b) use ($term) {
+                            $b->where('batch_number', 'like', "%{$term}%");
+                        });
                 });
             })
             ->latest('id')
             ->get();
 
         $periodSlug = $this->period === 'custom'
-            ? ($this->dateFrom . '-to-' . $this->dateTo)
+            ? ($this->dateFrom.'-to-'.$this->dateTo)
             : $this->period;
-        $filename = 'products-sold-' . $periodSlug . '.csv';
+        $filename = 'products-sold-'.$periodSlug.'.csv';
 
         return response()->streamDownload(function () use ($items) {
             $handle = fopen('php://output', 'w');
@@ -405,7 +561,7 @@ class Index extends Component
                     $item->is_pack ? "Pack ({$item->pack_size})" : 'Loose unit',
                     $item->unit_price,
                     $item->subtotal,
-                    $item->sale?->invoice_number ?? ('INV-' . str_pad($item->sale_id, 5, '0', STR_PAD_LEFT)),
+                    $item->sale?->invoice_number ?? ('INV-'.str_pad($item->sale_id, 5, '0', STR_PAD_LEFT)),
                     $item->sale?->user?->name ?? '—',
                     $item->sale?->customer?->name ?? 'Walk-in',
                     ucfirst($item->sale?->payment_method ?? '—'),
@@ -418,11 +574,11 @@ class Index extends Component
 
     public function render()
     {
-        $elevated   = $this->isElevated();
-        $isCashier  = $this->isCashier();
-        $userId     = auth()->id();
+        $elevated = $this->isElevated();
+        $isCashier = $this->isCashier();
+        $userId = auth()->id();
 
-        $scopeFn = fn($q) => $q; // all staff see all sales
+        $scopeFn = fn ($q) => $q; // all staff see all sales
 
         // --- POS Sales ---
         $posHeaders = [
@@ -437,9 +593,9 @@ class Index extends Component
 
         $salesQuery = Sale::with('user', 'customer')
             ->tap($scopeFn)
-            ->when($this->search, fn($q) => $q->where('id', $this->search)
-                ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
-                ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
+            ->when($this->search, fn ($q) => $q->where('id', $this->search)
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%"))
+                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$this->search}%")));
 
         $filteredSales = $this->periodQuery(clone $salesQuery)->whereIn('status', ['paid', 'completed']);
         // Net of discount — total_amount is the pre-discount figure.
@@ -467,7 +623,7 @@ class Index extends Component
         // Sales with no recorded method still had money taken, but part of it
         // may never have arrived. Outstanding debt per sale lets that bucket
         // report cash actually collected rather than the amount billed.
-        $owedPerSale = \App\Models\Debt::query()
+        $owedPerSale = Debt::query()
             ->selectRaw('sale_id, SUM(COALESCE(amount_owed, 0) - COALESCE(amount_paid, 0)) AS still_owed')
             ->groupBy('sale_id')
             ->pluck('still_owed', 'sale_id');
@@ -483,7 +639,7 @@ class Index extends Component
 
         $creditUsed = 0.0;
         $changeGiven = 0.0;
-        $unrecorded  = 0.0;
+        $unrecorded = 0.0;
 
         foreach ((clone $filteredSales)->get(['id', 'total_amount', 'coupon_discount', 'payment_details']) as $paid) {
             $details = $paid->payment_details;
@@ -492,6 +648,7 @@ class Index extends Component
             if (! is_array($details)) {
                 // Older sales stored no breakdown; report rather than guess.
                 $unrecorded += $actuallyTaken($paid);
+
                 continue;
             }
 
@@ -535,7 +692,7 @@ class Index extends Component
         // not assumed to be cash.
         $repaidByMethod = ['cash' => 0.0, 'card' => 0.0, 'transfer' => 0.0];
 
-        $repayments = $this->periodQuery(\App\Models\DebtPayment::query())
+        $repayments = $this->periodQuery(DebtPayment::query())
             ->where('at_point_of_sale', false)
             ->selectRaw('payment_method, SUM(amount) AS total')
             ->groupBy('payment_method')
@@ -546,7 +703,7 @@ class Index extends Component
 
             if (array_key_exists($method, $repaidByMethod)) {
                 $repaidByMethod[$method] += (float) $repayment->total;
-                $collected[$method]      += (float) $repayment->total;
+                $collected[$method] += (float) $repayment->total;
             }
         }
 
@@ -558,7 +715,7 @@ class Index extends Component
             ? Sale::with('saleItems.product', 'saleItems.batch', 'user', 'customer')->find($this->viewSaleId)
             : null;
 
-        $returnableSale   = $this->returnSaleId
+        $returnableSale = $this->returnSaleId
             ? Sale::with('saleItems.product', 'saleItems.batch', 'customer')->find($this->returnSaleId)
             : null;
         $returnWindowHours = (int) AppSetting::get('return_window_hours', 48);
@@ -567,9 +724,9 @@ class Index extends Component
         // All staff can see and complete handovers regardless of who made the sale
         $handoverQuery = Sale::with('user', 'customer')
             ->where('status', 'paid')
-            ->when($this->search, fn($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
-                ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%"))
-                ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$this->search}%")));
+            ->when($this->search, fn ($q) => $q->where('invoice_number', 'like', "%{$this->search}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%"))
+                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$this->search}%")));
 
         $pendingHandoverCount = (clone $handoverQuery)->count();
         $pendingHandoverTotal = (clone $handoverQuery)->sum('total_amount');
@@ -586,11 +743,11 @@ class Index extends Component
         ];
 
         $onlineQuery = Order::with('customer', 'claimedByUser')
-            ->when($this->search, fn($q) => $q
+            ->when($this->search, fn ($q) => $q
                 ->where('order_number', 'like', "%{$this->search}%")
                 ->orWhere('guest_name', 'like', "%{$this->search}%")
                 ->orWhere('guest_phone', 'like', "%{$this->search}%")
-                ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%")));
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%")));
 
         $completedOnline = $this->periodQuery(clone $onlineQuery)->whereIn('status', ['completed', 'ready']);
         $onlineRevenue = $completedOnline->sum('total_amount');
@@ -631,18 +788,18 @@ class Index extends Component
                 $q->where(function ($sub) use ($term) {
                     $sub->whereHas('product', function ($p) use ($term) {
                         $p->where('name', 'like', "%{$term}%")
-                          ->orWhere('barcode', 'like', "%{$term}%")
-                          ->orWhere('sku', 'like', "%{$term}%");
+                            ->orWhere('barcode', 'like', "%{$term}%")
+                            ->orWhere('sku', 'like', "%{$term}%");
                     })
-                    ->orWhereHas('sale', function ($s) use ($term) {
-                        $s->where('invoice_number', 'like', "%{$term}%")
-                          ->orWhere('id', $term)
-                          ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"))
-                          ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$term}%"));
-                    })
-                    ->orWhereHas('batch', function ($b) use ($term) {
-                        $b->where('batch_number', 'like', "%{$term}%");
-                    });
+                        ->orWhereHas('sale', function ($s) use ($term) {
+                            $s->where('invoice_number', 'like', "%{$term}%")
+                                ->orWhere('id', $term)
+                                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$term}%"))
+                                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+                        })
+                        ->orWhereHas('batch', function ($b) use ($term) {
+                            $b->where('batch_number', 'like', "%{$term}%");
+                        });
                 });
             });
 
@@ -657,39 +814,39 @@ class Index extends Component
         $returnsCount = $this->periodQuery(SaleReturn::query())->count();
 
         return view('livewire.sales.index', [
-            'returnsCount'         => $returnsCount,
-            'returnableSale'       => $returnableSale,
-            'returnWindowHours'    => $returnWindowHours,
-            'elevated'             => $elevated,
-            'isCashier'            => $isCashier,
-            'posHeaders'           => $posHeaders,
-            'sales'                => $sales,
-            'viewSale'             => $viewSale,
-            'totalRevenue'         => $totalRevenue,
-            'totalProfit'          => $totalProfit,
-            'totalTransactions'    => $totalTransactions,
-            'totalItemsSold'       => $totalItemsSold,
-            'avgSale'              => $avgSale,
-            'collected'            => $collected,
-            'cashCollected'        => $cashCollected,
-            'cashRefunded'         => $cashRefunded,
-            'creditUsed'           => $creditUsed,
-            'unrecordedCash'       => $unrecorded,
-            'onlineHeaders'        => $onlineHeaders,
-            'onlineOrders'         => $onlineOrders,
-            'viewOrder'            => $viewOrder,
-            'onlineRevenue'        => $onlineRevenue,
-            'onlineTransactions'   => $onlineTransactions,
-            'pendingOnlineCount'   => $pendingOnlineCount,
+            'returnsCount' => $returnsCount,
+            'returnableSale' => $returnableSale,
+            'returnWindowHours' => $returnWindowHours,
+            'elevated' => $elevated,
+            'isCashier' => $isCashier,
+            'posHeaders' => $posHeaders,
+            'sales' => $sales,
+            'viewSale' => $viewSale,
+            'totalRevenue' => $totalRevenue,
+            'totalProfit' => $totalProfit,
+            'totalTransactions' => $totalTransactions,
+            'totalItemsSold' => $totalItemsSold,
+            'avgSale' => $avgSale,
+            'collected' => $collected,
+            'cashCollected' => $cashCollected,
+            'cashRefunded' => $cashRefunded,
+            'creditUsed' => $creditUsed,
+            'unrecordedCash' => $unrecorded,
+            'onlineHeaders' => $onlineHeaders,
+            'onlineOrders' => $onlineOrders,
+            'viewOrder' => $viewOrder,
+            'onlineRevenue' => $onlineRevenue,
+            'onlineTransactions' => $onlineTransactions,
+            'pendingOnlineCount' => $pendingOnlineCount,
             'onlinePaymentBreakdown' => $onlinePaymentBreakdown,
-            'handoverSales'        => $handoverSales,
+            'handoverSales' => $handoverSales,
             'pendingHandoverCount' => $pendingHandoverCount,
             'pendingHandoverTotal' => $pendingHandoverTotal,
-            'itemHeaders'                => $itemHeaders,
-            'soldItems'                  => $soldItems,
-            'soldItemsCount'             => $soldItemsCount,
-            'soldItemsTotalValue'        => $soldItemsTotalValue,
-            'soldDistinctProductsCount'  => $soldDistinctProductsCount,
+            'itemHeaders' => $itemHeaders,
+            'soldItems' => $soldItems,
+            'soldItemsCount' => $soldItemsCount,
+            'soldItemsTotalValue' => $soldItemsTotalValue,
+            'soldDistinctProductsCount' => $soldDistinctProductsCount,
         ]);
     }
 }

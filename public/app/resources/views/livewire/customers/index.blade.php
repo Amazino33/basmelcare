@@ -17,8 +17,13 @@
         @endscope
 
         @scope('cell_phone', $customer)
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
                 <span>{{ $customer->phone ?? '—' }}</span>
+                @if($customer->credit_balance > 0)
+                    <span class="badge badge-warning badge-xs font-semibold" title="Change Owed / Stored Credit">
+                        ₦{{ number_format($customer->credit_balance, 0) }} Change
+                    </span>
+                @endif
                 @if($customer->isOptedOutOfBroadcasts())
                     <span class="badge badge-error badge-outline badge-xs" title="Opted out of marketing broadcasts">Opted Out</span>
                 @endif
@@ -238,6 +243,29 @@
                     <span>Purchase history, medical records and account balances are not available to promoters.</span>
                 </div>
             @else
+            <!-- Change Owed / Stored Credit Balance -->
+            <div class="flex items-center justify-between p-3 rounded-lg bg-base-200 mb-4 border border-base-300">
+                <div class="flex items-center gap-2.5">
+                    <x-icon name="o-banknotes" class="w-5 h-5 shrink-0 text-warning" />
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wider text-base-content/70">
+                            Change Owed / Stored Credit
+                        </div>
+                        <div class="text-base font-bold {{ $viewCustomer->credit_balance > 0 ? 'text-warning' : 'text-base-content/70' }}">
+                            ₦{{ number_format($viewCustomer->credit_balance, 2) }}
+                        </div>
+                    </div>
+                </div>
+                @if($this->canManageCredit())
+                    <x-button
+                        label="Adjust / Correct"
+                        wire:click="openCreditAdjustment({{ $viewCustomer->id }})"
+                        icon="o-pencil"
+                        class="btn-xs btn-outline btn-warning"
+                    />
+                @endif
+            </div>
+
             <!-- Quick Stats -->
             <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="bg-base-200 rounded p-2 text-center">
@@ -444,6 +472,21 @@
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.mrModal = false" />
                 <x-button label="Save Record" type="submit" class="btn-primary" />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
+
+    <!-- Adjust Customer Credit Modal -->
+    <x-modal wire:model="creditAdjustModal" title="Adjust Customer Credit / Change" box-class="max-w-sm">
+        <x-form wire:submit="saveCreditAdjustment">
+            <p class="text-xs text-base-content/70 mb-3">
+                Correct the customer's stored credit balance. A non-cash audit record will be logged with your explanation.
+            </p>
+            <x-input label="New Credit Balance" wire:model="new_credit_balance" prefix="₦" type="number" step="0.01" />
+            <x-textarea label="Reason for Correction" wire:model="credit_adjust_reason" placeholder="e.g. ₦400 mistakenly entered at checkout..." rows="2" />
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.creditAdjustModal = false" />
+                <x-button label="Save Correction" type="submit" class="btn-warning" icon="o-check" />
             </x-slot:actions>
         </x-form>
     </x-modal>

@@ -3,7 +3,6 @@
 namespace App\Livewire\DebtBook;
 
 use App\Livewire\Concerns\DeniesAuditorWrites;
-
 use App\Models\Debt;
 use App\Models\DebtPayment;
 use Livewire\Component;
@@ -16,19 +15,32 @@ class Index extends Component
     use Toast, WithPagination;
 
     public string $search = '';
+
     public string $statusFilter = 'outstanding';
 
     // Payment form
     public ?int $payDebtId = null;
+
     public string $pay_amount = '';
+
     public string $pay_method = 'cash';
+
     public string $pay_note = '';
+
     public bool $payModal = false;
+
     public ?int $lastDebtPaymentId = null;
 
     // Details
     public ?int $viewDebtId = null;
+
     public bool $detailsDrawer = false;
+
+    // Debt adjustment
+    public bool $adjustDebtModal = false;
+    public ?int $adjustDebtId = null;
+    public string $new_amount_owed = '';
+    public string $debt_adjust_reason = '';
 
     public function openPayment($debtId)
     {
@@ -42,7 +54,9 @@ class Index extends Component
 
     public function recordPayment()
     {
-        if ($this->blockedAsAuditor()) return;
+        if ($this->blockedAsAuditor()) {
+            return;
+        }
 
         $this->validate([
             'pay_amount' => 'required|numeric|min:0.01',
@@ -54,7 +68,8 @@ class Index extends Component
         $amount = (float) $this->pay_amount;
 
         if ($amount > $debt->balance) {
-            $this->error('Payment exceeds outstanding balance (₦' . number_format($debt->balance, 2) . ').');
+            $this->error('Payment exceeds outstanding balance (₦'.number_format($debt->balance, 2).').');
+
             return;
         }
 
@@ -76,7 +91,7 @@ class Index extends Component
 
         $this->lastDebtPaymentId = $debtPayment->id;
         $this->payModal = false;
-        $this->success('Payment of ₦' . number_format($amount, 2) . ' recorded.');
+        $this->success('Payment of ₦'.number_format($amount, 2).' recorded.');
         $this->reset(['payDebtId', 'pay_amount', 'pay_method', 'pay_note']);
         $this->dispatch('open-debt-receipt', id: $debtPayment->id);
     }
@@ -85,6 +100,86 @@ class Index extends Component
     {
         $this->viewDebtId = $debtId;
         $this->detailsDrawer = true;
+    }
+
+    public function canManage(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
+    }
+
+    public function openAdjustDebt(int $debtId): void
+    {
+        if (! $this->canManage()) {
+            $this->error('Only a branch manager or admin can adjust debts.');
+            return;
+        }
+
+        $debt = Debt::findOrFail($debtId);
+        $this->adjustDebtId       = $debtId;
+        $this->new_amount_owed    = (string) $debt->amount_owed;
+        $this->debt_adjust_reason = '';
+        $this->adjustDebtModal    = true;
+    }
+
+    public function saveAdjustDebt(): void
+    {
+        if ($this->blockedAsAuditor()) return;
+        if (! $this->canManage()) {
+            $this->error('Only a branch manager or admin can adjust debts.');
+            return;
+        }
+
+        $debt = Debt::findOrFail($this->adjustDebtId);
+
+        $this->validate([
+            'new_amount_owed'    => ['required', 'numeric', 'min:0'],
+            'debt_adjust_reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $newOwed = round((float) $this->new_amount_owed, 2);
+        $oldOwed = (float) $debt->amount_owed;
+
+        $debt->amount_owed = $newOwed;
+        $balance = max(0, $newOwed - (float) ($debt->amount_paid ?? 0));
+        $debt->status = $balance <= 0.001 ? 'paid' : ((float) ($debt->amount_paid ?? 0) > 0 ? 'partial' : 'unpaid');
+        $debt->save();
+
+        $this->adjustDebtModal = false;
+        $this->reset(['adjustDebtId', 'new_amount_owed', 'debt_adjust_reason']);
+        $this->success("Debt #{$debt->id} amount owed adjusted from ₦" . number_format($oldOwed, 2) . " to ₦" . number_format($newOwed, 2) . ".");
+    }
+
+    public function voidDebtPayment(int $paymentId): void
+    {
+        if ($this->blockedAsAuditor()) return;
+        if (! $this->canManage()) {
+            $this->error('Only a branch manager or admin can void debt payments.');
+            return;
+        }
+
+        $payment = DebtPayment::with('debt')->findOrFail($paymentId);
+
+        if (str_starts_with($payment->note ?? '', '[VOIDED]')) {
+            $this->warning('This payment has already been voided.');
+            return;
+        }
+
+        $managerName = auth()->user()->name ?? 'Branch Manager';
+        $amount = (float) $payment->amount;
+        $debt = $payment->debt;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($payment, $debt, $amount, $managerName) {
+            $debt->amount_paid = max(0, (float) ($debt->amount_paid ?? 0) - $amount);
+            $debt->status = ((float) $debt->amount_owed - (float) $debt->amount_paid) <= 0.001 ? 'paid' : ((float) $debt->amount_paid > 0 ? 'partial' : 'unpaid');
+            $debt->save();
+
+            $payment->update([
+                'note' => "[VOIDED by {$managerName}] " . ($payment->note ?? 'Mistaken payment voided'),
+                'amount' => 0.00,
+            ]);
+        });
+
+        $this->success("Debt payment #{$payment->id} voided and reversed.");
     }
 
     public function render()
@@ -101,7 +196,7 @@ class Index extends Component
         ];
 
         $debtsQuery = Debt::with('customer', 'sale')
-            ->when($this->search, fn($q) => $q->whereHas('customer', fn($c) => $c->where('name', 'like', "%{$this->search}%")));
+            ->when($this->search, fn ($q) => $q->whereHas('customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%")));
 
         if ($this->statusFilter === 'outstanding') {
             $debtsQuery->whereIn('status', ['unpaid', 'partial']);

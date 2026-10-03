@@ -9,6 +9,7 @@ use App\Models\MedicalRecord;
 use App\Models\PromoterCode;
 use App\Models\ReferralCommission;
 use App\Services\WhatsAppService;
+use Illuminate\Database\QueryException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -16,47 +17,79 @@ use Mary\Traits\Toast;
 
 class Index extends Component
 {
-    use Toast, WithPagination, WithFileUploads;
+    use Toast, WithFileUploads, WithPagination;
 
     public string $search = '';
+
     public string $name = '';
+
     public string $type = 'retail';
+
     public string $phone = '';
+
     public string $email = '';
+
     public string $address = '';
+
     public string $notes = '';
+
     public ?int $customerId = null;
+
     public bool $broadcast_opt_out = false;
+
     public bool $modal = false;
 
     // OTP verification for promoter commissions
     public bool $otpModal = false;
+
     public string $otpCode = '';
+
     public string $otpError = '';
+
     public ?int $pendingCommissionCustomerId = null;
+
     public string $pendingPhone = '';
 
     // Wi-Fi code handover
     public bool $codeModal = false;
+
     public ?int $issuedCodeId = null;
+
     public string $issuedCode = '';
+
     public bool $codeSent = false;
+
     public bool $codeRedeemed = false;
+
     public bool $noSmartDevice = false;
+
     public string $otpChannel = '';
+
     public float $earnedAmount = 0;
 
     // Customer profile drawer
     public ?int $viewCustomerId = null;
+
     public bool $profileDrawer = false;
+
+    // Credit adjustment
+    public bool $creditAdjustModal = false;
+    public string $new_credit_balance = '';
+    public string $credit_adjust_reason = '';
 
     // Medical record form
     public string $mr_title = '';
+
     public string $mr_type = 'prescription';
+
     public string $mr_details = '';
+
     public string $mr_date = '';
+
     public string $mr_note = '';
+
     public $mr_file = null;
+
     public bool $mrModal = false;
 
     /**
@@ -68,7 +101,7 @@ class Index extends Component
         $roles = auth()->user()->role ?? [];
 
         return in_array('promoter', $roles)
-            && !array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
+            && ! array_intersect($roles, ['admin', 'pharmacist', 'branch_manager', 'sales', 'cashier']);
     }
 
     /** Medical records are clinical: only a pharmacist or admin may write them. */
@@ -91,23 +124,24 @@ class Index extends Component
 
     public function save()
     {
-        $user       = auth()->user();
+        $user = auth()->user();
         $isPromoter = $this->isPromoter();
 
         // Promoters may only ever create; they cannot edit existing records.
         if ($isPromoter && $this->customerId) {
             $this->modal = false;
             $this->error('Promoters cannot edit customer records.');
+
             return;
         }
 
         $this->validate([
-            'name'    => 'required|string|max:255',
-            'type'    => 'required|in:retail,wholesale',
-            'phone'   => ($isPromoter && !$this->customerId) ? 'required|string|max:20' : 'nullable|string|max:20',
-            'email'   => 'nullable|email|max:255',
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:retail,wholesale',
+            'phone' => ($isPromoter && ! $this->customerId) ? 'required|string|max:20' : 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
             'address' => 'nullable|string',
-            'notes'   => 'nullable|string',
+            'notes' => 'nullable|string',
         ]);
 
         $phone = Customer::normalizePhone($this->phone);
@@ -115,11 +149,12 @@ class Index extends Component
         // Reject a number already on file, in any spelling.
         if ($phone) {
             $clash = Customer::where('phone', $phone)
-                ->when($this->customerId, fn($q) => $q->whereKeyNot($this->customerId))
+                ->when($this->customerId, fn ($q) => $q->whereKeyNot($this->customerId))
                 ->first();
 
             if ($clash) {
-                $this->addError('phone', 'This phone number is already registered to ' . $clash->name . '.');
+                $this->addError('phone', 'This phone number is already registered to '.$clash->name.'.');
+
                 return;
             }
         }
@@ -127,16 +162,17 @@ class Index extends Component
         // A promoter must not verify against a phone they control themselves.
         if ($isPromoter && $phone && $phone === Customer::normalizePhone($user->phone)) {
             $this->addError('phone', 'You cannot register a customer using your own phone number.');
+
             return;
         }
 
         $data = [
-            'name'    => $this->name,
-            'type'    => $this->type,
-            'phone'   => $phone,
-            'email'   => $this->email,
+            'name' => $this->name,
+            'type' => $this->type,
+            'phone' => $phone,
+            'email' => $this->email,
             'address' => $this->address,
-            'notes'   => $this->notes,
+            'notes' => $this->notes,
         ];
 
         if ($this->customerId) {
@@ -148,16 +184,17 @@ class Index extends Component
             $this->modal = false;
             $this->success('Customer updated.');
             $this->reset(['name', 'type', 'phone', 'email', 'address', 'notes', 'customerId', 'broadcast_opt_out']);
+
             return;
         }
 
         $customer = Customer::create(array_merge($data, [
-            'registered_by'        => auth()->id(),
+            'registered_by' => auth()->id(),
             'broadcast_opt_out_at' => $this->broadcast_opt_out ? now() : null,
         ]));
 
         if ($isPromoter) {
-            $otp  = $customer->generateOtp();
+            $otp = $customer->generateOtp();
             // How the OTP reached them tells us whether they can use Wi-Fi at all.
             $this->otpChannel = $this->sendOtp($customer->phone, $otp);
             $sent = $this->otpChannel !== WhatsAppService::FAILED;
@@ -174,13 +211,14 @@ class Index extends Component
 
             if ($sent) {
                 $this->pendingCommissionCustomerId = $customer->id;
-                $this->pendingPhone  = $customer->phone;
-                $this->otpCode  = '';
+                $this->pendingPhone = $customer->phone;
+                $this->otpCode = '';
                 $this->otpError = '';
                 $this->otpModal = true;
             } else {
                 $this->warning('Customer added, but OTP could not be sent — check WhatsApp/SMS settings. No commission logged.');
             }
+
             return;
         }
 
@@ -193,6 +231,7 @@ class Index extends Component
     {
         if (empty(trim($this->otpCode))) {
             $this->otpError = 'Please enter the OTP.';
+
             return;
         }
 
@@ -202,32 +241,36 @@ class Index extends Component
             ->where('registered_by', auth()->id())
             ->first();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->otpModal = false;
-            $this->modal    = false;
+            $this->modal = false;
             $this->resetPendingOtp();
             $this->error('Customer not found, or not registered by you.');
+
             return;
         }
 
         if (PromoterCode::where('customer_id', $customer->id)->exists()) {
             $this->otpModal = false;
-            $this->modal    = false;
+            $this->modal = false;
             $this->resetPendingOtp();
             $this->error('A Wi-Fi code has already been issued for this customer.');
+
             return;
         }
 
         if ($customer->otpAttemptsExhausted()) {
             $this->otpError = 'Too many incorrect attempts. Tap Resend to get a new code.';
+
             return;
         }
 
-        if (!$customer->verifyOtp(trim($this->otpCode))) {
+        if (! $customer->verifyOtp(trim($this->otpCode))) {
             $remaining = max(0, Customer::OTP_MAX_ATTEMPTS - (int) $customer->fresh()->otp_attempts);
             $this->otpError = $remaining > 0
                 ? "Incorrect or expired OTP. {$remaining} attempt(s) left."
                 : 'Too many incorrect attempts. Tap Resend to get a new code.';
+
             return;
         }
 
@@ -241,41 +284,42 @@ class Index extends Component
 
         try {
             $code = PromoterCode::create([
-                'code'          => PromoterCode::generateCode(),
-                'user_id'       => auth()->id(),
-                'customer_id'   => $customer->id,
+                'code' => PromoterCode::generateCode(),
+                'user_id' => auth()->id(),
+                'customer_id' => $customer->id,
                 'delivered_via' => $this->otpChannel,
-                'valid_until'   => today(),
+                'valid_until' => today(),
                 // Never usable, so don't leave a live code lying around.
-                'revoked_at'    => $noSmartDevice ? now() : null,
+                'revoked_at' => $noSmartDevice ? now() : null,
             ]);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             $this->otpModal = false;
-            $this->modal    = false;
+            $this->modal = false;
             $this->resetPendingOtp();
             $this->error('A Wi-Fi code has already been issued for this customer.');
+
             return;
         }
 
-        $this->issuedCodeId  = $code->id;
-        $this->issuedCode    = $code->code;
+        $this->issuedCodeId = $code->id;
+        $this->issuedCode = $code->code;
         $this->noSmartDevice = $noSmartDevice;
-        $this->codeRedeemed  = false;
+        $this->codeRedeemed = false;
 
         if ($noSmartDevice) {
             // They can never connect, so the promoter is paid now rather than
             // being penalised for the customer's handset.
             $this->earnedAmount = $this->recordCommission($customer);
             $this->codeRedeemed = true;
-            $this->codeSent     = $this->sendNoDeviceMessage($customer->phone);
+            $this->codeSent = $this->sendNoDeviceMessage($customer->phone);
         } else {
             $this->codeSent = $this->sendCode($customer->phone, $code->code);
         }
 
-        $this->otpModal  = false;
+        $this->otpModal = false;
         $this->codeModal = true;
-        $this->otpCode   = '';
-        $this->otpError  = '';
+        $this->otpCode = '';
+        $this->otpError = '';
     }
 
     /** Records the promoter's commission for this customer, returning the amount. */
@@ -285,11 +329,11 @@ class Index extends Component
 
         try {
             ReferralCommission::create([
-                'user_id'     => auth()->id(),
+                'user_id' => auth()->id(),
                 'customer_id' => $customer->id,
-                'amount'      => $amount,
+                'amount' => $amount,
             ]);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             // Unique (user_id, customer_id) — already paid for this customer.
             return (float) ReferralCommission::where('user_id', auth()->id())
                 ->where('customer_id', $customer->id)->value('amount');
@@ -304,11 +348,11 @@ class Index extends Component
      */
     private function sendNoDeviceMessage(string $phone): bool
     {
-        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $name = AppSetting::get('pharmacy_name', 'BasmelCare');
         $message = "Welcome to {$name}!";
 
         if ($offer = $this->couponMessage()) {
-            $message .= ' ' . $offer;
+            $message .= ' '.$offer;
         } else {
             $message .= ' Thank you for registering with us.';
         }
@@ -339,7 +383,7 @@ class Index extends Component
     public function closeCodeModal(): void
     {
         $this->codeModal = false;
-        $this->modal     = false;   // closes the shared dialog
+        $this->modal = false;   // closes the shared dialog
         $this->issuedCodeId = null;
         $this->issuedCode = '';
         $this->codeRedeemed = false;
@@ -351,14 +395,14 @@ class Index extends Component
 
     private function sendCode(string $phone, string $code): bool
     {
-        $name  = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $name = AppSetting::get('pharmacy_name', 'BasmelCare');
         $hours = (int) AppSetting::get('voucher_validity_hours', 24);
 
         $message = "Welcome to {$name}! Your free Wi-Fi code is: *{$code}*. "
-            . "Connect to the {$name} network and enter it to get {$hours} hours of internet.";
+            ."Connect to the {$name} network and enter it to get {$hours} hours of internet.";
 
         if ($offer = $this->couponMessage()) {
-            $message .= ' ' . $offer;
+            $message .= ' '.$offer;
         }
 
         return app(WhatsAppService::class)->send($phone, $message);
@@ -385,18 +429,18 @@ class Index extends Component
             return null;
         }
 
-        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
-        $line    = "Show this code at {$name} for {$coupon->offerSummary()}: *{$coupon->code}*.";
+        $name = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $line = "Show this code at {$name} for {$coupon->offerSummary()}: *{$coupon->code}*.";
         $conditions = $coupon->conditionsSummary();
 
-        return $conditions ? $line . ' ' . $conditions : $line;
+        return $conditions ? $line.' '.$conditions : $line;
     }
 
     private function resetPendingOtp(): void
     {
         $this->pendingCommissionCustomerId = null;
         $this->pendingPhone = '';
-        $this->otpCode  = '';
+        $this->otpCode = '';
         $this->otpError = '';
     }
 
@@ -406,16 +450,18 @@ class Index extends Component
             ->where('registered_by', auth()->id())
             ->first();
 
-        if (!$customer || !$customer->phone) {
+        if (! $customer || ! $customer->phone) {
             $this->otpError = 'Cannot resend — customer not found, or not registered by you.';
+
             return;
         }
 
         if (ReferralCommission::where('customer_id', $customer->id)->exists()) {
             $this->otpModal = false;
-            $this->modal    = false;
+            $this->modal = false;
             $this->resetPendingOtp();
             $this->error('A commission has already been recorded for this customer.');
+
             return;
         }
 
@@ -423,10 +469,11 @@ class Index extends Component
         if ($customer->otp_sent_at && $customer->otp_sent_at->diffInSeconds(now()) < 60) {
             $wait = 60 - $customer->otp_sent_at->diffInSeconds(now());
             $this->otpError = "Please wait {$wait}s before requesting another code.";
+
             return;
         }
 
-        $otp  = $customer->generateOtp();
+        $otp = $customer->generateOtp();
         $sent = $this->sendOtp($customer->phone, $otp);
 
         if ($sent) {
@@ -445,7 +492,7 @@ class Index extends Component
         $customer?->clearOtp();
 
         $this->otpModal = false;
-        $this->modal    = false;
+        $this->modal = false;
         $this->resetPendingOtp();
         $this->warning('Customer added without verification. No commission logged.');
     }
@@ -453,7 +500,7 @@ class Index extends Component
     /** @return string one of the WhatsAppService VIA_* / FAILED constants */
     private function sendOtp(string $phone, string $otp): string
     {
-        $name    = AppSetting::get('pharmacy_name', 'BasmelCare');
+        $name = AppSetting::get('pharmacy_name', 'BasmelCare');
         $message = "Your {$name} registration code is: *{$otp}*. Valid for 10 minutes.";
 
         return app(WhatsAppService::class)->deliver($phone, $message);
@@ -463,6 +510,7 @@ class Index extends Component
     {
         if ($this->isPromoter()) {
             $this->error('Promoters cannot edit customer records.');
+
             return;
         }
 
@@ -482,6 +530,7 @@ class Index extends Component
     {
         if ($this->isPromoter()) {
             $this->error('Promoters cannot modify broadcast preferences.');
+
             return;
         }
 
@@ -500,6 +549,7 @@ class Index extends Component
     {
         if ($this->isPromoter()) {
             $this->error('Promoters cannot delete customer records.');
+
             return;
         }
 
@@ -511,8 +561,9 @@ class Index extends Component
     {
         // Promoters may only open profiles of customers they registered.
         if ($this->isPromoter()
-            && !Customer::where('id', $id)->where('registered_by', auth()->id())->exists()) {
+            && ! Customer::where('id', $id)->where('registered_by', auth()->id())->exists()) {
             $this->error('You can only view customers you registered.');
+
             return;
         }
 
@@ -520,10 +571,76 @@ class Index extends Component
         $this->profileDrawer = true;
     }
 
+    public function canManageCredit(): bool
+    {
+        return (bool) array_intersect(auth()->user()->role ?? [], ['admin', 'branch_manager']);
+    }
+
+    public function openCreditAdjustment(int $customerId): void
+    {
+        if (! $this->canManageCredit()) {
+            $this->error('Only an admin or branch manager can adjust credit balances.');
+            return;
+        }
+
+        $customer = Customer::findOrFail($customerId);
+        $this->viewCustomerId       = $customer->id;
+        $this->new_credit_balance   = (string) $customer->credit_balance;
+        $this->credit_adjust_reason = '';
+        $this->creditAdjustModal    = true;
+    }
+
+    public function saveCreditAdjustment(): void
+    {
+        if (! $this->canManageCredit()) {
+            $this->error('Only an admin or branch manager can adjust credit balances.');
+            return;
+        }
+
+        if (! $this->viewCustomerId) {
+            return;
+        }
+
+        $customer = Customer::findOrFail($this->viewCustomerId);
+
+        $this->validate([
+            'new_credit_balance'   => ['required', 'numeric', 'min:0'],
+            'credit_adjust_reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $oldBalance = (float) $customer->credit_balance;
+        $newBalance = round((float) $this->new_credit_balance, 2);
+
+        if (abs($newBalance - $oldBalance) < 0.001) {
+            $this->error('The new balance is identical to the current balance.');
+            return;
+        }
+
+        $managerName = auth()->user()->name ?? 'Branch Manager';
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $oldBalance, $newBalance, $managerName) {
+            $customer->update(['credit_balance' => $newBalance]);
+
+            \App\Models\CreditPayout::create([
+                'customer_id'    => $customer->id,
+                'amount'         => 0.00,
+                'balance_before' => $oldBalance,
+                'balance_after'  => $newBalance,
+                'cashier_id'     => auth()->id(),
+                'note'           => "Adjustment by {$managerName}: {$this->credit_adjust_reason} (Balance corrected from ₦" . number_format($oldBalance, 2) . " to ₦" . number_format($newBalance, 2) . ")",
+            ]);
+        });
+
+        $this->creditAdjustModal = false;
+        $this->reset(['new_credit_balance', 'credit_adjust_reason']);
+        $this->success("Credit balance for {$customer->name} corrected to ₦" . number_format($newBalance, 2) . ".");
+    }
+
     public function openMedicalRecord()
     {
         if (! $this->canEditMedicalRecords()) {
             $this->error('Only a pharmacist or admin can add medical records.');
+
             return;
         }
 
@@ -536,6 +653,7 @@ class Index extends Component
     {
         if (! $this->canEditMedicalRecords()) {
             $this->error('Only a pharmacist or admin can add medical records.');
+
             return;
         }
 
@@ -570,6 +688,7 @@ class Index extends Component
     {
         if (! $this->canEditMedicalRecords()) {
             $this->error('Only a pharmacist or admin can delete medical records.');
+
             return;
         }
 
@@ -599,21 +718,21 @@ class Index extends Component
 
             if (! $isPromoter) {
                 $relations = [
-                    'sales' => fn($q) => $q->latest()->limit(10),
-                    'orders' => fn($q) => $q->with('items.product')->latest()->limit(10),
-                    'debts' => fn($q) => $q->whereIn('status', ['unpaid', 'partial']),
-                    'appointments' => fn($q) => $q->with('staff')->latest()->limit(5),
+                    'sales' => fn ($q) => $q->latest()->limit(10),
+                    'orders' => fn ($q) => $q->with('items.product')->latest()->limit(10),
+                    'debts' => fn ($q) => $q->whereIn('status', ['unpaid', 'partial']),
+                    'appointments' => fn ($q) => $q->with('staff')->latest()->limit(5),
                 ];
 
                 // Not merely hidden — never loaded for staff without clinical access.
                 if ($this->canViewMedicalRecords()) {
-                    $relations['medicalRecords'] = fn($q) => $q->latest();
+                    $relations['medicalRecords'] = fn ($q) => $q->latest();
                     $relations[] = 'medicalRecords.recorder';
                 }
             }
 
             $viewCustomer = Customer::with($relations)
-                ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
+                ->when($isPromoter, fn ($q) => $q->where('registered_by', auth()->id()))
                 ->find($this->viewCustomerId);
         }
 
@@ -623,8 +742,8 @@ class Index extends Component
             'canViewRecords' => $this->canViewMedicalRecords(),
             'canEditRecords' => $this->canEditMedicalRecords(),
             'customers' => Customer::with('registeredBy')
-                ->when($isPromoter, fn($q) => $q->where('registered_by', auth()->id()))
-                ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+                ->when($isPromoter, fn ($q) => $q->where('registered_by', auth()->id()))
+                ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
                 ->latest()->paginate(20),
             'viewCustomer' => $viewCustomer,
         ]);
